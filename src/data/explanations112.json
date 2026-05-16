@@ -1,0 +1,34 @@
+{
+  "112-Q005": {
+    "answer": "A",
+    "explanation": "(B)(C)根據GEM20110714，GC有顯著較長的PFS和OS，但有較多的grade 3 and 4 hematologic adverse events\n(D)根據JUPITER-02，toripalimab plus GC有顯著較長的PFS，median OS not reached\n(E)根據Keynote-048 subgroups analysis，pembrolizumab-chemotherapy在CPS<1 OS改善沒有顯著差異",
+    "explanationFigures": []
+  },
+  "112-Q009": {
+    "answer": "B",
+    "explanation": "此題考轉移性荷爾蒙受體陽性乳癌的治療架構\nACDE選項考Ovary function suppression, ET及CDK4/6i的應用\nB選項考二線後的治療選項\n\n附上2024 ASCO education book 架構圖(https://ascopubs.org/doi/10.1200/EDBK_432442), 需注意圖中4L+未包含Dato-Dxd (TROPION Breast 01, PFS benefit+, OS benefit-, 於2025/01 FDA approved, 可能為今年考點)\n\n目前荷爾蒙受體陽性轉移性乳癌第一線治療\nEndocrine therapy（SERM or Aromatase inhibitor） + CDK4/6i\nCDK4/6i選擇可以是\n- Palbociclib（PALOMA-2)\n- Ribociclib（MONALEESA-2）\n- Abemaciclib（MONARCH-3）\nPALOMA-2, MONALEESA-2, MONARCH-3皆收錄停經後乳癌患者，而由MONALESSA-7（Ribociclib使用於Pre- or Peri-menopause）將CDK4/6i使用範圍拓展到停經前患者也可使用。\n\n依照題幹\nA: Postmenopause需要連續無月經達12個月，7個月前仍有月經來上尚無法判定已屬於Postmenopause，可檢測FSH/Estradiol判斷卵巢功能是否尚未符合停經後標準評估需不需要進行Ovary function suppression（OFS）。\nB: 錯誤, 二線標準治療為SERD為主幹(如Fulvestrant), 再依照PI3k-Akt pathway alteration有無選用PI3K inhibitor（如alpelisib in SOLAR-1 study and BYlieve study）或AKT inhibitor（capivasertib in capitello-291）, 目前PI3k-Akt pathway alteration相關的抑制劑皆是在二線（含）以後。\nC, D: 如果不驗FSH/E2, 只以連續無月經月份判斷病患仍不算進入Postmenopause故需要OFS，方式可以採手術（卵巢切除）或是藥物（GnRHa）。進行OFS後治療就同Postmenopausal，使用Endocrine therapy + CDK4/6i。\nE: 沒有Visceral crisis優先用ET+CDK4/6i，只是因為之前的研究沒有收Visceral crisis病患。有Visceral crisis也並非就需把化療拉到第一線, 此觀念已在RIGHTCHOICE study後被推翻（ET+Ribociclib vs Chemotherapy, ORR皆約6成, 且PFS與Adverse event表現都是CDK4/6i組更好, 故不管有無Visceral crisis, ET+CDK4/6i都可以作為第一線選項)",
+    "explanationFigures": [
+      "/explanations/112/Q009/Treatment_of_HR+_Breast_cancer_algorithm.png"
+    ]
+  },
+  "112-Q010": {
+    "answer": "C",
+    "explanation": "除NGS外四個選項皆可，HR+ HER2-早期乳癌, 可以下列四種基因檢測綜合判斷是否需要加上化療。\n\n檢測平台         LN          檢測參數及判定\nOncoType DX ->   -    | 21 gene及含量判定recurrence score\nMammaPrint  -> - or + | 70 gene 判斷風險(需合併clinical risk評估臨床風險)\nPAM50       ->   -    | 50 gene 判斷屬於哪種subtype(Luminal A, B, HER2, basal-like)及風險\nEndopredict -> - or + | 12 gene 判斷EPclin Score",
+    "explanationFigures": []
+  },
+  "112-Q011": {
+    "answer": "A or C",
+    "explanation": "A可能有爭議但C明顯錯誤，故應選C\n\nA：大多數統計資料Uveal melanoma中Choroid佔85-90%，剩餘是iris及ciliary body合計佔剩餘10%。無法確定考題用的是哪份資料。需要知道最多的是Choroid即可。\n\nB: uveal melanoma\n腫瘤發展早期的突變跟G-protein α subunits相關, 佔85%(GNAQ and GNA11, mutually exclusive), 會活化下游MAPK pathway。\n腫瘤發展晚期的突變為BAP1, SF3B1(splicing factor 3B subunit 1), EIF1AX (eukaryotic translation initiation factor 1A X-linked)。有SF3B1, EIF1AX突變預後比較好。BAP1可以是germline(亦容易造成mesothelioma)。\nRef: Devita 12th p. 1605\n\nC錯誤：Immunotherapy在Cutaneous melanoma的成功沒有辦法複製在Uveal melanoma, 舉例以CheckMate-067為例（Ref C2），ORR分別為Ipi 19%, Nivo 44.9%, Ipi+Nivo 58.3%。而Uveal melanoma即便用Ipi+Nivo combined IO therapy ORR也只有13.7%（Meta-analysis, Ref C2）, 其於大多資料Nivo單用約5%, Ipi單用為0%。Devita亦有提出可能原因為Uveal melanoma TMB明顯不如Cutaneous melanoma。\n\nRef C1: https://ascopubs.org/doi/10.1200/JCO.2021.39.15_suppl.9506\nRef C2: https://ascopubs.org/doi/10.1200/JCO.2022.40.16_suppl.9534\n\nD: 最常見metastasis分為liver (>90%), Lung (24%), Bone (16%), 最少的是LN & Brain (<6%)\n\nE: \nMetastatic uveal melanoma的ICI治療效果明顯不如Cutaneous melanoma, 應依照IMCgp100-202 trial結果優先考慮於HLA-A*02:01 positive病人使用Tebentafusp(BiTE targeting gp100 & CD3), 於trial中使用Tebentafusp對比於physician choice therapy(Pembro, Ipi or DTIC)有OS benefit, 此藥物另一個特色是即使用Tebentafusp後best reponse是PD的病人存活也比使用physician choice therapy後best response是PD的病人來得長（表示此藥物的機轉特別, response即便連SD都無法達到也能延長存活）。\n\n若病患為HLA-A*02:01 negative則才考慮IO, 若病患為liver dominant disease則應該積極考慮local therapy。附上uptodate流程圖更利於理解。",
+    "explanationFigures": [
+      "/explanations/112/Q011/Metastatic_uveal_melanoma_treatment.png"
+    ]
+  },
+  "112-Q012": {
+    "answer": "A",
+    "explanation": "針對不適合手術或無法手術病患, curative RT為最建議方式。化療可考慮與RT並用作爲CCRT(with cisplatin, PF, TP, cetuximab等radiosensitizer)。僅在不適合手術或RT的病患使用immunotherapy（如Cemiplimab, Pembrolizumab）作為systemic treatment。\n\n附2025 Ver2 NCCN guideline for Squamous Cell Skin Cancer供參考",
+    "explanationFigures": [
+      "/explanations/112/Q012/NCCN_guideline.png",
+      "/explanations/112/Q012/Agents_combined_with_RT.png"
+    ]
+  }
+}
