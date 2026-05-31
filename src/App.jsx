@@ -1607,15 +1607,21 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
         <div>
           <button className="link-button" onClick={() => setOpen(!open)}>{open ? '收合' : '展開'}</button>
           <span className="qid">{question.id}</span>
+          {question.notionUrl && (
+            <a className="notion-link" href={question.notionUrl} target="_blank" rel="noreferrer" title="Open Notion explanation">🔗</a>
+          )}
           <span className="pill">{question.cancer}</span>
           <span className="pill soft">{question.topic}</span>
           {question.trials?.map((trial) => <span key={trial} className="pill trial">{trial}</span>)}
         </div>
         <div className="question-actions">
-          {onEdit && <button className="secondary" onClick={() => onEdit(question.id)}>編輯題目</button>}
-          <button className={stat.bookmarked ? 'bookmark active' : 'bookmark'} onClick={toggleBookmark}>
-            {stat.bookmarked ? '★ 已標記' : '☆ 標記'}
-          </button>
+            {onEdit && <button className="secondary" onClick={() => onEdit(question.id)}>編輯題目</button>}
+            {question.notionUrl && (
+              <button className="secondary" onClick={() => window.open(question.notionUrl, '_blank')}>Notion 詳解</button>
+            )}
+            <button className={stat.bookmarked ? 'bookmark active' : 'bookmark'} onClick={toggleBookmark}>
+              {stat.bookmarked ? '★ 已標記' : '☆ 標記'}
+            </button>
         </div>
       </div>
 
@@ -1649,6 +1655,10 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
               );
             })}
           </div>
+                <label>
+                  Notion URL
+                  <input value={draft.notionUrl} onChange={(e) => setDraft((p) => ({ ...p, notionUrl: e.target.value }))} placeholder="https://www.notion.so/..." />
+                </label>
 
           {hideAnswerUntilSubmit && !revealed && (
             <div className="submit-row">
@@ -1751,6 +1761,7 @@ function QuestionEditor({ question, override, onSave, onCancel }) {
     topic: override?.topic ?? question?.topic ?? '',
     trials: (override?.trials ?? question?.trials ?? []).join(', '),
     explanation: override?.explanation ?? question?.explanation ?? '',
+    notionUrl: override?.notionUrl ?? question?.notionUrl ?? '',
   });
 
   useEffect(() => {
@@ -1770,6 +1781,7 @@ function QuestionEditor({ question, override, onSave, onCancel }) {
       topic: question.topic || '',
       trials: (question.trials || []).join(', '),
       explanation: question.explanation || '',
+      notionUrl: question.notionUrl || '',
     });
   }, [question?.id]);
 
@@ -1782,6 +1794,7 @@ function QuestionEditor({ question, override, onSave, onCancel }) {
       topic: draft.topic,
       trials: draft.trials.split(',').map((t) => t.trim()).filter(Boolean),
       explanation: draft.explanation,
+      notionUrl: draft.notionUrl,
     };
     onSave(question.id, nextOverride);
     onCancel();
@@ -2139,6 +2152,7 @@ function QuestionEditPanel({ state, onSaveOverride }) {
   const [topic, setTopic] = useState('');
   const [trials, setTrials] = useState('');
   const [explanation, setExplanation] = useState('');
+  const [notionUrl, setNotionUrl] = useState('');
   const [message, setMessage] = useState('');
 
   useEffect(() => {
@@ -2166,6 +2180,7 @@ function QuestionEditPanel({ state, onSaveOverride }) {
     setTopic(override.topic ?? q.topic ?? '');
     setTrials((override.trials || q.trials || []).join(', '));
     setExplanation(override.explanation ?? q.explanation ?? '');
+    setNotionUrl(override.notionUrl ?? q.notionUrl ?? '');
     setMessage('');
   }, [year, number, state.questionOverrides]);
 
@@ -2180,6 +2195,7 @@ function QuestionEditPanel({ state, onSaveOverride }) {
       topic,
       trials: trials.split(',').map((t) => t.trim()).filter(Boolean),
       explanation,
+      notionUrl,
     };
     onSaveOverride(id, nextOverride);
     setMessage(`${id} 已儲存修正`);
@@ -2236,6 +2252,7 @@ function QuestionEditPanel({ state, onSaveOverride }) {
             <label>Trials<input value={trials} onChange={(e) => setTrials(e.target.value)} placeholder="逗號分隔" /></label>
           </div>
           <label>詳解<textarea value={explanation} onChange={(e) => setExplanation(e.target.value)} /></label>
+          <label>Notion URL<input value={notionUrl} onChange={(e) => setNotionUrl(e.target.value)} placeholder="https://www.notion.so/..." /></label>
 
           <div className="inline-actions">
             <button className="primary" onClick={save}>儲存修正</button>
