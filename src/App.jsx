@@ -1737,47 +1737,51 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
 }
 
 function QuestionEditor({ question, override, onSave, onCancel }) {
-  const [stem, setStem] = useState(question.stem || '');
-  const [optionA, setOptionA] = useState((override?.options?.A ?? question.options?.A) || '');
-  const [optionB, setOptionB] = useState((override?.options?.B ?? question.options?.B) || '');
-  const [optionC, setOptionC] = useState((override?.options?.C ?? question.options?.C) || '');
-  const [optionD, setOptionD] = useState((override?.options?.D ?? question.options?.D) || '');
-  const [optionE, setOptionE] = useState((override?.options?.E ?? question.options?.E) || '');
-  const [answer, setAnswer] = useState(override?.answer ?? question.answer ?? '');
-  const [cancer, setCancer] = useState(override?.cancer ?? question.cancer ?? '');
-  const [topic, setTopic] = useState(override?.topic ?? question.topic ?? '');
-  const [trials, setTrials] = useState((override?.trials || question.trials || []).join(', '));
-  const [explanation, setExplanation] = useState(override?.explanation ?? question.explanation ?? '');
+  const [draft, setDraft] = useState({
+    stem: question?.stem || '',
+    options: {
+      A: (override?.options?.A ?? question?.options?.A) || '',
+      B: (override?.options?.B ?? question?.options?.B) || '',
+      C: (override?.options?.C ?? question?.options?.C) || '',
+      D: (override?.options?.D ?? question?.options?.D) || '',
+      E: (override?.options?.E ?? question?.options?.E) || '',
+    },
+    answer: override?.answer ?? question?.answer ?? '',
+    cancer: override?.cancer ?? question?.cancer ?? '',
+    topic: override?.topic ?? question?.topic ?? '',
+    trials: (override?.trials ?? question?.trials ?? []).join(', '),
+    explanation: override?.explanation ?? question?.explanation ?? '',
+  });
 
   useEffect(() => {
-    setStem(question.stem || '');
-    setOptionA((override?.options?.A ?? question.options?.A) || '');
-    setOptionB((override?.options?.B ?? question.options?.B) || '');
-    setOptionC((override?.options?.C ?? question.options?.C) || '');
-    setOptionD((override?.options?.D ?? question.options?.D) || '');
-    setOptionE((override?.options?.E ?? question.options?.E) || '');
-    setAnswer(override?.answer ?? question.answer ?? '');
-    setCancer(override?.cancer ?? question.cancer ?? '');
-    setTopic(override?.topic ?? question.topic ?? '');
-    setTrials((override?.trials || question.trials || []).join(', '));
-    setExplanation(override?.explanation ?? question.explanation ?? '');
-  }, [question.id, override]);
+    if (!question) return;
+
+    setDraft({
+      stem: question.stem || '',
+      options: {
+        A: question.options?.A || '',
+        B: question.options?.B || '',
+        C: question.options?.C || '',
+        D: question.options?.D || '',
+        E: question.options?.E || '',
+      },
+      answer: question.answer || '',
+      cancer: question.cancer || '',
+      topic: question.topic || '',
+      trials: (question.trials || []).join(', '),
+      explanation: question.explanation || '',
+    });
+  }, [question?.id]);
 
   const save = () => {
     const nextOverride = {
-      stem,
-      options: {
-        A: optionA,
-        B: optionB,
-        C: optionC,
-        D: optionD,
-        E: optionE,
-      },
-      answer,
-      cancer,
-      topic,
-      trials: trials.split(',').map((t) => t.trim()).filter(Boolean),
-      explanation,
+      stem: draft.stem,
+      options: { ...draft.options },
+      answer: draft.answer,
+      cancer: draft.cancer,
+      topic: draft.topic,
+      trials: draft.trials.split(',').map((t) => t.trim()).filter(Boolean),
+      explanation: draft.explanation,
     };
     onSave(question.id, nextOverride);
     onCancel();
@@ -1804,60 +1808,60 @@ function QuestionEditor({ question, override, onSave, onCancel }) {
 
       <label>
         題幹
-        <textarea value={stem} onChange={(e) => setStem(e.target.value)} />
+        <textarea value={draft.stem} onChange={(e) => setDraft((p) => ({ ...p, stem: e.target.value }))} />
       </label>
 
       <div className="options-grid">
         <label>
           選項 A
-          <input value={optionA} onChange={(e) => setOptionA(e.target.value)} />
+          <input value={draft.options.A} onChange={(e) => setDraft((p) => ({ ...p, options: { ...p.options, A: e.target.value } }))} />
         </label>
         <label>
           選項 B
-          <input value={optionB} onChange={(e) => setOptionB(e.target.value)} />
+          <input value={draft.options.B} onChange={(e) => setDraft((p) => ({ ...p, options: { ...p.options, B: e.target.value } }))} />
         </label>
         <label>
           選項 C
-          <input value={optionC} onChange={(e) => setOptionC(e.target.value)} />
+          <input value={draft.options.C} onChange={(e) => setDraft((p) => ({ ...p, options: { ...p.options, C: e.target.value } }))} />
         </label>
         <label>
           選項 D
-          <input value={optionD} onChange={(e) => setOptionD(e.target.value)} />
+          <input value={draft.options.D} onChange={(e) => setDraft((p) => ({ ...p, options: { ...p.options, D: e.target.value } }))} />
         </label>
         <label>
           選項 E
-          <input value={optionE} onChange={(e) => setOptionE(e.target.value)} />
+          <input value={draft.options.E} onChange={(e) => setDraft((p) => ({ ...p, options: { ...p.options, E: e.target.value } }))} />
         </label>
       </div>
 
       <div className="two-columns">
         <label>
           答案
-          <select value={answer} onChange={(e) => setAnswer(e.target.value)}>
+          <select value={draft.answer} onChange={(e) => setDraft((p) => ({ ...p, answer: e.target.value }))}>
             <option value="">尚未輸入</option>
             {['A', 'B', 'C', 'D', 'E'].map((optionKey) => <option key={optionKey} value={optionKey}>{optionKey}</option>)}
           </select>
         </label>
         <label>
           Cancer
-          <input value={cancer} onChange={(e) => setCancer(e.target.value)} />
+          <input value={draft.cancer} onChange={(e) => setDraft((p) => ({ ...p, cancer: e.target.value }))} />
         </label>
       </div>
 
       <div className="two-columns">
         <label>
           Topic
-          <input value={topic} onChange={(e) => setTopic(e.target.value)} />
+          <input value={draft.topic} onChange={(e) => setDraft((p) => ({ ...p, topic: e.target.value }))} />
         </label>
         <label>
           Trials
-          <input value={trials} onChange={(e) => setTrials(e.target.value)} placeholder="Use comma-separated values" />
+          <input value={draft.trials} onChange={(e) => setDraft((p) => ({ ...p, trials: e.target.value }))} placeholder="Use comma-separated values" />
         </label>
       </div>
 
       <label>
         詳解
-        <textarea value={explanation} onChange={(e) => setExplanation(e.target.value)} />
+        <textarea value={draft.explanation} onChange={(e) => setDraft((p) => ({ ...p, explanation: e.target.value }))} />
       </label>
 
       <div className="inline-actions">
