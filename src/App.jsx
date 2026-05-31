@@ -16,7 +16,13 @@ import {
 } from './firebase.js';
 
 const STORAGE_KEY = 'oncologyTracker.aiReview.v1';
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = (() => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+})();
 
 const defaultState = {
   sessions: {},
@@ -1655,10 +1661,6 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
               );
             })}
           </div>
-                <label>
-                  Notion URL
-                  <input value={draft.notionUrl} onChange={(e) => setDraft((p) => ({ ...p, notionUrl: e.target.value }))} placeholder="https://www.notion.so/..." />
-                </label>
 
           {hideAnswerUntilSubmit && !revealed && (
             <div className="submit-row">
