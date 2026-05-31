@@ -27,6 +27,7 @@ const defaultState = {
     preferredCancers: [],
   },
   planProgress: {},
+  questionOverrides: {},
   cloudMeta: {
     updatedAt: null,
     device: null,
@@ -1329,6 +1330,10 @@ function mergeCloudState(localState, cloudState) {
       ...(localState.planProgress || {}),
       ...(cloudState.planProgress || {}),
     },
+    questionOverrides: {
+      ...(localState.questionOverrides || {}),
+      ...(cloudState.questionOverrides || {}),
+    },
     cloudMeta: {
       ...(localState.cloudMeta || {}),
       ...(cloudState.cloudMeta || {}),
@@ -1358,9 +1363,36 @@ function addDays(dateString, days) {
   return date.toISOString().slice(0, 10);
 }
 
-function getQuestion(id) {
+function findQuestionById(id) {
   return questionBank.find((q) => q.id === id);
 }
+
+function applyQuestionOverride(question, overrides = {}) {
+  if (!question) return question;
+  const override = overrides[question.id];
+  if (!override) return question;
+
+  return {
+    ...question,
+    ...override,
+    options: {
+      ...(question.options || {}),
+      ...(override.options || {}),
+    },
+    trials: override.trials ?? question.trials,
+  };
+}
+
+function getQuestion(state, id) {
+  const base = findQuestionById(id);
+  return applyQuestionOverride(base, state?.questionOverrides || {});
+}
+
+const getQuestionWithOverride = (id, state) => {
+  const original = findQuestionById(id);
+  if (!original) return null;
+  return applyQuestionOverride(original, state?.questionOverrides || {});
+};
 
 function emptyStat() {
   return {
@@ -1413,13 +1445,17 @@ function shuffleStable(items) {
 function generateDailyQuestionIds(state) {
   const { dailyCount, preferredYears, preferredCancers } = state.settings;
   const pool = questionBank.filter((q) => {
-    const yearOk = preferredYears.length === 0 || preferredYears.includes(q.year);
-    const cancerOk = preferredCancers.length === 0 || preferredCancers.includes(q.cancer);
-    return yearOk && cancerOk;
+    const question = getQuestionWithOverride(q.id, state);
+    const yearOk = preferredYears.length === 0 || preferredYears.includes(question?.year);
+    const cancerOk = preferredCancers.length === 0 || preferredCancers.includes(question?.cancer);
+    return question && yearOk && cancerOk;
   });
 
   const ranked = pool
-    .map((q) => ({ q, stat: getStat(state, q.id), priority: classifyPriority(q, getStat(state, q.id)) }))
+    .map((q) => {
+      const resolved = getQuestionWithOverride(q.id, state);
+      return { q: resolved, stat: getStat(state, q.id), priority: classifyPriority(resolved, getStat(state, q.id)) };
+    })
     .sort((a, b) => {
       if (a.priority !== b.priority) return a.priority - b.priority;
       const ar = wrongRate(a.stat);
@@ -1436,7 +1472,10 @@ function generateDailyQuestionIds(state) {
 
 function getCancerSummary(state) {
   return cancerCategories.map((cancer) => {
-    const ids = questionBank.filter((q) => q.cancer === cancer).map((q) => q.id);
+    const ids = questionBank
+      .map((q) => getQuestionWithOverride(q.id, state))
+      .filter((q) => q?.cancer === cancer)
+      .map((q) => q.id);
     const attempts = ids.reduce((sum, id) => sum + getStat(state, id).attempts, 0);
     const wrong = ids.reduce((sum, id) => sum + getStat(state, id).wrong, 0);
     const correct = ids.reduce((sum, id) => sum + getStat(state, id).correct, 0);
@@ -1455,8 +1494,8 @@ function getCancerSummary(state) {
 
 function buildAiPrompt(state) {
   const weak = questionBank
-    .map((q) => ({ q, stat: getStat(state, q.id) }))
-    .filter(({ stat }) => stat.wrong > 0 || stat.bookmarked)
+    .map((q) => ({ q: getQuestionWithOverride(q.id, state), stat: getStat(state, q.id) }))
+    .filter(({ q, stat }) => q && (stat.wrong > 0 || stat.bookmarked))
     .sort((a, b) => wrongRate(b.stat) - wrongRate(a.stat) || b.stat.wrong - a.stat.wrong)
     .slice(0, 15);
 
@@ -1474,7 +1513,7 @@ function MetricCard({ label, value, sub }) {
 }
 
 
-function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswerUntilSubmit = false }) {
+function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswerUntilSubmit = false, onEdit }) {
   const initialAnswer = stat.correctAnswer || question.answer || '';
   const [selected, setSelected] = useState(stat.userAnswer || '');
   const [correctAnswer, setCorrectAnswer] = useState(initialAnswer);
@@ -1572,9 +1611,12 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
           <span className="pill soft">{question.topic}</span>
           {question.trials?.map((trial) => <span key={trial} className="pill trial">{trial}</span>)}
         </div>
-        <button className={stat.bookmarked ? 'bookmark active' : 'bookmark'} onClick={toggleBookmark}>
-          {stat.bookmarked ? '★ 已標記' : '☆ 標記'}
-        </button>
+        <div className="question-actions">
+          {onEdit && <button className="secondary" onClick={() => onEdit(question.id)}>編輯題目</button>}
+          <button className={stat.bookmarked ? 'bookmark active' : 'bookmark'} onClick={toggleBookmark}>
+            {stat.bookmarked ? '★ 已標記' : '☆ 標記'}
+          </button>
+        </div>
       </div>
 
       <p className="stem">{question.stem}</p>
@@ -1694,6 +1736,137 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
   );
 }
 
+function QuestionEditor({ question, override, onSave, onCancel }) {
+  const [stem, setStem] = useState(question.stem || '');
+  const [optionA, setOptionA] = useState((override?.options?.A ?? question.options?.A) || '');
+  const [optionB, setOptionB] = useState((override?.options?.B ?? question.options?.B) || '');
+  const [optionC, setOptionC] = useState((override?.options?.C ?? question.options?.C) || '');
+  const [optionD, setOptionD] = useState((override?.options?.D ?? question.options?.D) || '');
+  const [optionE, setOptionE] = useState((override?.options?.E ?? question.options?.E) || '');
+  const [answer, setAnswer] = useState(override?.answer ?? question.answer ?? '');
+  const [cancer, setCancer] = useState(override?.cancer ?? question.cancer ?? '');
+  const [topic, setTopic] = useState(override?.topic ?? question.topic ?? '');
+  const [trials, setTrials] = useState((override?.trials || question.trials || []).join(', '));
+  const [explanation, setExplanation] = useState(override?.explanation ?? question.explanation ?? '');
+
+  useEffect(() => {
+    setStem(question.stem || '');
+    setOptionA((override?.options?.A ?? question.options?.A) || '');
+    setOptionB((override?.options?.B ?? question.options?.B) || '');
+    setOptionC((override?.options?.C ?? question.options?.C) || '');
+    setOptionD((override?.options?.D ?? question.options?.D) || '');
+    setOptionE((override?.options?.E ?? question.options?.E) || '');
+    setAnswer(override?.answer ?? question.answer ?? '');
+    setCancer(override?.cancer ?? question.cancer ?? '');
+    setTopic(override?.topic ?? question.topic ?? '');
+    setTrials((override?.trials || question.trials || []).join(', '));
+    setExplanation(override?.explanation ?? question.explanation ?? '');
+  }, [question.id, override]);
+
+  const save = () => {
+    const nextOverride = {
+      stem,
+      options: {
+        A: optionA,
+        B: optionB,
+        C: optionC,
+        D: optionD,
+        E: optionE,
+      },
+      answer,
+      cancer,
+      topic,
+      trials: trials.split(',').map((t) => t.trim()).filter(Boolean),
+      explanation,
+    };
+    onSave(question.id, nextOverride);
+    onCancel();
+  };
+
+  const clearOverride = () => {
+    if (window.confirm('確定清除此題的編輯內容嗎？')) {
+      onSave(question.id, null);
+      onCancel();
+    }
+  };
+
+  return (
+    <div className="question-editor panel">
+      <div className="section-head">
+        <div>
+          <h3>{question.id} 編輯題目</h3>
+          <p className="muted">覆蓋題幹、選項、答案、癌別、題目主題、trial、詳解。</p>
+        </div>
+        <div className="inline-actions mini">
+          <button className="secondary" onClick={onCancel}>取消</button>
+        </div>
+      </div>
+
+      <label>
+        題幹
+        <textarea value={stem} onChange={(e) => setStem(e.target.value)} />
+      </label>
+
+      <div className="options-grid">
+        <label>
+          選項 A
+          <input value={optionA} onChange={(e) => setOptionA(e.target.value)} />
+        </label>
+        <label>
+          選項 B
+          <input value={optionB} onChange={(e) => setOptionB(e.target.value)} />
+        </label>
+        <label>
+          選項 C
+          <input value={optionC} onChange={(e) => setOptionC(e.target.value)} />
+        </label>
+        <label>
+          選項 D
+          <input value={optionD} onChange={(e) => setOptionD(e.target.value)} />
+        </label>
+        <label>
+          選項 E
+          <input value={optionE} onChange={(e) => setOptionE(e.target.value)} />
+        </label>
+      </div>
+
+      <div className="two-columns">
+        <label>
+          答案
+          <select value={answer} onChange={(e) => setAnswer(e.target.value)}>
+            <option value="">尚未輸入</option>
+            {['A', 'B', 'C', 'D', 'E'].map((optionKey) => <option key={optionKey} value={optionKey}>{optionKey}</option>)}
+          </select>
+        </label>
+        <label>
+          Cancer
+          <input value={cancer} onChange={(e) => setCancer(e.target.value)} />
+        </label>
+      </div>
+
+      <div className="two-columns">
+        <label>
+          Topic
+          <input value={topic} onChange={(e) => setTopic(e.target.value)} />
+        </label>
+        <label>
+          Trials
+          <input value={trials} onChange={(e) => setTrials(e.target.value)} placeholder="Use comma-separated values" />
+        </label>
+      </div>
+
+      <label>
+        詳解
+        <textarea value={explanation} onChange={(e) => setExplanation(e.target.value)} />
+      </label>
+
+      <div className="inline-actions">
+        <button className="primary" onClick={save}>儲存編輯</button>
+        {override && <button className="secondary" onClick={clearOverride}>清除編輯</button>}
+      </div>
+    </div>
+  );
+}
 
 
 function SyncPanel({
@@ -1830,7 +2003,7 @@ function ManualExplanationPanel({ state, onUpdateStat }) {
     const manualItems = Object.entries(state.stats)
       .filter(([, stat]) => stat.explanation || stat.correctAnswer || stat.wrongNotes)
       .map(([id, stat]) => {
-        const q = getQuestion(id);
+        const q = getQuestionWithOverride(id, state);
         return {
           id,
           year: q?.year || null,
@@ -1947,12 +2120,141 @@ function ManualExplanationPanel({ state, onUpdateStat }) {
   );
 }
 
+function QuestionEditPanel({ state, onSaveOverride }) {
+  const [year, setYear] = useState('113');
+  const [number, setNumber] = useState('');
+  const [foundQuestion, setFoundQuestion] = useState(null);
+  const [stem, setStem] = useState('');
+  const [optionA, setOptionA] = useState('');
+  const [optionB, setOptionB] = useState('');
+  const [optionC, setOptionC] = useState('');
+  const [optionD, setOptionD] = useState('');
+  const [optionE, setOptionE] = useState('');
+  const [answer, setAnswer] = useState('');
+  const [cancer, setCancer] = useState('');
+  const [topic, setTopic] = useState('');
+  const [trials, setTrials] = useState('');
+  const [explanation, setExplanation] = useState('');
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    const numericNumber = Number(String(number).replace(/\D/g, ''));
+    if (!numericNumber) {
+      setFoundQuestion(null);
+      return;
+    }
+    const q = questionBank.find((qq) => Number(qq.year) === Number(year) && Number(qq.number) === numericNumber) || null;
+    setFoundQuestion(q);
+    if (!q) {
+      setStem(''); setOptionA(''); setOptionB(''); setOptionC(''); setOptionD(''); setOptionE(''); setAnswer(''); setCancer(''); setTopic(''); setTrials(''); setExplanation('');
+      setMessage('找不到該題，請確認年度與題號');
+      return;
+    }
+    const override = state.questionOverrides?.[q.id] || {};
+    setStem(override.stem ?? q.stem ?? '');
+    setOptionA(override.options?.A ?? q.options?.A ?? '');
+    setOptionB(override.options?.B ?? q.options?.B ?? '');
+    setOptionC(override.options?.C ?? q.options?.C ?? '');
+    setOptionD(override.options?.D ?? q.options?.D ?? '');
+    setOptionE(override.options?.E ?? q.options?.E ?? '');
+    setAnswer(override.answer ?? q.answer ?? '');
+    setCancer(override.cancer ?? q.cancer ?? '');
+    setTopic(override.topic ?? q.topic ?? '');
+    setTrials((override.trials || q.trials || []).join(', '));
+    setExplanation(override.explanation ?? q.explanation ?? '');
+    setMessage('');
+  }, [year, number, state.questionOverrides]);
+
+  const save = () => {
+    if (!foundQuestion) { setMessage('找不到題目，無法儲存'); return; }
+    const id = foundQuestion.id;
+    const nextOverride = {
+      stem,
+      options: { A: optionA, B: optionB, C: optionC, D: optionD, E: optionE },
+      answer,
+      cancer,
+      topic,
+      trials: trials.split(',').map((t) => t.trim()).filter(Boolean),
+      explanation,
+    };
+    onSaveOverride(id, nextOverride);
+    setMessage(`${id} 已儲存修正`);
+  };
+
+  const restore = () => {
+    if (!foundQuestion) { setMessage('找不到題目'); return; }
+    if (!window.confirm('確定還原回原始題目？這會移除所有覆寫內容。')) return;
+    onSaveOverride(foundQuestion.id, null);
+    setMessage(`${foundQuestion.id} 已還原為原始題目`);
+  };
+
+  return (
+    <main className="panel">
+      <div className="section-head">
+        <div>
+          <h2>Question Edit</h2>
+          <p className="muted">搜尋題目後可直接修改題幹、選項、答案與其他欄位，變更會存在本機並同步到雲端。</p>
+        </div>
+      </div>
+
+      <div className="filters">
+        <select value={year} onChange={(e) => setYear(e.target.value)}>
+          <option>112</option>
+          <option>113</option>
+          <option>114</option>
+        </select>
+        <input value={number} onChange={(e) => setNumber(e.target.value)} placeholder="題號 (數字)" />
+        <div className="inline-actions">
+          <button className="secondary" onClick={() => { setNumber(''); setMessage(''); }}>清除</button>
+        </div>
+      </div>
+
+      {foundQuestion ? (
+        <div className="question-editor panel">
+          <h3>{foundQuestion.id} 編輯題目</h3>
+          <label>
+            題幹
+            <textarea value={stem} onChange={(e) => setStem(e.target.value)} />
+          </label>
+          <div className="options-grid">
+            <label>選項 A<input value={optionA} onChange={(e) => setOptionA(e.target.value)} /></label>
+            <label>選項 B<input value={optionB} onChange={(e) => setOptionB(e.target.value)} /></label>
+            <label>選項 C<input value={optionC} onChange={(e) => setOptionC(e.target.value)} /></label>
+            <label>選項 D<input value={optionD} onChange={(e) => setOptionD(e.target.value)} /></label>
+            <label>選項 E<input value={optionE} onChange={(e) => setOptionE(e.target.value)} /></label>
+          </div>
+          <div className="two-columns">
+            <label>正解<select value={answer} onChange={(e) => setAnswer(e.target.value)}><option value="">尚未輸入</option>{['A','B','C','D','E'].map((x)=>(<option key={x} value={x}>{x}</option>))}</select></label>
+            <label>Cancer<input value={cancer} onChange={(e) => setCancer(e.target.value)} /></label>
+          </div>
+          <div className="two-columns">
+            <label>Topic<input value={topic} onChange={(e) => setTopic(e.target.value)} /></label>
+            <label>Trials<input value={trials} onChange={(e) => setTrials(e.target.value)} placeholder="逗號分隔" /></label>
+          </div>
+          <label>詳解<textarea value={explanation} onChange={(e) => setExplanation(e.target.value)} /></label>
+
+          <div className="inline-actions">
+            <button className="primary" onClick={save}>儲存修正</button>
+            <button className="secondary" onClick={restore}>還原原始題目</button>
+            {message && <span className="save-message">{message}</span>}
+          </div>
+        </div>
+      ) : (
+        <div className="empty-state">
+          <p className="muted">請輸入年度與題號以載入題目。</p>
+          {message && <div className="error-text">{message}</div>}
+        </div>
+      )}
+    </main>
+  );
+}
 export default function App() {
   const [state, setState] = useState(loadState);
   const [tab, setTab] = useState('today');
   const [search, setSearch] = useState('');
   const [bankCancer, setBankCancer] = useState('All');
   const [bankYear, setBankYear] = useState('All');
+  const [editingQuestionId, setEditingQuestionId] = useState(null);
   const [aiPromptOpen, setAiPromptOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [syncStatus, setSyncStatus] = useState('尚未登入，資料目前只存在這台裝置。');
@@ -2058,6 +2360,18 @@ export default function App() {
     updateState((prev) => ({ ...prev, stats: { ...prev.stats, [id]: nextStat } }));
   };
 
+  const saveQuestionOverride = (id, override) => {
+    updateState((prev) => {
+      const nextOverrides = { ...(prev.questionOverrides || {}) };
+      if (override && Object.keys(override).length) {
+        nextOverrides[id] = override;
+      } else {
+        delete nextOverrides[id];
+      }
+      return { ...prev, questionOverrides: nextOverrides };
+    });
+  };
+
   const loginWithEmail = async (email, password) => {
     setSyncError('');
     setSyncStatus('登入中...');
@@ -2122,7 +2436,7 @@ export default function App() {
 
   const todaySession = state.sessions[TODAY];
   const todayIds = todaySession?.questionIds || [];
-  const todayQuestions = todayIds.map(getQuestion).filter(Boolean);
+  const todayQuestions = todayIds.map((id) => getQuestionWithOverride(id, state)).filter(Boolean);
 
   const createTodaySession = () => {
     const ids = generateDailyQuestionIds(state);
@@ -2142,13 +2456,13 @@ export default function App() {
   };
 
   const dueReview = useMemo(() => questionBank
-    .map((q) => ({ q, stat: getStat(state, q.id) }))
-    .filter(({ stat }) => stat.nextReviewDate && stat.nextReviewDate <= TODAY)
+    .map((q) => ({ q: getQuestionWithOverride(q.id, state), stat: getStat(state, q.id) }))
+    .filter(({ q, stat }) => q && stat.nextReviewDate && stat.nextReviewDate <= TODAY)
     .sort((a, b) => wrongRate(b.stat) - wrongRate(a.stat)), [state]);
 
   const weakQuestions = useMemo(() => questionBank
-    .map((q) => ({ q, stat: getStat(state, q.id) }))
-    .filter(({ stat }) => stat.wrong > 0 || stat.bookmarked)
+    .map((q) => ({ q: getQuestionWithOverride(q.id, state), stat: getStat(state, q.id) }))
+    .filter(({ q, stat }) => q && (stat.wrong > 0 || stat.bookmarked))
     .sort((a, b) => wrongRate(b.stat) - wrongRate(a.stat) || b.stat.wrong - a.stat.wrong), [state]);
 
   const summary = useMemo(() => {
@@ -2219,13 +2533,17 @@ export default function App() {
   };
 
 
-  const bankQuestions = useMemo(() => questionBank.filter((q) => {
-    const text = `${q.id} ${q.stem} ${Object.values(q.options || {}).join(' ')} ${(q.trials || []).join(' ')}`.toLowerCase();
-    const searchOk = !search || text.includes(search.toLowerCase());
-    const cancerOk = bankCancer === 'All' || q.cancer === bankCancer;
-    const yearOk = bankYear === 'All' || String(q.year) === String(bankYear);
-    return searchOk && cancerOk && yearOk;
-  }).slice(0, 80), [search, bankCancer, bankYear]);
+  const bankQuestions = useMemo(() => questionBank
+    .map((q) => getQuestionWithOverride(q.id, state))
+    .filter(Boolean)
+    .filter((q) => {
+      const text = `${q.id} ${q.stem} ${Object.values(q.options || {}).join(' ')} ${(q.trials || []).join(' ')}`.toLowerCase();
+      const searchOk = !search || text.includes(search.toLowerCase());
+      const cancerOk = bankCancer === 'All' || q.cancer === bankCancer;
+      const yearOk = bankYear === 'All' || String(q.year) === String(bankYear);
+      return searchOk && cancerOk && yearOk;
+    })
+    .slice(0, 80), [search, bankCancer, bankYear, state.questionOverrides]);
 
   const updateSettings = (patch) => {
     updateState((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } }));
@@ -2290,7 +2608,7 @@ export default function App() {
       )}
 
       <nav className="tabs">
-        {[['today', 'Daily Practice'], ['review', 'Review Queue'], ['bank', 'Question Bank'], ['manual', 'Manual Add'], ['analytics', 'Analytics'], ['plan', '100-Day Plan'], ['sync', 'Cloud Sync'], ['settings', 'Settings']].map(([key, label]) => (
+        {[['today', 'Daily Practice'], ['review', 'Review Queue'], ['bank', 'Question Bank'], ['manual', 'Manual Add'], ['question-edit', 'Question Edit'], ['analytics', 'Analytics'], ['plan', '100-Day Plan'], ['sync', 'Cloud Sync'], ['settings', 'Settings']].map(([key, label]) => (
           <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>
         ))}
       </nav>
@@ -2365,7 +2683,25 @@ export default function App() {
           </div>
           <p className="muted">顯示前 80 題，共符合 {bankQuestions.length} 題。</p>
           <div className="question-list">
-            {bankQuestions.map((q) => <QuestionCard key={q.id} question={q} stat={getStat(state, q.id)} onUpdateStat={updateStat} compact />)}
+            {bankQuestions.map((q) => (
+              <div key={q.id} className="bank-question-wrapper">
+                <QuestionCard
+                  question={q}
+                  stat={getStat(state, q.id)}
+                  onUpdateStat={updateStat}
+                  compact
+                  onEdit={(id) => setEditingQuestionId(id)}
+                />
+                {editingQuestionId === q.id && (
+                  <QuestionEditor
+                    question={q}
+                    override={state.questionOverrides?.[q.id]}
+                    onSave={saveQuestionOverride}
+                    onCancel={() => setEditingQuestionId(null)}
+                  />
+                )}
+              </div>
+            ))}
           </div>
         </main>
       )}
@@ -2373,6 +2709,10 @@ export default function App() {
 
       {tab === 'manual' && (
         <ManualExplanationPanel state={state} onUpdateStat={updateStat} />
+      )}
+
+      {tab === 'question-edit' && (
+        <QuestionEditPanel state={state} onSaveOverride={saveQuestionOverride} />
       )}
 
       {tab === 'analytics' && (
