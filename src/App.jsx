@@ -1879,6 +1879,11 @@ function QuestionEditor({ question, override, onSave, onCancel }) {
         <textarea value={draft.explanation} onChange={(e) => setDraft((p) => ({ ...p, explanation: e.target.value }))} />
       </label>
 
+      <label>
+        Notion URL
+        <input value={draft.notionUrl} onChange={(e) => setDraft((p) => ({ ...p, notionUrl: e.target.value }))} placeholder="https://www.notion.so/..." />
+      </label>
+
       <div className="inline-actions">
         <button className="primary" onClick={save}>儲存編輯</button>
         {override && <button className="secondary" onClick={clearOverride}>清除編輯</button>}
