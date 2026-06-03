@@ -1519,25 +1519,29 @@ function MetricCard({ label, value, sub }) {
 }
 
 
-function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswerUntilSubmit = false, onEdit }) {
+function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswerUntilSubmit = false, practiceMode = false, onEdit }) {
   const initialAnswer = stat.correctAnswer || question.answer || '';
-  const [selected, setSelected] = useState(stat.userAnswer || '');
+  const [selected, setSelected] = useState(practiceMode ? '' : stat.userAnswer || '');
   const [correctAnswer, setCorrectAnswer] = useState(initialAnswer);
   const [explanation, setExplanation] = useState(stat.explanation || question.explanation || '');
   const [wrongNotes, setWrongNotes] = useState(stat.wrongNotes || '');
   const [open, setOpen] = useState(!compact);
-  const [revealed, setRevealed] = useState(!hideAnswerUntilSubmit || Boolean(stat.lastAttemptAt));
+  const [revealed, setRevealed] = useState(
+    practiceMode ? false : (!hideAnswerUntilSubmit || Boolean(stat.lastAttemptAt))
+  );
   const [feedback, setFeedback] = useState('');
 
   useEffect(() => {
     const nextAnswer = stat.correctAnswer || question.answer || '';
-    setSelected(stat.userAnswer || '');
+    setSelected(practiceMode ? '' : stat.userAnswer || '');
     setCorrectAnswer(nextAnswer);
     setExplanation(stat.explanation || question.explanation || '');
     setWrongNotes(stat.wrongNotes || '');
-    setRevealed(!hideAnswerUntilSubmit || Boolean(stat.lastAttemptAt));
+    setRevealed(
+      practiceMode ? false : (!hideAnswerUntilSubmit || Boolean(stat.lastAttemptAt))
+    );
     setFeedback('');
-  }, [question.id, hideAnswerUntilSubmit]);
+  }, [question.id, hideAnswerUntilSubmit, practiceMode]);
 
   const answerIsSingleChoice = /^[A-E]$/.test(String(correctAnswer || '').trim().toUpperCase());
   const isCorrectSelection = selected && answerIsSingleChoice && selected === String(correctAnswer).trim().toUpperCase();
@@ -2662,7 +2666,14 @@ export default function App() {
           ) : (
             <div className="question-list">
               {todayQuestions.map((q) => (
-                <QuestionCard key={q.id} question={q} stat={getStat(state, q.id)} onUpdateStat={updateStat} hideAnswerUntilSubmit />
+                <QuestionCard
+                  key={`${todaySession?.createdAt || TODAY}-${q.id}`}
+                  question={q}
+                  stat={getStat(state, q.id)}
+                  onUpdateStat={updateStat}
+                  hideAnswerUntilSubmit
+                  practiceMode
+                />
               ))}
             </div>
           )}
