@@ -24,6 +24,7 @@ const TODAY = (() => {
   return `${y}-${m}-${day}`;
 })();
 
+
 const defaultState = {
   sessions: {},
   stats: {},
@@ -1590,16 +1591,26 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
 
   useEffect(() => {
     if (!practiceMode || !onPracticeChange) return;
-    onPracticeChange({ selected, revealed, correctAnswer, explanation, wrongNotes });
-  }, [selected, revealed, correctAnswer, explanation, wrongNotes, practiceMode, onPracticeChange]);
+    const current = practiceDraft || {};
+    const changed = current.selected !== selected || current.revealed !== revealed || current.correctAnswer !== correctAnswer || current.explanation !== explanation || current.wrongNotes !== wrongNotes;
+    if (changed) {
+      onPracticeChange({ selected, revealed, correctAnswer, explanation, wrongNotes });
+    }
+  }, [selected, revealed, correctAnswer, explanation, wrongNotes, practiceMode, onPracticeChange, practiceDraft]);
 
   const answerIsSingleChoice = /^[A-E]$/.test(String(correctAnswer || '').trim().toUpperCase());
   const isCorrectSelection = selected && answerIsSingleChoice && selected === String(correctAnswer).trim().toUpperCase();
 
   const recordRating = (rating) => {
+    if (practiceMode && practiceDraft?.rated) {
+      setFeedback('此題已評分，跳過重複紀錄。');
+      return;
+    }
+
     const previous = stat;
     const newAttempts = (previous.attempts || 0) + 1;
-    const isCorrect = rating !== 'Again';
+    // Determine correctness by comparing selected option to correctAnswer
+    const isCorrect = answerIsSingleChoice && selected === String(correctAnswer).trim().toUpperCase();
     const newCorrect = previous.correct + (isCorrect ? 1 : 0);
     const newWrong = previous.wrong + (isCorrect ? 0 : 1);
 
@@ -1635,6 +1646,11 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
     });
 
     setFeedback(`紀錄：${rating}，下次複習 ${interval} 天後`);
+
+    // Mark practiceDraft as rated so UI/logic won't double-record
+    if (practiceMode && onPracticeChange) {
+      onPracticeChange({ rated: true, rating });
+    }
   };
 
   const record = (result) => recordRating(result === 'correct' ? 'Good' : 'Again');
@@ -1908,59 +1924,59 @@ function QuestionEditor({ question, override, onSave, onCancel }) {
       <div className="options-grid">
         <label>
           選項 A
-          <input value={draft.options.A} onChange={(e) => setDraft((p) => ({ ...p, options: { ...p.options, A: e.target.value } }))} />
+          <input name="draft_optionA" value={draft.options.A} onChange={(e) => setDraft((p) => ({ ...p, options: { ...p.options, A: e.target.value } }))} />
         </label>
         <label>
           選項 B
-          <input value={draft.options.B} onChange={(e) => setDraft((p) => ({ ...p, options: { ...p.options, B: e.target.value } }))} />
+          <input name="draft_optionB" value={draft.options.B} onChange={(e) => setDraft((p) => ({ ...p, options: { ...p.options, B: e.target.value } }))} />
         </label>
         <label>
           選項 C
-          <input value={draft.options.C} onChange={(e) => setDraft((p) => ({ ...p, options: { ...p.options, C: e.target.value } }))} />
+          <input name="draft_optionC" value={draft.options.C} onChange={(e) => setDraft((p) => ({ ...p, options: { ...p.options, C: e.target.value } }))} />
         </label>
         <label>
           選項 D
-          <input value={draft.options.D} onChange={(e) => setDraft((p) => ({ ...p, options: { ...p.options, D: e.target.value } }))} />
+          <input name="draft_optionD" value={draft.options.D} onChange={(e) => setDraft((p) => ({ ...p, options: { ...p.options, D: e.target.value } }))} />
         </label>
         <label>
           選項 E
-          <input value={draft.options.E} onChange={(e) => setDraft((p) => ({ ...p, options: { ...p.options, E: e.target.value } }))} />
+          <input name="draft_optionE" value={draft.options.E} onChange={(e) => setDraft((p) => ({ ...p, options: { ...p.options, E: e.target.value } }))} />
         </label>
       </div>
 
       <div className="two-columns">
         <label>
           答案
-          <select value={draft.answer} onChange={(e) => setDraft((p) => ({ ...p, answer: e.target.value }))}>
+          <select name="draft_answer" value={draft.answer} onChange={(e) => setDraft((p) => ({ ...p, answer: e.target.value }))}>
             <option value="">尚未輸入</option>
             {['A', 'B', 'C', 'D', 'E'].map((optionKey) => <option key={optionKey} value={optionKey}>{optionKey}</option>)}
           </select>
         </label>
         <label>
           Cancer
-          <input value={draft.cancer} onChange={(e) => setDraft((p) => ({ ...p, cancer: e.target.value }))} />
+          <input name="draft_cancer" value={draft.cancer} onChange={(e) => setDraft((p) => ({ ...p, cancer: e.target.value }))} />
         </label>
       </div>
 
       <div className="two-columns">
         <label>
           Topic
-          <input value={draft.topic} onChange={(e) => setDraft((p) => ({ ...p, topic: e.target.value }))} />
+          <input name="draft_topic" value={draft.topic} onChange={(e) => setDraft((p) => ({ ...p, topic: e.target.value }))} />
         </label>
         <label>
           Trials
-          <input value={draft.trials} onChange={(e) => setDraft((p) => ({ ...p, trials: e.target.value }))} placeholder="Use comma-separated values" />
+          <input name="draft_trials" value={draft.trials} onChange={(e) => setDraft((p) => ({ ...p, trials: e.target.value }))} placeholder="Use comma-separated values" />
         </label>
       </div>
 
       <label>
         詳解
-        <textarea value={draft.explanation} onChange={(e) => setDraft((p) => ({ ...p, explanation: e.target.value }))} />
+        <textarea name="draft_explanation" value={draft.explanation} onChange={(e) => setDraft((p) => ({ ...p, explanation: e.target.value }))} />
       </label>
 
       <label>
         Notion URL
-        <input value={draft.notionUrl} onChange={(e) => setDraft((p) => ({ ...p, notionUrl: e.target.value }))} placeholder="https://www.notion.so/..." />
+        <input name="draft_notionUrl" value={draft.notionUrl} onChange={(e) => setDraft((p) => ({ ...p, notionUrl: e.target.value }))} placeholder="https://www.notion.so/..." />
       </label>
 
       <div className="inline-actions">
@@ -2017,11 +2033,11 @@ function SyncPanel({
         <div className="auth-grid">
           <label>
             Email
-            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="your@email.com" autoComplete="email" />
+            <input name="sync_email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="your@email.com" autoComplete="email" />
           </label>
           <label>
             Password
-            <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="至少 6 個字元" type="password" autoComplete="current-password" />
+            <input name="sync_password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="至少 6 個字元" type="password" autoComplete="current-password" />
           </label>
           <div className="inline-actions">
             <button className="primary" onClick={submitLogin}>登入同步</button>
@@ -2142,7 +2158,7 @@ function ManualExplanationPanel({ state, onUpdateStat }) {
       <div className="manual-grid">
         <label>
           年度
-          <select value={year} onChange={(e) => setYear(e.target.value)}>
+          <select name="manual_year" value={year} onChange={(e) => setYear(e.target.value)}>
             <option value="112">112</option>
             <option value="113">113</option>
             <option value="114">114</option>
@@ -2152,6 +2168,7 @@ function ManualExplanationPanel({ state, onUpdateStat }) {
         <label>
           題號
           <input
+            name="manual_number"
             value={number}
             onChange={(e) => setNumber(e.target.value)}
             placeholder="例如：23、023、Q023"
@@ -2198,6 +2215,7 @@ function ManualExplanationPanel({ state, onUpdateStat }) {
             <label>
               詳解 / guideline / trial note
               <textarea
+                name="manual_explanation"
                 value={explanation}
                 onChange={(e) => setExplanation(e.target.value)}
                 placeholder="建議格式：答案、考點、為什麼其他選項錯、相關 trial/guideline、記憶點。"
@@ -2206,6 +2224,7 @@ function ManualExplanationPanel({ state, onUpdateStat }) {
             <label>
               錯誤原因 / 弱點標籤
               <textarea
+                name="manual_wrongNotes"
                 value={wrongNotes}
                 onChange={(e) => setWrongNotes(e.target.value)}
                 placeholder="例如：endpoint 不熟、biomarker cutoff 忘記、drug toxicity 混淆、trial population 不熟。"
@@ -2304,12 +2323,12 @@ function QuestionEditPanel({ state, onSaveOverride }) {
       </div>
 
       <div className="filters">
-        <select value={year} onChange={(e) => setYear(e.target.value)}>
+        <select name="edit_year" value={year} onChange={(e) => setYear(e.target.value)}>
           <option>112</option>
           <option>113</option>
           <option>114</option>
         </select>
-        <input value={number} onChange={(e) => setNumber(e.target.value)} placeholder="題號 (數字)" />
+        <input name="edit_number" value={number} onChange={(e) => setNumber(e.target.value)} placeholder="題號 (數字)" />
         <div className="inline-actions">
           <button className="secondary" onClick={() => { setNumber(''); setMessage(''); }}>清除</button>
         </div>
@@ -2320,25 +2339,25 @@ function QuestionEditPanel({ state, onSaveOverride }) {
           <h3>{foundQuestion.id} 編輯題目</h3>
           <label>
             題幹
-            <textarea value={stem} onChange={(e) => setStem(e.target.value)} />
+            <textarea name="edit_stem" value={stem} onChange={(e) => setStem(e.target.value)} />
           </label>
           <div className="options-grid">
-            <label>選項 A<input value={optionA} onChange={(e) => setOptionA(e.target.value)} /></label>
-            <label>選項 B<input value={optionB} onChange={(e) => setOptionB(e.target.value)} /></label>
-            <label>選項 C<input value={optionC} onChange={(e) => setOptionC(e.target.value)} /></label>
-            <label>選項 D<input value={optionD} onChange={(e) => setOptionD(e.target.value)} /></label>
-            <label>選項 E<input value={optionE} onChange={(e) => setOptionE(e.target.value)} /></label>
-          </div>
-          <div className="two-columns">
-            <label>正解<select value={answer} onChange={(e) => setAnswer(e.target.value)}><option value="">尚未輸入</option>{['A','B','C','D','E'].map((x)=>(<option key={x} value={x}>{x}</option>))}</select></label>
-            <label>Cancer<input value={cancer} onChange={(e) => setCancer(e.target.value)} /></label>
-          </div>
-          <div className="two-columns">
-            <label>Topic<input value={topic} onChange={(e) => setTopic(e.target.value)} /></label>
-            <label>Trials<input value={trials} onChange={(e) => setTrials(e.target.value)} placeholder="逗號分隔" /></label>
-          </div>
-          <label>詳解<textarea value={explanation} onChange={(e) => setExplanation(e.target.value)} /></label>
-          <label>Notion URL<input value={notionUrl} onChange={(e) => setNotionUrl(e.target.value)} placeholder="https://www.notion.so/..." /></label>
+              <label>選項 A<input name="edit_optionA" value={optionA} onChange={(e) => setOptionA(e.target.value)} /></label>
+              <label>選項 B<input name="edit_optionB" value={optionB} onChange={(e) => setOptionB(e.target.value)} /></label>
+              <label>選項 C<input name="edit_optionC" value={optionC} onChange={(e) => setOptionC(e.target.value)} /></label>
+              <label>選項 D<input name="edit_optionD" value={optionD} onChange={(e) => setOptionD(e.target.value)} /></label>
+              <label>選項 E<input name="edit_optionE" value={optionE} onChange={(e) => setOptionE(e.target.value)} /></label>
+            </div>
+            <div className="two-columns">
+              <label>正解<select name="edit_answer" value={answer} onChange={(e) => setAnswer(e.target.value)}><option value="">尚未輸入</option>{['A','B','C','D','E'].map((x)=>(<option key={x} value={x}>{x}</option>))}</select></label>
+              <label>Cancer<input name="edit_cancer" value={cancer} onChange={(e) => setCancer(e.target.value)} /></label>
+            </div>
+            <div className="two-columns">
+              <label>Topic<input name="edit_topic" value={topic} onChange={(e) => setTopic(e.target.value)} /></label>
+              <label>Trials<input name="edit_trials" value={trials} onChange={(e) => setTrials(e.target.value)} placeholder="逗號分隔" /></label>
+            </div>
+            <label>詳解<textarea name="edit_explanation" value={explanation} onChange={(e) => setExplanation(e.target.value)} /></label>
+            <label>Notion URL<input name="edit_notionUrl" value={notionUrl} onChange={(e) => setNotionUrl(e.target.value)} placeholder="https://www.notion.so/..." /></label>
 
           <div className="inline-actions">
             <button className="primary" onClick={save}>儲存修正</button>
@@ -2549,13 +2568,28 @@ export default function App() {
     updateState((prev) => {
       const sess = prev.sessions?.[TODAY] || {};
       const drafts = { ...(sess.practiceDrafts || {}) };
-      drafts[questionId] = { ...(drafts[questionId] || {}), ...patch };
+      const current = drafts[questionId] || {};
+      const nextDraft = { ...current, ...patch };
+
+      const same =
+        current.selected === nextDraft.selected &&
+        current.revealed === nextDraft.revealed &&
+        current.correctAnswer === nextDraft.correctAnswer &&
+        current.explanation === nextDraft.explanation &&
+        current.wrongNotes === nextDraft.wrongNotes &&
+        current.rated === nextDraft.rated &&
+        current.rating === nextDraft.rating;
+
+      if (same) return prev;
+
+      drafts[questionId] = nextDraft;
+
       return {
         ...prev,
         sessions: {
           ...(prev.sessions || {}),
           [TODAY]: {
-            ...(sess),
+            ...sess,
             practiceDrafts: drafts,
           },
         },
@@ -2803,14 +2837,14 @@ export default function App() {
             </div>
           </div>
           <div className="filters">
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜尋：KEYNOTE-671、EGFR、breast、PARP..." />
-            <select value={bankYear} onChange={(e) => setBankYear(e.target.value)}>
+            <input name="bank_search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜尋：KEYNOTE-671、EGFR、breast、PARP..." />
+            <select name="bank_year" value={bankYear} onChange={(e) => setBankYear(e.target.value)}>
               <option>All</option>
               <option>112</option>
               <option>113</option>
               <option>114</option>
             </select>
-            <select value={bankCancer} onChange={(e) => setBankCancer(e.target.value)}>
+            <select name="bank_cancer" value={bankCancer} onChange={(e) => setBankCancer(e.target.value)}>
               <option>All</option>
               {cancerCategories.map((c) => <option key={c}>{c}</option>)}
             </select>
@@ -2958,7 +2992,7 @@ export default function App() {
           <div className="settings-grid">
             <label>
               每日題數
-              <input type="number" min="10" max="15" value={state.settings.dailyCount} onChange={(e) => updateSettings({ dailyCount: Math.max(10, Math.min(15, Number(e.target.value))) })} />
+              <input name="dailyCount" type="number" min="10" max="15" value={state.settings.dailyCount} onChange={(e) => updateSettings({ dailyCount: Math.max(10, Math.min(15, Number(e.target.value))) })} />
             </label>
             <label>
               年份篩選
