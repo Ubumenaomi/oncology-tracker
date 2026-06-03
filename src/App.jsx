@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import './App.css';
 import { questionBank, cancerCategories } from './data/questionBank.js';
 import {
@@ -1589,14 +1589,18 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
     setFeedback('');
   }, [question.id, hideAnswerUntilSubmit, practiceMode, practiceDraft]);
 
+  const onPracticeChangeRef = useRef(onPracticeChange);
+  useEffect(() => { onPracticeChangeRef.current = onPracticeChange; }, [onPracticeChange]);
+
   useEffect(() => {
-    if (!practiceMode || !onPracticeChange) return;
+    if (!practiceMode || !onPracticeChangeRef.current) return;
     const current = practiceDraft || {};
-    const changed = current.selected !== selected || current.revealed !== revealed || current.correctAnswer !== correctAnswer || current.explanation !== explanation || current.wrongNotes !== wrongNotes;
+    // Only sync `selected` when answer has been revealed (avoid frequent writes while choosing)
+    const changed = (revealed && current.selected !== selected) || current.revealed !== revealed || current.correctAnswer !== correctAnswer || current.explanation !== explanation || current.wrongNotes !== wrongNotes;
     if (changed) {
-      onPracticeChange({ selected, revealed, correctAnswer, explanation, wrongNotes });
+      onPracticeChangeRef.current({ selected: revealed ? selected : current.selected, revealed, correctAnswer, explanation, wrongNotes });
     }
-  }, [selected, revealed, correctAnswer, explanation, wrongNotes, practiceMode, onPracticeChange, practiceDraft]);
+  }, [selected, revealed, correctAnswer, explanation, wrongNotes, practiceMode, practiceDraft]);
 
   const answerIsSingleChoice = /^[A-E]$/.test(String(correctAnswer || '').trim().toUpperCase());
   const isCorrectSelection = selected && answerIsSingleChoice && selected === String(correctAnswer).trim().toUpperCase();
@@ -2564,7 +2568,7 @@ export default function App() {
   const todayIds = todaySession?.questionIds || [];
   const todayQuestions = todayIds.map((id) => getQuestionWithOverride(id, state)).filter(Boolean);
 
-  const updatePracticeDraft = (questionId, patch) => {
+  const updatePracticeDraft = useCallback((questionId, patch) => {
     updateState((prev) => {
       const sess = prev.sessions?.[TODAY] || {};
       const drafts = { ...(sess.practiceDrafts || {}) };
@@ -2595,7 +2599,7 @@ export default function App() {
         },
       };
     });
-  };
+  }, [TODAY]);
 
   const createTodaySession = () => {
     const ids = generateDailyQuestionIds(state);
