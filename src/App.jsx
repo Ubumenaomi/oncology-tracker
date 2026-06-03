@@ -1318,32 +1318,32 @@ function mergeCloudState(localState, cloudState) {
 
   return {
     ...defaultState,
-    ...localState,
     ...cloudState,
+    ...localState,
     sessions: {
-      ...(localState.sessions || {}),
       ...(cloudState.sessions || {}),
+      ...(localState.sessions || {}),
     },
     stats: {
-      ...(localState.stats || {}),
       ...(cloudState.stats || {}),
+      ...(localState.stats || {}),
     },
     settings: {
       ...defaultState.settings,
-      ...(localState.settings || {}),
       ...(cloudState.settings || {}),
+      ...(localState.settings || {}),
     },
     planProgress: {
-      ...(localState.planProgress || {}),
       ...(cloudState.planProgress || {}),
+      ...(localState.planProgress || {}),
     },
     questionOverrides: {
-      ...(localState.questionOverrides || {}),
       ...(cloudState.questionOverrides || {}),
+      ...(localState.questionOverrides || {}),
     },
     cloudMeta: {
-      ...(localState.cloudMeta || {}),
       ...(cloudState.cloudMeta || {}),
+      ...(localState.cloudMeta || {}),
     },
   };
 }
@@ -1587,7 +1587,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
     }
 
     setFeedback('');
-  }, [question.id, hideAnswerUntilSubmit, practiceMode, practiceDraft]);
+  }, [question.id]);
 
   const onPracticeChangeRef = useRef(onPracticeChange);
   useEffect(() => { onPracticeChangeRef.current = onPracticeChange; }, [onPracticeChange]);
@@ -1595,12 +1595,25 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
   useEffect(() => {
     if (!practiceMode || !onPracticeChangeRef.current) return;
     const current = practiceDraft || {};
-    // Only sync `selected` when answer has been revealed (avoid frequent writes while choosing)
-    const changed = (revealed && current.selected !== selected) || current.revealed !== revealed || current.correctAnswer !== correctAnswer || current.explanation !== explanation || current.wrongNotes !== wrongNotes;
-    if (changed) {
-      onPracticeChangeRef.current({ selected: revealed ? selected : current.selected, revealed, correctAnswer, explanation, wrongNotes });
+    const patch = {
+      selected,
+      revealed,
+      correctAnswer,
+      explanation,
+      wrongNotes,
+    };
+
+    const same =
+      current.selected === patch.selected &&
+      current.revealed === patch.revealed &&
+      current.correctAnswer === patch.correctAnswer &&
+      current.explanation === patch.explanation &&
+      current.wrongNotes === patch.wrongNotes;
+
+    if (!same) {
+      onPracticeChangeRef.current(patch);
     }
-  }, [selected, revealed, correctAnswer, explanation, wrongNotes, practiceMode, practiceDraft]);
+  }, [selected, revealed, correctAnswer, explanation, wrongNotes, practiceMode]);
 
   const answerIsSingleChoice = /^[A-E]$/.test(String(correctAnswer || '').trim().toUpperCase());
   const isCorrectSelection = selected && answerIsSingleChoice && selected === String(correctAnswer).trim().toUpperCase();
@@ -1730,7 +1743,12 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                     name={`q-${question.id}`}
                     checked={selected === key}
                     disabled={hideAnswerUntilSubmit && revealed}
-                    onChange={() => setSelected(key)}
+                    onChange={() => {
+                      setSelected(key);
+                      if (practiceMode && onPracticeChangeRef.current) {
+                        onPracticeChangeRef.current({ selected: key });
+                      }
+                    }}
                   />
                   <span className="option-key">{key}</span>
                   <span>{value}</span>
