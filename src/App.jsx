@@ -1435,6 +1435,15 @@ function nextInterval(result, mastery, rate) {
   return 30;
 }
 
+function nextIntervalByRating(rating, stat) {
+  const current = stat.intervalDays || 1;
+  if (rating === 'Again') return 1;
+  if (rating === 'Hard') return Math.max(2, Math.round(current * 1.2));
+  if (rating === 'Good') return Math.max(4, Math.round(current * 2.2));
+  if (rating === 'Easy') return Math.max(7, Math.round(current * 3.0));
+  return 3;
+}
+
 function classifyPriority(q, stat, today = TODAY) {
   const due = stat.nextReviewDate && stat.nextReviewDate <= today;
   if (due && stat.wrong > 0) return 0;
@@ -1450,30 +1459,56 @@ function shuffleStable(items) {
 
 function generateDailyQuestionIds(state) {
   const { dailyCount, preferredYears, preferredCancers } = state.settings;
-  const pool = questionBank.filter((q) => {
-    const question = getQuestionWithOverride(q.id, state);
-    const yearOk = preferredYears.length === 0 || preferredYears.includes(question?.year);
-    const cancerOk = preferredCancers.length === 0 || preferredCancers.includes(question?.cancer);
-    return question && yearOk && cancerOk;
-  });
 
-  const ranked = pool
-    .map((q) => {
-      const resolved = getQuestionWithOverride(q.id, state);
-      return { q: resolved, stat: getStat(state, q.id), priority: classifyPriority(resolved, getStat(state, q.id)) };
-    })
-    .sort((a, b) => {
-      if (a.priority !== b.priority) return a.priority - b.priority;
-      const ar = wrongRate(a.stat);
-      const br = wrongRate(b.stat);
-      if (ar !== br) return br - ar;
-      return a.stat.attempts - b.stat.attempts;
+  const pool = questionBank
+    .map((q) => getQuestionWithOverride(q.id, state))
+    .filter(Boolean)
+    .filter((q) => {
+      const yearOk = !preferredYears || preferredYears.length === 0 || preferredYears.includes(Number(q.year));
+      const cancerOk = !preferredCancers || preferredCancers.length === 0 || preferredCancers.includes(q.cancer);
+      return yearOk && cancerOk;
     });
 
-  const weakOrDue = ranked.filter((x) => x.priority <= 2).slice(0, Math.ceil(dailyCount * 0.6));
-  const newItems = shuffleStable(ranked.filter((x) => x.priority === 3)).slice(0, dailyCount - weakOrDue.length);
-  const fallback = shuffleStable(ranked.filter((x) => x.priority === 4)).slice(0, dailyCount - weakOrDue.length - newItems.length);
-  return [...weakOrDue, ...newItems, ...fallback].slice(0, dailyCount).map((x) => x.q.id);
+  const withStats = pool.map((q) => ({ q, stat: getStat(state, q.id) }));
+
+  const due = withStats.filter(({ stat }) => stat.nextReviewDate && stat.nextReviewDate <= TODAY);
+  const highWrong = withStats.filter(({ stat }) => stat.wrong > 0 && wrongRate(stat) >= 50);
+  const newQuestions = withStats.filter(({ stat }) => (stat.attempts || 0) === 0);
+  const bookmarked = withStats.filter(({ stat }) => stat.bookmarked);
+  const regular = withStats.filter(({ stat }) => (stat.attempts || 0) > 0 && !(stat.nextReviewDate && stat.nextReviewDate <= TODAY) && !(stat.wrong > 0 && wrongRate(stat) >= 50));
+
+  const pickUnique = (source, count, used) => {
+    const shuffled = shuffleStable(source);
+    const selected = [];
+    for (const item of shuffled) {
+      if (selected.length >= count) break;
+      if (used.has(item.q.id)) continue;
+      selected.push(item.q.id);
+      used.add(item.q.id);
+    }
+    return selected;
+  };
+
+  const used = new Set();
+  const result = [];
+
+  const dueCount = Math.ceil(dailyCount * 0.4);
+  const wrongCount = Math.ceil(dailyCount * 0.3);
+  const newCount = Math.ceil(dailyCount * 0.2);
+  const bookmarkCount = Math.max(1, dailyCount - dueCount - wrongCount - newCount);
+
+  result.push(...pickUnique(due, dueCount, used));
+  result.push(...pickUnique(highWrong, wrongCount, used));
+  result.push(...pickUnique(newQuestions, newCount, used));
+  result.push(...pickUnique(bookmarked, bookmarkCount, used));
+
+  // fill remaining with regular items
+  if (result.length < dailyCount) {
+    const remaining = dailyCount - result.length;
+    result.push(...pickUnique(regular, remaining, used));
+  }
+
+  return result.slice(0, dailyCount);
 }
 
 function getCancerSummary(state) {
@@ -1546,32 +1581,48 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
   const answerIsSingleChoice = /^[A-E]$/.test(String(correctAnswer || '').trim().toUpperCase());
   const isCorrectSelection = selected && answerIsSingleChoice && selected === String(correctAnswer).trim().toUpperCase();
 
-  const record = (result) => {
+  const recordRating = (rating) => {
     const previous = stat;
-    const newCorrect = result === 'correct' ? previous.correct + 1 : previous.correct;
-    const newWrong = result === 'wrong' ? previous.wrong + 1 : previous.wrong;
-    const newAttempts = previous.attempts + 1;
-    const newRate = Math.round((newWrong / newAttempts) * 100);
-    const nextMastery = result === 'correct'
-      ? Math.min(5, Math.max(previous.mastery || 0, previous.mastery + 1 || 1))
-      : Math.max(0, (previous.mastery || 0) - 1);
-    const interval = nextInterval(result, nextMastery, newRate);
+    const newAttempts = (previous.attempts || 0) + 1;
+    const isCorrect = rating !== 'Again';
+    const newCorrect = previous.correct + (isCorrect ? 1 : 0);
+    const newWrong = previous.wrong + (isCorrect ? 0 : 1);
+
+    const ratingScoreMap = { Again: 4, Hard: 3, Good: 2, Easy: 1 };
+    const score = ratingScoreMap[rating] || 3;
+    const prevDifficulty = previous.difficulty || 3;
+    const newDifficulty = Math.round(((prevDifficulty * (previous.attempts || 0)) + score) / newAttempts * 10) / 10;
+
+    let nextMastery = previous.mastery || 0;
+    if (rating === 'Again') nextMastery = Math.max(0, nextMastery - 1);
+    if (rating === 'Hard') nextMastery = Math.max(0, nextMastery);
+    if (rating === 'Good') nextMastery = Math.min(5, nextMastery + 1);
+    if (rating === 'Easy') nextMastery = Math.min(5, nextMastery + 2);
+
+    const interval = nextIntervalByRating(rating, previous);
 
     onUpdateStat(question.id, {
       ...previous,
       attempts: newAttempts,
       correct: newCorrect,
       wrong: newWrong,
-      lastResult: result,
+      lastResult: rating,
       lastAttemptAt: TODAY,
       nextReviewDate: addDays(TODAY, interval),
       mastery: nextMastery,
+      difficulty: newDifficulty,
+      intervalDays: interval,
       userAnswer: selected || previous.userAnswer || null,
       correctAnswer: correctAnswer || previous.correctAnswer || question.answer || null,
       explanation,
       wrongNotes,
+      lastRating: rating,
     });
+
+    setFeedback(`紀錄：${rating}，下次複習 ${interval} 天後`);
   };
+
+  const record = (result) => recordRating(result === 'correct' ? 'Good' : 'Again');
 
   const submitAnswer = () => {
     if (!selected) {
@@ -1579,21 +1630,8 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
       return;
     }
     setRevealed(true);
-
-    if (answerIsSingleChoice) {
-      const result = isCorrectSelection ? 'correct' : 'wrong';
-      record(result);
-      setFeedback(isCorrectSelection ? '答對。' : '答錯，請看正解與詳解。');
-    } else {
-      onUpdateStat(question.id, {
-        ...stat,
-        userAnswer: selected,
-        correctAnswer: correctAnswer || stat.correctAnswer || question.answer || null,
-        explanation,
-        wrongNotes,
-      });
-      setFeedback('此題尚無單一正解或正解格式不明，請手動標記答對/答錯。');
-    }
+    // In practiceMode we reveal and wait for user rating (Again/Hard/Good/Easy)
+    setFeedback(answerIsSingleChoice ? (isCorrectSelection ? '答對，請選擇評分 (Again/Hard/Good/Easy)。' : '答錯，請選擇評分 (Again/Hard/Good/Easy)。') : '請選擇評分 (Again/Hard/Good/Easy)。');
   };
 
   const saveNote = () => {
@@ -1701,18 +1739,12 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                     {[0, 1, 2, 3, 4, 5].map((x) => <option key={x} value={x}>{x}</option>)}
                   </select>
                 </label>
-                {!answerIsSingleChoice && (
-                  <>
-                    <button className="good" onClick={() => record('correct')}>手動標記答對</button>
-                    <button className="bad" onClick={() => record('wrong')}>手動標記答錯</button>
-                  </>
-                )}
-                {!hideAnswerUntilSubmit && (
-                  <>
-                    <button className="good" onClick={() => record('correct')}>答對</button>
-                    <button className="bad" onClick={() => record('wrong')}>答錯</button>
-                  </>
-                )}
+                <div className="rating-buttons">
+                  <button className="again" onClick={() => recordRating('Again')}>Again</button>
+                  <button className="hard" onClick={() => recordRating('Hard')}>Hard</button>
+                  <button className="good" onClick={() => recordRating('Good')}>Good</button>
+                  <button className="easy" onClick={() => recordRating('Easy')}>Easy</button>
+                </div>
                 <button className="secondary" onClick={saveNote}>儲存詳解/筆記</button>
               </div>
 
