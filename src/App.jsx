@@ -1794,7 +1794,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                 </label>
                 <div className="rating-buttons">
                   <button
-                    className="again"
+                    className="rating-button again"
                     title="Again（重複）：重新學習，建議 1 天後複習"
                     onClick={() => recordRating('Again')}
                   >
@@ -1802,15 +1802,15 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                     <div className="rating-sub">重複 · 1 天</div>
                   </button>
                   <button
-                    className="hard"
+                    className="rating-button hard"
                     title="Hard（難）：答對但不穩，建議 3 天後複習"
                     onClick={() => recordRating('Hard')}
                   >
                     🟠 Hard
-                    <div className="rating-sub">困難 · ~3 天</div>
+                    <div className="rating-sub">困難 · 約 3 天</div>
                   </button>
                   <button
-                    className="good"
+                    className="rating-button good"
                     title="Good（好）：正常答對，建議 7–14 天後複習"
                     onClick={() => recordRating('Good')}
                   >
@@ -1818,7 +1818,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                     <div className="rating-sub">良好 · 7–14 天</div>
                   </button>
                   <button
-                    className="easy"
+                    className="rating-button easy"
                     title="Easy（非常熟）：秒答且熟悉，建議 21–30 天後複習"
                     onClick={() => recordRating('Easy')}
                   >
