@@ -1554,7 +1554,7 @@ function MetricCard({ label, value, sub }) {
 }
 
 
-function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswerUntilSubmit = false, practiceMode = false, onEdit }) {
+function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswerUntilSubmit = false, practiceMode = false, practiceDraft = null, onPracticeChange = null, onEdit }) {
   const initialAnswer = stat.correctAnswer || question.answer || '';
   const [selected, setSelected] = useState(practiceMode ? '' : stat.userAnswer || '');
   const [correctAnswer, setCorrectAnswer] = useState(initialAnswer);
@@ -1568,15 +1568,30 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
 
   useEffect(() => {
     const nextAnswer = stat.correctAnswer || question.answer || '';
-    setSelected(practiceMode ? '' : stat.userAnswer || '');
-    setCorrectAnswer(nextAnswer);
-    setExplanation(stat.explanation || question.explanation || '');
-    setWrongNotes(stat.wrongNotes || '');
-    setRevealed(
-      practiceMode ? false : (!hideAnswerUntilSubmit || Boolean(stat.lastAttemptAt))
-    );
+
+    if (practiceMode && practiceDraft) {
+      setSelected(practiceDraft.selected ?? '');
+      setCorrectAnswer(practiceDraft.correctAnswer ?? nextAnswer);
+      setExplanation(practiceDraft.explanation ?? (stat.explanation || question.explanation || ''));
+      setWrongNotes(practiceDraft.wrongNotes ?? (stat.wrongNotes || ''));
+      setRevealed(practiceDraft.revealed ?? false);
+    } else {
+      setSelected(practiceMode ? '' : stat.userAnswer || '');
+      setCorrectAnswer(nextAnswer);
+      setExplanation(stat.explanation || question.explanation || '');
+      setWrongNotes(stat.wrongNotes || '');
+      setRevealed(
+        practiceMode ? false : (!hideAnswerUntilSubmit || Boolean(stat.lastAttemptAt))
+      );
+    }
+
     setFeedback('');
-  }, [question.id, hideAnswerUntilSubmit, practiceMode]);
+  }, [question.id, hideAnswerUntilSubmit, practiceMode, practiceDraft]);
+
+  useEffect(() => {
+    if (!practiceMode || !onPracticeChange) return;
+    onPracticeChange({ selected, revealed, correctAnswer, explanation, wrongNotes });
+  }, [selected, revealed, correctAnswer, explanation, wrongNotes, practiceMode, onPracticeChange]);
 
   const answerIsSingleChoice = /^[A-E]$/.test(String(correctAnswer || '').trim().toUpperCase());
   const isCorrectSelection = selected && answerIsSingleChoice && selected === String(correctAnswer).trim().toUpperCase();
@@ -1740,10 +1755,38 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                   </select>
                 </label>
                 <div className="rating-buttons">
-                  <button className="again" onClick={() => recordRating('Again')}>Again</button>
-                  <button className="hard" onClick={() => recordRating('Hard')}>Hard</button>
-                  <button className="good" onClick={() => recordRating('Good')}>Good</button>
-                  <button className="easy" onClick={() => recordRating('Easy')}>Easy</button>
+                  <button
+                    className="again"
+                    title="Again（重複）：重新學習，建議 1 天後複習"
+                    onClick={() => recordRating('Again')}
+                  >
+                    🔁 Again
+                    <div className="rating-sub">重複 · 1 天</div>
+                  </button>
+                  <button
+                    className="hard"
+                    title="Hard（難）：答對但不穩，建議 3 天後複習"
+                    onClick={() => recordRating('Hard')}
+                  >
+                    🟠 Hard
+                    <div className="rating-sub">困難 · ~3 天</div>
+                  </button>
+                  <button
+                    className="good"
+                    title="Good（好）：正常答對，建議 7–14 天後複習"
+                    onClick={() => recordRating('Good')}
+                  >
+                    ✅ Good
+                    <div className="rating-sub">良好 · 7–14 天</div>
+                  </button>
+                  <button
+                    className="easy"
+                    title="Easy（非常熟）：秒答且熟悉，建議 21–30 天後複習"
+                    onClick={() => recordRating('Easy')}
+                  >
+                    ✨ Easy
+                    <div className="rating-sub">非常熟 · 21–30 天</div>
+                  </button>
                 </div>
                 <button className="secondary" onClick={saveNote}>儲存詳解/筆記</button>
               </div>
@@ -2502,13 +2545,31 @@ export default function App() {
   const todayIds = todaySession?.questionIds || [];
   const todayQuestions = todayIds.map((id) => getQuestionWithOverride(id, state)).filter(Boolean);
 
+  const updatePracticeDraft = (questionId, patch) => {
+    updateState((prev) => {
+      const sess = prev.sessions?.[TODAY] || {};
+      const drafts = { ...(sess.practiceDrafts || {}) };
+      drafts[questionId] = { ...(drafts[questionId] || {}), ...patch };
+      return {
+        ...prev,
+        sessions: {
+          ...(prev.sessions || {}),
+          [TODAY]: {
+            ...(sess),
+            practiceDrafts: drafts,
+          },
+        },
+      };
+    });
+  };
+
   const createTodaySession = () => {
     const ids = generateDailyQuestionIds(state);
     updateState((prev) => ({
       ...prev,
       sessions: {
         ...prev.sessions,
-        [TODAY]: { date: TODAY, questionIds: ids, createdAt: new Date().toISOString(), completed: false },
+        [TODAY]: { date: TODAY, questionIds: ids, createdAt: new Date().toISOString(), completed: false, practiceDrafts: {} },
       },
     }));
     setTab('today');
@@ -2705,6 +2766,8 @@ export default function App() {
                   onUpdateStat={updateStat}
                   hideAnswerUntilSubmit
                   practiceMode
+                  practiceDraft={todaySession?.practiceDrafts?.[q.id]}
+                  onPracticeChange={(patch) => updatePracticeDraft(q.id, patch)}
                 />
               ))}
             </div>
