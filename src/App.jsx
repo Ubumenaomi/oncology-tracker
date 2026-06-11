@@ -27,6 +27,23 @@ const ERROR_TYPE_OPTIONS = [
   'Overconfidence',
 ];
 
+const FLASHCARD_RATINGS = {
+  Again: { interval: 1, masteryDelta: -1 },
+  Hard: { interval: 3, masteryDelta: 0 },
+  Good: { interval: 7, masteryDelta: 1 },
+  Easy: { interval: 21, masteryDelta: 2 },
+};
+
+const XP_RULES = {
+  dailyComplete: 30,
+  planTask: 50,
+  wrongAgainRecovery: 80,
+  highConfidenceWrongCorrected: 120,
+  cancerBoss: 150,
+  fullMock75: 300,
+  wrongRetest90: 300,
+};
+
 const TODAY = (() => {
   const d = new Date();
   const y = d.getFullYear();
@@ -53,1269 +70,279 @@ const defaultState = {
   },
 };
 
-const studyPlan100 = [
-  {
-    "id": 1,
-    "day": "Day 1",
-    "cancer": "Lung",
-    "topic": "NSCLC 基礎架構",
-    "details": "TNM staging、resectability、molecular testing、PD-L1 interpretation",
-    "goldenTrials": [
-      "NCCN Algorithm"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 2,
-    "day": "Day 2",
-    "cancer": "Lung",
-    "topic": "EGFR early NSCLC",
-    "details": "adjuvant osimertinib、EGFR exon 19 deletion / L858R、post-op chemo 角色",
-    "goldenTrials": [
-      "ADAURA"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 3,
-    "day": "Day 3",
-    "cancer": "Lung",
-    "topic": "Unresectable stage III NSCLC",
-    "details": "CCRT 後 consolidation、durvalumab eligibility、PFS/OS endpoint",
-    "goldenTrials": [
-      "PACIFIC"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 4,
-    "day": "Day 4",
-    "cancer": "Lung",
-    "topic": "Neoadjuvant IO",
-    "details": "resectable NSCLC neoadjuvant chemo-IO、pCR/MPR/EFS 定義",
-    "goldenTrials": [
-      "CheckMate 816"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 5,
-    "day": "Day 5",
-    "cancer": "Lung",
-    "topic": "Perioperative IO",
-    "details": "neoadjuvant + adjuvant pembrolizumab、stage II–IIIB、EFS/OS",
-    "goldenTrials": [
-      "KEYNOTE-671"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 6,
-    "day": "Day 6",
-    "cancer": "Lung",
-    "topic": "Adjuvant IO",
-    "details": "postoperative atezolizumab / pembrolizumab、PD-L1 cutoff、EGFR/ALK exclusion",
-    "goldenTrials": [
-      "IMpower010",
-      "KEYNOTE-091"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 7,
-    "day": "Day 7",
-    "cancer": "Lung",
-    "topic": "Metastatic nonsquamous NSCLC",
-    "details": "IO + platinum/pemetrexed、bevacizumab-containing regimen、PD-L1 高低",
-    "goldenTrials": [
-      "KEYNOTE-189",
-      "IMpower150"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 8,
-    "day": "Day 8",
-    "cancer": "Lung",
-    "topic": "Metastatic squamous NSCLC",
-    "details": "IO + platinum/taxane、PD-L1 ≥50% monotherapy、contraindications",
-    "goldenTrials": [
-      "KEYNOTE-407"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 9,
-    "day": "Day 9",
-    "cancer": "Lung",
-    "topic": "Dual IO / short-course chemo",
-    "details": "nivolumab + ipilimumab + 2-cycle chemo、toxicity",
-    "goldenTrials": [
-      "CheckMate 9LA"
-    ],
-    "priority": "Medium",
-    "completed": false
-  },
-  {
-    "id": 10,
-    "day": "Day 10",
-    "cancer": "Lung",
-    "topic": "EGFR advanced first-line",
-    "details": "osimertinib ± chemotherapy、amivantamab/lazertinib、PFS/OS",
-    "goldenTrials": [
-      "FLAURA",
-      "FLAURA2",
-      "MARIPOSA"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 11,
-    "day": "Day 11",
-    "cancer": "Lung",
-    "topic": "EGFR post-osimertinib",
-    "details": "resistance biopsy、small cell transformation、amivantamab + chemo",
-    "goldenTrials": [
-      "MARIPOSA-2",
-      "KEYNOTE-789"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 12,
-    "day": "Day 12",
-    "cancer": "Lung",
-    "topic": "ALK rearranged NSCLC",
-    "details": "alectinib/brigatinib/lorlatinib、CNS efficacy、lorlatinib toxicity",
-    "goldenTrials": [
-      "ALEX",
-      "CROWN"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 13,
-    "day": "Day 13",
-    "cancer": "Lung",
-    "topic": "Other actionable mutations",
-    "details": "KRAS G12C、MET exon14、RET、NTRK、HER2 mutation treatment",
-    "goldenTrials": [
-      "CodeBreaK",
-      "LIBRETTO-001",
-      "DESTINY-Lung"
-    ],
-    "priority": "Medium",
-    "completed": false
-  },
-  {
-    "id": 14,
-    "day": "Day 14",
-    "cancer": "Lung",
-    "topic": "SCLC first-line",
-    "details": "extensive-stage SCLC chemo-IO、maintenance IO",
-    "goldenTrials": [
-      "IMpower133",
-      "CASPIAN"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 15,
-    "day": "Day 15",
-    "cancer": "Lung",
-    "topic": "CNS / leptomeningeal disease",
-    "details": "EGFR CNS penetration、osimertinib、radiation sequencing",
-    "goldenTrials": [
-      "BLOOM",
-      "FLAURA CNS"
-    ],
-    "priority": "Medium",
-    "completed": false
-  },
-  {
-    "id": 16,
-    "day": "Day 16",
-    "cancer": "Lung",
-    "topic": "Lung pathology / IHC",
-    "details": "TTF-1、p40、Napsin A、CDX2、INSM1、mesothelioma markers",
-    "goldenTrials": [
-      "IHC Review"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 17,
-    "day": "Day 17",
-    "cancer": "Lung",
-    "topic": "Lung toxicity management",
-    "details": "ILD/pneumonitis、EGFR-TKI、ICI、T-DXd、radiation pneumonitis",
-    "goldenTrials": [
-      "Toxicity Review"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 18,
-    "day": "Day 18",
-    "cancer": "Lung",
-    "topic": "112–114 Lung questions",
-    "details": "完成 lung 題庫與錯題標記",
-    "goldenTrials": [
-      "Question Bank"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 19,
-    "day": "Day 19",
-    "cancer": "Lung",
-    "topic": "Lung rapid recall",
-    "details": "演練 treatment sequencing 與 trial endpoint blank recall",
-    "goldenTrials": [
-      "Golden Trial Recall"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 20,
-    "day": "Day 20",
-    "cancer": "Lung",
-    "topic": "Lung mock exam",
-    "details": "Lung full mock + 錯題匯入 Review Queue",
-    "goldenTrials": [
-      "Mock Exam"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 21,
-    "day": "Day 21",
-    "cancer": "Breast",
-    "topic": "Early HR+/HER2−",
-    "details": "Oncotype DX、MammaPrint、PAM50、EndoPredict、adjuvant chemo decision",
-    "goldenTrials": [
-      "TAILORx",
-      "RxPONDER"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 22,
-    "day": "Day 22",
-    "cancer": "Breast",
-    "topic": "Adjuvant CDK4/6",
-    "details": "high-risk definition、abemaciclib/ribociclib、duration/toxicity",
-    "goldenTrials": [
-      "monarchE",
-      "NATALEE"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 23,
-    "day": "Day 23",
-    "cancer": "Breast",
-    "topic": "gBRCA early breast cancer",
-    "details": "OlympiA eligibility、TNBC vs HR+ high-risk criteria、EFS/OS",
-    "goldenTrials": [
-      "OlympiA"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 24,
-    "day": "Day 24",
-    "cancer": "Breast",
-    "topic": "Metastatic HR+/HER2− first-line",
-    "details": "OFS、AI/fulvestrant + CDK4/6、visceral crisis distinction",
-    "goldenTrials": [
-      "PALOMA",
-      "MONALEESA",
-      "MONARCH"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 25,
-    "day": "Day 25",
-    "cancer": "Breast",
-    "topic": "Post-CDK4/6 sequencing",
-    "details": "ESR1、PIK3CA、AKT/PTEN、SERD、PI3K/AKT inhibitor",
-    "goldenTrials": [
-      "SOLAR-1",
-      "CAPItello-291",
-      "EMERALD"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 26,
-    "day": "Day 26",
-    "cancer": "Breast",
-    "topic": "HER2+ early adjuvant",
-    "details": "trastuzumab、pertuzumab、node-positive benefit",
-    "goldenTrials": [
-      "APHINITY"
-    ],
-    "priority": "Medium",
-    "completed": false
-  },
-  {
-    "id": 27,
-    "day": "Day 27",
-    "cancer": "Breast",
-    "topic": "HER2+ residual disease",
-    "details": "non-pCR after neoadjuvant therapy、adjuvant T-DM1",
-    "goldenTrials": [
-      "KATHERINE"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 28,
-    "day": "Day 28",
-    "cancer": "Breast",
-    "topic": "HER2+ metastatic first-line",
-    "details": "taxane + trastuzumab + pertuzumab、OS benefit",
-    "goldenTrials": [
-      "CLEOPATRA"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 29,
-    "day": "Day 29",
-    "cancer": "Breast",
-    "topic": "HER2+ metastatic second-line",
-    "details": "T-DXd vs T-DM1、ILD/pneumonitis risk",
-    "goldenTrials": [
-      "DESTINY-Breast03"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 30,
-    "day": "Day 30",
-    "cancer": "Breast",
-    "topic": "HER2-low / HER2-ultralow",
-    "details": "definition、ADC sequencing、ER+ and TNBC application",
-    "goldenTrials": [
-      "DESTINY-Breast04",
-      "DESTINY-Breast06"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 31,
-    "day": "Day 31",
-    "cancer": "Breast",
-    "topic": "TNBC neoadjuvant IO",
-    "details": "KEYNOTE-522 schema、pCR/EFS/OS、adjuvant pembrolizumab",
-    "goldenTrials": [
-      "KEYNOTE-522"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 32,
-    "day": "Day 32",
-    "cancer": "Breast",
-    "topic": "TNBC metastatic ADC",
-    "details": "sacituzumab govitecan、TROP2 ADC、toxicity",
-    "goldenTrials": [
-      "ASCENT",
-      "TROPION-Breast01"
-    ],
-    "priority": "Medium",
-    "completed": false
-  },
-  {
-    "id": 33,
-    "day": "Day 33",
-    "cancer": "Breast",
-    "topic": "Breast CNS metastasis",
-    "details": "HER2+ CNS regimen、tucatinib、T-DXd CNS data、LMD",
-    "goldenTrials": [
-      "HER2CLIMB"
-    ],
-    "priority": "Medium",
-    "completed": false
-  },
-  {
-    "id": 34,
-    "day": "Day 34",
-    "cancer": "Breast",
-    "topic": "Endocrine resistance",
-    "details": "primary vs secondary resistance、mTOR、SERD、sequencing",
-    "goldenTrials": [
-      "BOLERO-2",
-      "EMERALD"
-    ],
-    "priority": "Medium",
-    "completed": false
-  },
-  {
-    "id": 35,
-    "day": "Day 35",
-    "cancer": "Breast",
-    "topic": "Breast biomarkers",
-    "details": "ER/PR/HER2 interpretation、FISH、germline BRCA、PIK3CA、ESR1",
-    "goldenTrials": [
-      "Biomarker Review"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 36,
-    "day": "Day 36",
-    "cancer": "Breast",
-    "topic": "Breast toxicity",
-    "details": "CDK4/6 neutropenia/diarrhea、PI3K hyperglycemia、ADC ILD",
-    "goldenTrials": [
-      "Toxicity Review"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 37,
-    "day": "Day 37",
-    "cancer": "Breast",
-    "topic": "Breast local therapy",
-    "details": "RT omission criteria、AMAROS、hypofractionation、boost",
-    "goldenTrials": [
-      "CALGB 9343",
-      "AMAROS"
-    ],
-    "priority": "Medium",
-    "completed": false
-  },
-  {
-    "id": 38,
-    "day": "Day 38",
-    "cancer": "Breast",
-    "topic": "112–114 Breast questions",
-    "details": "完成 breast 題庫與錯題標記",
-    "goldenTrials": [
-      "Question Bank"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 39,
-    "day": "Day 39",
-    "cancer": "Breast",
-    "topic": "Breast rapid recall",
-    "details": "HER2/TNBC/HR+ treatment map blank recall",
-    "goldenTrials": [
-      "Golden Trial Recall"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 40,
-    "day": "Day 40",
-    "cancer": "Breast",
-    "topic": "Breast mock exam",
-    "details": "Breast full mock + 錯題匯入 Review Queue",
-    "goldenTrials": [
-      "Mock Exam"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 41,
-    "day": "Day 41",
-    "cancer": "GU",
-    "topic": "mHSPC treatment intensification",
-    "details": "ADT + ARPI ± docetaxel、high-volume/high-risk",
-    "goldenTrials": [
-      "LATITUDE",
-      "STAMPEDE",
-      "ARASENS"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 42,
-    "day": "Day 42",
-    "cancer": "GU",
-    "topic": "mCRPC sequencing",
-    "details": "post-ARPI、taxane、PARPi、radioligand、cross-resistance",
-    "goldenTrials": [
-      "CARD",
-      "PROfound"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 43,
-    "day": "Day 43",
-    "cancer": "GU",
-    "topic": "PARPi + ARPI",
-    "details": "mCRPC first-line combination、HRR/BRCA subgroup、toxicity",
-    "goldenTrials": [
-      "PROpel",
-      "TALAPRO-2",
-      "MAGNITUDE"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 44,
-    "day": "Day 44",
-    "cancer": "GU",
-    "topic": "PSMA radioligand therapy",
-    "details": "Lu177-PSMA indication、PSMA PET、OS/PFS、marrow toxicity",
-    "goldenTrials": [
-      "VISION"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 45,
-    "day": "Day 45",
-    "cancer": "GU",
-    "topic": "RCC metastatic IO combinations",
-    "details": "IO-IO vs IO-TKI、risk group、toxicity",
-    "goldenTrials": [
-      "CheckMate-214",
-      "KEYNOTE-426",
-      "CLEAR"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 46,
-    "day": "Day 46",
-    "cancer": "GU",
-    "topic": "RCC adjuvant therapy",
-    "details": "clear cell RCC risk、adjuvant pembrolizumab OS",
-    "goldenTrials": [
-      "KEYNOTE-564"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 47,
-    "day": "Day 47",
-    "cancer": "GU",
-    "topic": "Urothelial carcinoma",
-    "details": "maintenance avelumab、EV、FGFR inhibitor、Nectin-4",
-    "goldenTrials": [
-      "JAVELIN Bladder 100",
-      "EV-301",
-      "THOR"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 48,
-    "day": "Day 48",
-    "cancer": "GU",
-    "topic": "Testicular cancer",
-    "details": "seminoma stage I surveillance、carboplatin AUC7、RT",
-    "goldenTrials": [
-      "Seminoma Review"
-    ],
-    "priority": "Medium",
-    "completed": false
-  },
-  {
-    "id": 49,
-    "day": "Day 49",
-    "cancer": "GU",
-    "topic": "GU question bank",
-    "details": "完成 GU 題庫與錯題標記",
-    "goldenTrials": [
-      "Question Bank"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 50,
-    "day": "Day 50",
-    "cancer": "GU",
-    "topic": "GU mock exam",
-    "details": "GU full mock + 錯題匯入 Review Queue",
-    "goldenTrials": [
-      "Mock Exam"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 51,
-    "day": "Day 51",
-    "cancer": "GYN",
-    "topic": "Endometrial cancer basics",
-    "details": "MMR/MSI、histology、advanced/recurrent treatment backbone",
-    "goldenTrials": [
-      "GYN Algorithm"
-    ],
-    "priority": "Medium",
-    "completed": false
-  },
-  {
-    "id": 52,
-    "day": "Day 52",
-    "cancer": "GYN",
-    "topic": "Endometrial first-line IO",
-    "details": "dostarlimab + carbo/paclitaxel、dMMR vs overall population",
-    "goldenTrials": [
-      "RUBY"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 53,
-    "day": "Day 53",
-    "cancer": "GYN",
-    "topic": "Pembrolizumab in endometrial cancer",
-    "details": "pMMR/dMMR cohorts、maintenance design",
-    "goldenTrials": [
-      "NRG-GY018"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 54,
-    "day": "Day 54",
-    "cancer": "GYN",
-    "topic": "Durvalumab in endometrial cancer",
-    "details": "DUO-E design、durvalumab ± olaparib maintenance",
-    "goldenTrials": [
-      "DUO-E"
-    ],
-    "priority": "Medium",
-    "completed": false
-  },
-  {
-    "id": 55,
-    "day": "Day 55",
-    "cancer": "GYN",
-    "topic": "Cervical cancer metastatic",
-    "details": "pembrolizumab + chemo ± bevacizumab、PD-L1 CPS",
-    "goldenTrials": [
-      "KEYNOTE-826"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 56,
-    "day": "Day 56",
-    "cancer": "GYN",
-    "topic": "Cervical cancer locally advanced",
-    "details": "pembrolizumab + CCRT、PFS/OS、CALLA contrast",
-    "goldenTrials": [
-      "KEYNOTE-A18",
-      "CALLA"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 57,
-    "day": "Day 57",
-    "cancer": "GYN",
-    "topic": "Ovarian maintenance",
-    "details": "BRCA/HRD、olaparib、niraparib、bevacizumab combination",
-    "goldenTrials": [
-      "SOLO-1",
-      "PAOLA-1",
-      "PRIMA"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 58,
-    "day": "Day 58",
-    "cancer": "GYN",
-    "topic": "PARPi toxicity / resistance",
-    "details": "anemia、MDS/AML risk、maintenance duration、HRD interpretation",
-    "goldenTrials": [
-      "PARPi Review"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 59,
-    "day": "Day 59",
-    "cancer": "GYN",
-    "topic": "GYN question bank",
-    "details": "完成 GYN 題庫與錯題標記",
-    "goldenTrials": [
-      "Question Bank"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 60,
-    "day": "Day 60",
-    "cancer": "GYN",
-    "topic": "GYN mock exam",
-    "details": "GYN full mock + 錯題匯入 Review Queue",
-    "goldenTrials": [
-      "Mock Exam"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 61,
-    "day": "Day 61",
-    "cancer": "Head & Neck",
-    "topic": "HPV OPSCC",
-    "details": "AJCC staging、cisplatin vs cetuximab、de-escalation pitfalls",
-    "goldenTrials": [
-      "RTOG 1016",
-      "De-ESCALaTE"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 62,
-    "day": "Day 62",
-    "cancer": "Head & Neck",
-    "topic": "Definitive / adjuvant CCRT",
-    "details": "cisplatin schedule、high-risk features、ENE/positive margin",
-    "goldenTrials": [
-      "JCOG1008",
-      "RTOG 9501"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 63,
-    "day": "Day 63",
-    "cancer": "Head & Neck",
-    "topic": "R/M HNSCC first-line",
-    "details": "PD-L1 CPS、pembrolizumab mono vs chemo-IO",
-    "goldenTrials": [
-      "KEYNOTE-048"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 64,
-    "day": "Day 64",
-    "cancer": "Head & Neck",
-    "topic": "EXTREME and second-line",
-    "details": "cetuximab + platinum/5FU、nivolumab、afatinib、methotrexate",
-    "goldenTrials": [
-      "EXTREME",
-      "CheckMate 141",
-      "KEYNOTE-040"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 65,
-    "day": "Day 65",
-    "cancer": "Head & Neck",
-    "topic": "NPC systemic therapy",
-    "details": "induction GP、R/M NPC chemo-IO、EBV",
-    "goldenTrials": [
-      "JUPITER-02",
-      "CAPTAIN-1st",
-      "GEM20110714"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 66,
-    "day": "Day 66",
-    "cancer": "Head & Neck",
-    "topic": "Salivary / thyroid / skin cancer",
-    "details": "NGS/druggable mutation、lenvatinib、cemiplimab",
-    "goldenTrials": [
-      "SELECT",
-      "LIBRETTO"
-    ],
-    "priority": "Medium",
-    "completed": false
-  },
-  {
-    "id": 67,
-    "day": "Day 67",
-    "cancer": "Head & Neck",
-    "topic": "H&N mock exam",
-    "details": "H&N full mock + 錯題匯入 Review Queue",
-    "goldenTrials": [
-      "Mock Exam"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 68,
-    "day": "Day 68",
-    "cancer": "GI",
-    "topic": "Esophageal/gastric basics",
-    "details": "histology、HER2、PD-L1 CPS、MSI/dMMR、CLDN18.2",
-    "goldenTrials": [
-      "GI Biomarker Review"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 69,
-    "day": "Day 69",
-    "cancer": "GI",
-    "topic": "Gastric first-line IO",
-    "details": "HER2-negative advanced gastric/GEJ、nivolumab + chemo",
-    "goldenTrials": [
-      "CheckMate-649",
-      "KEYNOTE-859"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 70,
-    "day": "Day 70",
-    "cancer": "GI",
-    "topic": "Esophageal IO",
-    "details": "ESCC chemo-IO vs dual IO、TPS/CPS、PFS/OS interpretation",
-    "goldenTrials": [
-      "KEYNOTE-590",
-      "CheckMate-648"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 71,
-    "day": "Day 71",
-    "cancer": "GI",
-    "topic": "HER2+ gastric cancer",
-    "details": "trastuzumab first-line、pembrolizumab add-on、T-DXd後線",
-    "goldenTrials": [
-      "ToGA",
-      "KEYNOTE-811",
-      "DESTINY-Gastric"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 72,
-    "day": "Day 72",
-    "cancer": "GI",
-    "topic": "BRAF V600E CRC",
-    "details": "encorafenib + cetuximab ± chemo、first-line BREAKWATER",
-    "goldenTrials": [
-      "BEACON",
-      "BREAKWATER"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 73,
-    "day": "Day 73",
-    "cancer": "GI",
-    "topic": "Rectal cancer",
-    "details": "TNT、PROSPECT、dMMR dostarlimab、watch-and-wait",
-    "goldenTrials": [
-      "PROSPECT",
-      "OPRA",
-      "Dostarlimab dMMR rectal"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 74,
-    "day": "Day 74",
-    "cancer": "GI",
-    "topic": "HCC systemic therapy",
-    "details": "atezo/bev、durva/treme、durvalumab mono、TACE combination",
-    "goldenTrials": [
-      "IMbrave150",
-      "HIMALAYA",
-      "EMERALD-1"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 75,
-    "day": "Day 75",
-    "cancer": "GI",
-    "topic": "GI mock exam",
-    "details": "GI full mock + 錯題匯入 Review Queue",
-    "goldenTrials": [
-      "Mock Exam"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 76,
-    "day": "Day 76",
-    "cancer": "Heme",
-    "topic": "AML/MDS essentials",
-    "details": "response criteria、blast cutoff、MRD、venetoclax/HMA",
-    "goldenTrials": [
-      "AML Review"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 77,
-    "day": "Day 77",
-    "cancer": "Heme",
-    "topic": "Hodgkin lymphoma",
-    "details": "ABVD、A+AVD、interim PET、BV consolidation",
-    "goldenTrials": [
-      "ECHELON-1",
-      "AETHERA"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 78,
-    "day": "Day 78",
-    "cancer": "Heme",
-    "topic": "CAR-T / DLBCL",
-    "details": "CD19 CAR-T、CRS、ICANS、tocilizumab vs steroid",
-    "goldenTrials": [
-      "ZUMA-1",
-      "JULIET",
-      "TRANSFORM"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 79,
-    "day": "Day 79",
-    "cancer": "Heme",
-    "topic": "Multiple myeloma",
-    "details": "SLiM-CRAB、risk cytogenetics、VRd/DRd/D-VTd",
-    "goldenTrials": [
-      "MAIA",
-      "GRIFFIN",
-      "PERSEUS"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 80,
-    "day": "Day 80",
-    "cancer": "Heme",
-    "topic": "ALL/CML essentials",
-    "details": "Ph+ ALL、TKI、CML milestones、T315I",
-    "goldenTrials": [
-      "CML Review"
-    ],
-    "priority": "Medium",
-    "completed": false
-  },
-  {
-    "id": 81,
-    "day": "Day 81",
-    "cancer": "Melanoma/Sarcoma",
-    "topic": "Melanoma adjuvant/metastatic IO",
-    "details": "PD-1、ipi/nivo、relatlimab、BRAF/MEK",
-    "goldenTrials": [
-      "KEYNOTE-054",
-      "CheckMate 238",
-      "RELATIVITY-047"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 82,
-    "day": "Day 82",
-    "cancer": "Melanoma/Sarcoma",
-    "topic": "Uveal melanoma",
-    "details": "HLA-A*02:01、gp100 bispecific、liver metastasis",
-    "goldenTrials": [
-      "Tebentafusp Phase III"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 83,
-    "day": "Day 83",
-    "cancer": "Melanoma/Sarcoma",
-    "topic": "Sarcoma / GIST",
-    "details": "pazopanib、imatinib-sensitive GIST、subtype caveat",
-    "goldenTrials": [
-      "PALETTE"
-    ],
-    "priority": "Medium",
-    "completed": false
-  },
-  {
-    "id": 84,
-    "day": "Day 84",
-    "cancer": "Supportive/Stats",
-    "topic": "Supportive care",
-    "details": "febrile neutropenia、MASCC、bone agents、terminal secretion",
-    "goldenTrials": [
-      "IDSA/NCCN Supportive"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 85,
-    "day": "Day 85",
-    "cancer": "Supportive/Stats",
-    "topic": "Mini mock",
-    "details": "Heme/Melanoma/Supportive mixed mock",
-    "goldenTrials": [
-      "Mock Exam"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 86,
-    "day": "Day 86",
-    "cancer": "Supportive/Stats",
-    "topic": "ICI toxicity",
-    "details": "pneumonitis、colitis、hepatitis、endocrinopathy、myocarditis",
-    "goldenTrials": [
-      "irAE Review"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 87,
-    "day": "Day 87",
-    "cancer": "Supportive/Stats",
-    "topic": "Biomarker mega-review",
-    "details": "MSI/dMMR、PD-L1 CPS/TPS、HER2、BRCA/HRD、NTRK/RET",
-    "goldenTrials": [
-      "Biomarker Review"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 88,
-    "day": "Day 88",
-    "cancer": "Supportive/Stats",
-    "topic": "Targeted therapy toxicity",
-    "details": "ADC、TKI、PARPi、CDK4/6、PI3K/AKT toxicity",
-    "goldenTrials": [
-      "Toxicity Review"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 89,
-    "day": "Day 89",
-    "cancer": "Supportive/Stats",
-    "topic": "Pathology/IHC rapid review",
-    "details": "CUP、lung vs GI vs H&N、lymphoma markers",
-    "goldenTrials": [
-      "IHC Review"
-    ],
-    "priority": "Medium",
-    "completed": false
-  },
-  {
-    "id": 90,
-    "day": "Day 90",
-    "cancer": "Supportive/Stats",
-    "topic": "Statistics/trial interpretation",
-    "details": "KM curve、HR、CI、non-inferiority、ITT、subgroup forest plot",
-    "goldenTrials": [
-      "Stats Review"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 91,
-    "day": "Day 91",
-    "cancer": "Mock",
-    "topic": "112 full mock",
-    "details": "完整作答 112 年考題 120 題",
-    "goldenTrials": [
-      "112 Exam"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 92,
-    "day": "Day 92",
-    "cancer": "Mock",
-    "topic": "112 correction",
-    "details": "112 錯題詳解、錯因分類、加入 Review Queue",
-    "goldenTrials": [
-      "112 Correction"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 93,
-    "day": "Day 93",
-    "cancer": "Mock",
-    "topic": "113 full mock",
-    "details": "完整作答 113 年考題 120 題",
-    "goldenTrials": [
-      "113 Exam"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 94,
-    "day": "Day 94",
-    "cancer": "Mock",
-    "topic": "113 correction",
-    "details": "113 錯題詳解、錯因分類、加入 Review Queue",
-    "goldenTrials": [
-      "113 Correction"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 95,
-    "day": "Day 95",
-    "cancer": "Mock",
-    "topic": "114 full mock",
-    "details": "完整作答 114 年考題 120 題",
-    "goldenTrials": [
-      "114 Exam"
+const planModules = [
+  {
+    module: 'Lung',
+    cancer: 'Lung',
+    days: 13,
+    phase: 'Phase 1: High-frequency cancer progression',
+    bossUnlockContribution: 'Lung Boss',
+    tasks: [
+      ['NSCLC foundation', 'TNM, resectability, molecular testing, PD-L1 TPS, perioperative decision points', ['NCCN Algorithm'], ['algorithm', 'biomarker', 'NSCLC']],
+      ['EGFR early NSCLC', 'Adjuvant osimertinib, EGFR exon 19/L858R, postop chemotherapy role', ['ADAURA'], ['EGFR', 'adjuvant', 'targeted therapy']],
+      ['Unresectable stage III NSCLC', 'Definitive CCRT, durvalumab consolidation, PACIFIC eligibility and endpoints', ['PACIFIC'], ['CCRT', 'durvalumab', 'endpoint']],
+      ['Neoadjuvant chemo-IO', 'Resectable NSCLC, pCR/MPR/EFS definitions and trial traps', ['CheckMate 816'], ['neoadjuvant', 'ICI', 'endpoint']],
+      ['Perioperative pembrolizumab', 'Stage II-IIIB NSCLC, neoadjuvant pembrolizumab-chemo to adjuvant pembrolizumab', ['KEYNOTE-671'], ['perioperative', 'ICI', 'EFS']],
+      ['ALK/ROS1/RET/MET/NTRK', 'Driver-positive metastatic sequencing and resistance pattern recognition', ['CROWN', 'PROFILE', 'LIBRETTO'], ['biomarker', 'targeted therapy', 'sequencing']],
+      ['KRAS/HER2/BRAF/MET exon 14', 'Actionable mutations, drug names, eligibility, toxicity traps', ['CodeBreaK', 'DESTINY-Lung'], ['KRAS', 'HER2', 'biomarker']],
+      ['Metastatic ICI algorithms', 'PD-L1 high, chemo-IO, dual IO, contraindications, progression patterns', ['KEYNOTE-024', 'KEYNOTE-189', 'CheckMate-227'], ['metastatic', 'ICI', 'algorithm']],
+      ['SCLC limited stage', 'Concurrent chemoradiation, BID vs QD RT, PCI, CONVERT and CALGB 30610', ['CONVERT', 'CALGB 30610'], ['SCLC', 'radiation', 'trial']],
+      ['SCLC extensive stage', 'Platinum-etoposide plus ICI, maintenance, lurbinectedin, thoracic RT traps', ['IMpower133', 'CASPIAN'], ['SCLC', 'metastatic', 'ICI']],
+      ['Mesothelioma', 'First-line IO, histology, surgical controversies, TTFields and toxicity', ['CheckMate-743'], ['mesothelioma', 'ICI', 'rare']],
+      ['Lung toxicity drill', 'Pneumonitis, EGFR/ALK adverse effects, ADC ILD, radiation recall', ['Toxicity Review'], ['toxicity', 'ILD', 'TKI']],
+      ['Lung boss prep', '20-question Lung mixed bank: biomarkers, perioperative, SCLC, mesothelioma', ['Lung Boss'], ['boss', 'mixed mock', 'weakness repair']],
+    ],
+  },
+  {
+    module: 'Breast',
+    cancer: 'Breast',
+    days: 13,
+    phase: 'Phase 1: High-frequency cancer progression',
+    bossUnlockContribution: 'Breast Boss',
+    tasks: [
+      ['Early HR+/HER2- framework', 'Risk stratification, endocrine therapy, OFS, chemo decision', ['TAILORx', 'RxPONDER'], ['HR+', 'adjuvant', 'algorithm']],
+      ['Gene expression profile', 'Oncotype DX, MammaPrint, PAM50, EndoPredict, what each test can and cannot do', ['TAILORx', 'MINDACT'], ['biomarker', 'gene expression', 'adjuvant']],
+      ['Adjuvant CDK4/6', 'High-risk criteria, monarchE, NATALEE, duration, toxicity', ['monarchE', 'NATALEE'], ['CDK4/6', 'adjuvant', 'toxicity']],
+      ['HER2+ early disease', 'Neoadjuvant HP-chemo, residual disease, adjuvant T-DM1', ['KATHERINE', 'APHINITY'], ['HER2', 'neoadjuvant', 'ADC']],
+      ['TNBC neoadjuvant IO', 'KEYNOTE-522 population, pCR/EFS, adjuvant pembrolizumab continuation', ['KEYNOTE-522'], ['TNBC', 'ICI', 'neoadjuvant']],
+      ['gBRCA and PARPi', 'OlympiA eligibility, TNBC/luminal high-risk definitions, iDFS/OS', ['OlympiA'], ['PARPi', 'BRCA', 'adjuvant']],
+      ['Metastatic HR+/HER2-', 'Endocrine-CDK4/6 sequencing, ESR1, PIK3CA, AKT pathway choices', ['PALOMA', 'MONALEESA', 'SOLAR-1'], ['metastatic', 'sequencing', 'biomarker']],
+      ['HER2+ metastatic', 'First-line HP-taxane, second-line T-DXd, brain metastasis options', ['CLEOPATRA', 'DESTINY-Breast03', 'HER2CLIMB'], ['HER2', 'metastatic', 'ADC']],
+      ['HER2-low and ADC', 'HER2-low definition, T-DXd eligibility, ILD monitoring', ['DESTINY-Breast04'], ['HER2-low', 'ADC', 'toxicity']],
+      ['TNBC metastatic', 'PD-L1 assays, sacituzumab, PARPi, TROP2 ADC traps', ['ASCENT', 'KEYNOTE-355'], ['TNBC', 'ADC', 'PD-L1']],
+      ['Breast toxicity drill', 'CDK4/6 neutropenia/QTc/diarrhea, PI3K hyperglycemia, ADC ILD', ['Toxicity Review'], ['toxicity', 'ADC', 'CDK4/6']],
+      ['Breast trial endpoint recall', 'Blank recall for population, intervention, endpoint, OS/PFS/iDFS', ['Golden Trial Recall'], ['trial', 'endpoint', 'flashcard']],
+      ['Breast boss prep', 'HER2/TNBC/HR+ mixed mock and correction', ['Breast Boss'], ['boss', 'mixed mock', 'weakness repair']],
+    ],
+  },
+  {
+    module: 'GI',
+    cancer: 'GI',
+    days: 12,
+    phase: 'Phase 1: High-frequency cancer progression',
+    bossUnlockContribution: 'GI Boss',
+    tasks: [
+      ['CRC biomarkers', 'RAS/BRAF/MSI/HER2/NTRK, sidedness, anti-EGFR rules', ['FIRE-3', 'PARADIGM'], ['CRC', 'biomarker', 'metastatic']],
+      ['Metastatic CRC sequencing', 'FOLFOX/FOLFIRI, bevacizumab beyond progression, EGFR rechallenge, TAS-102', ['VELOUR', 'RAISE', 'SUNLIGHT'], ['CRC', 'sequencing', 'metastatic']],
+      ['Rectal TNT', 'PRODIGE-23, RAPIDO, OPRA, watch-and-wait, endpoint traps', ['PRODIGE-23', 'RAPIDO', 'OPRA'], ['rectal', 'neoadjuvant', 'radiation']],
+      ['Adjuvant colon cancer', 'Stage II risk, stage III duration, IDEA, ctDNA caveats', ['IDEA'], ['colon', 'adjuvant', 'algorithm']],
+      ['Gastric/GEJ first-line', 'HER2, PD-L1 CPS, CLDN18.2, chemo-IO, trastuzumab choices', ['CheckMate-649', 'KEYNOTE-859', 'SPOTLIGHT'], ['gastric', 'GEJ', 'biomarker']],
+      ['Esophageal cancer', 'CROSS, CheckMate-577, definitive CCRT, squamous vs adenocarcinoma', ['CROSS', 'CheckMate-577'], ['esophageal', 'CCRT', 'adjuvant']],
+      ['HCC systemic therapy', 'Atezo-bev, STRIDE, second-line sequencing, contraindications', ['IMbrave150', 'HIMALAYA'], ['HCC', 'ICI', 'sequencing']],
+      ['Pancreas cancer', 'Adjuvant modified FOLFIRINOX, metastatic regimens, BRCA/PARPi', ['PRODIGE-24', 'POLO'], ['pancreas', 'PARPi', 'adjuvant']],
+      ['Biliary tract cancer', 'TOPAZ-1, KEYNOTE-966, FGFR2, IDH1, HER2, BRAF', ['TOPAZ-1', 'KEYNOTE-966'], ['biliary', 'biomarker', 'ICI']],
+      ['GIST and NET', 'KIT/PDGFRA, imatinib dose, avapritinib, sunitinib/regorafenib/ripretinib', ['GIST Review'], ['GIST', 'targeted therapy', 'rare']],
+      ['GI toxicity and supportive traps', 'EGFR rash/hypomagnesemia, diarrhea, hepatic dysfunction, nutrition', ['Toxicity Review'], ['toxicity', 'supportive', 'GI']],
+      ['GI boss prep', 'GI mixed mock with CRC, gastric/GEJ, rectal TNT, HCC, biliary', ['GI Boss'], ['boss', 'mixed mock', 'weakness repair']],
+    ],
+  },
+  {
+    module: 'GU', cancer: 'GU', days: 9, phase: 'Phase 1: High-frequency cancer progression', bossUnlockContribution: 'GU Readiness',
+    tasks: [
+      ['RCC adjuvant and metastatic', 'KEYNOTE-564, IO/TKI first-line choices, risk groups, toxicity', ['KEYNOTE-564', 'CheckMate-9ER', 'CLEAR'], ['RCC', 'ICI', 'TKI']],
+      ['Urothelial perioperative', 'Cisplatin eligibility, neoadjuvant chemo, adjuvant nivolumab', ['CheckMate-274'], ['urothelial', 'perioperative', 'cisplatin']],
+      ['Urothelial metastatic', 'EV-pembrolizumab, avelumab maintenance, FGFR, EV toxicity', ['EV-302', 'JAVELIN-Bladder-100', 'THOR'], ['urothelial', 'ADC', 'FGFR']],
+      ['Prostate hormone-sensitive', 'Triplet therapy, ARPI selection, docetaxel, volume/risk traps', ['ARASENS', 'PEACE-1'], ['prostate', 'ARPI', 'metastatic']],
+      ['mCRPC sequencing', 'PARPi combinations, Lu-177 PSMA, radium-223, cabazitaxel', ['VISION', 'PROpel', 'TALAPRO-2'], ['prostate', 'PARPi', 'radioligand']],
+      ['Seminoma and germ cell', 'Stage I/II seminoma, RT fields, BEP/EP, salvage concepts', ['Seminoma Review'], ['seminoma', 'radiation', 'algorithm']],
+      ['GU biomarkers', 'BRCA/HRR, FGFR, MSI, PD-L1 caveats, germline testing', ['Biomarker Review'], ['biomarker', 'BRCA', 'FGFR']],
+      ['GU toxicity drill', 'EV rash/hyperglycemia/neuropathy, TKI HTN, IO nephritis', ['Toxicity Review'], ['toxicity', 'ADC', 'TKI']],
+      ['GU mixed correction', 'Fix GU wrong-rate >=50% and mastery <=2 questions', ['Weakness Review'], ['weakness repair', 'wrong retest', 'GU']],
+    ],
+  },
+  {
+    module: 'GYN', cancer: 'GYN', days: 8, phase: 'Phase 2: Trap-topic progression', bossUnlockContribution: 'GYN Readiness',
+    tasks: [
+      ['Endometrial IO', 'dMMR/pMMR, lenvatinib-pembrolizumab, dostarlimab/carbo-taxol', ['KEYNOTE-775', 'RUBY'], ['endometrial', 'ICI', 'biomarker']],
+      ['Cervical CCRT and IO', 'KEYNOTE-A18, brachytherapy OAR, recurrent/metastatic pembrolizumab', ['KEYNOTE-A18', 'KEYNOTE-826'], ['cervical', 'CCRT', 'ICI']],
+      ['Ovarian first-line maintenance', 'BRCA/HRD, bevacizumab, olaparib/niraparib, PAOLA-1', ['SOLO-1', 'PAOLA-1', 'PRIMA'], ['ovarian', 'PARPi', 'maintenance']],
+      ['Ovarian recurrence', 'Platinum-sensitive vs resistant, mirvetuximab, FRalpha, PARPi retreatment traps', ['MIRASOL'], ['ovarian', 'ADC', 'biomarker']],
+      ['GYN trial interpretation', 'PFS vs OS, maintenance endpoints, subgroup forest plots', ['Trial Interpretation'], ['endpoint', 'statistics', 'GYN']],
+      ['GYN toxicity drill', 'PARPi cytopenia/MDS, IO toxicity, bevacizumab bowel/perforation risk', ['Toxicity Review'], ['toxicity', 'PARPi', 'ICI']],
+      ['GYN rapid algorithm', 'Endometrial/cervical/ovarian treatment sequencing blank recall', ['Algorithm Recall'], ['algorithm', 'flashcard', 'GYN']],
+      ['GYN mixed correction', 'Fix GYN wrong-rate >=50% and high-confidence wrong questions', ['Weakness Review'], ['weakness repair', 'wrong retest', 'GYN']],
+    ],
+  },
+  {
+    module: 'Heme', cancer: 'Heme', days: 10, phase: 'Phase 2: Trap-topic progression', bossUnlockContribution: 'Heme Readiness',
+    tasks: [
+      ['Hodgkin lymphoma', 'ABVD vs A+AVD, PET-adapted therapy, brentuximab toxicity, checkpoint inhibitors', ['ECHELON-1', 'RATHL'], ['HL', 'toxicity', 'trial']],
+      ['DLBCL and CAR-T', 'R-CHOP, pola-R-CHP, second-line CAR-T, bridging, CRS/ICANS', ['POLARIX', 'ZUMA-7', 'TRANSFORM'], ['DLBCL', 'CAR-T', 'toxicity']],
+      ['Indolent lymphoma', 'FL/MCL/CLL treatment triggers, BTK inhibitors, venetoclax, anti-CD20', ['CLL Review'], ['CLL', 'BTK', 'sequencing']],
+      ['Multiple myeloma frontline', 'Transplant eligibility, quadruplets, maintenance, high-risk cytogenetics', ['GRIFFIN', 'PERSEUS'], ['MM', 'transplant', 'maintenance']],
+      ['Multiple myeloma relapse', 'BCMA, bispecifics, CAR-T, sequencing and infection risk', ['CARTITUDE', 'KarMMa'], ['MM', 'BCMA', 'CAR-T']],
+      ['CML and AML', 'TKI milestones, resistance mutations, venetoclax/HMA, FLT3/IDH', ['CML Review', 'AML Review'], ['CML', 'AML', 'targeted therapy']],
+      ['CNS lymphoma and special sites', 'PCNSL induction, consolidation, ocular/CNS relapse patterns', ['PCNSL Review'], ['PCNSL', 'algorithm', 'rare']],
+      ['Heme toxicity drill', 'TLS, cytokine release, neuropathy, cytopenia, infection prophylaxis', ['Toxicity Review'], ['toxicity', 'TLS', 'supportive']],
+      ['Heme trial endpoint recall', 'Blank recall of HL/DLBCL/MM pivotal trials and endpoints', ['Golden Trial Recall'], ['trial', 'endpoint', 'flashcard']],
+      ['Heme mixed correction', 'Fix Heme wrong-rate >=50%, mastery <=2, high-confidence wrong', ['Weakness Review'], ['weakness repair', 'wrong retest', 'Heme']],
     ],
-    "priority": "High",
-    "completed": false
   },
   {
-    "id": 96,
-    "day": "Day 96",
-    "cancer": "Mock",
-    "topic": "114 correction",
-    "details": "114 錯題詳解、錯因分類、加入 Review Queue",
-    "goldenTrials": [
-      "114 Correction"
+    module: 'Head & Neck', cancer: 'Head & Neck', days: 5, phase: 'Phase 2: Trap-topic progression', bossUnlockContribution: 'Head & Neck Boss',
+    tasks: [
+      ['HPV oropharynx and staging', 'HPV-positive prognosis, AJCC differences, de-escalation traps', ['HPV HNSCC Review'], ['HPV', 'staging', 'radiation']],
+      ['Definitive and induction CCRT', 'Cisplatin vs cetuximab, TPF induction, larynx preservation trial traps', ['DeCIDE', 'RTOG 1016'], ['CCRT', 'induction', 'trial']],
+      ['Recurrent/metastatic HNSCC', 'KEYNOTE-048, CheckMate-141, platinum timing, CPS interpretation', ['KEYNOTE-048', 'CheckMate-141'], ['metastatic', 'ICI', 'PD-L1']],
+      ['Nasopharyngeal carcinoma', 'Gemcitabine-cisplatin, toripalimab/camrelizumab, EBV DNA, CCRT', ['JUPITER-02'], ['NPC', 'ICI', 'CCRT']],
+      ['Head & Neck boss prep', 'HPV/HNSCC/NPC/CCRT mixed mock and correction', ['Head & Neck Boss'], ['boss', 'mixed mock', 'weakness repair']],
     ],
-    "priority": "High",
-    "completed": false
   },
   {
-    "id": 97,
-    "day": "Day 97",
-    "cancer": "Final Review",
-    "topic": "Golden trial recall",
-    "details": "所有癌別 golden trial endpoint / population / HR blank recall",
-    "goldenTrials": [
-      "Golden Trial Recall"
+    module: 'Rare/Skin/Sarcoma/CUP/Other', cancer: 'Other', days: 7, phase: 'Phase 2: Trap-topic progression', bossUnlockContribution: 'Rare Readiness',
+    tasks: [
+      ['Melanoma adjuvant/metastatic', 'BRAF/MEK, PD-1, CTLA-4, relatlimab, brain metastasis', ['COMBI-AD', 'CheckMate-238'], ['melanoma', 'ICI', 'BRAF']],
+      ['Non-melanoma skin cancers', 'CSCC, BCC, Merkel cell, immunotherapy and hedgehog inhibitors', ['KEYNOTE-629'], ['skin', 'ICI', 'rare']],
+      ['Sarcoma systemic therapy', 'GIST separation, pazopanib, trabectedin, subtype-specific traps', ['PALETTE'], ['sarcoma', 'rare', 'targeted therapy']],
+      ['CUP and IHC', 'Lung vs GI vs breast vs H&N markers, NGS, empiric therapy limits', ['CUP Review'], ['CUP', 'IHC', 'biomarker']],
+      ['Endocrine/neuroendocrine tumors', 'MEN/VHL, thyroid, NET grading, somatostatin/PRRT', ['NETTER-1'], ['NET', 'thyroid', 'rare']],
+      ['Rare tumor biomarkers', 'NTRK/RET/MSI/TMB/BRAF across tumor types', ['Tumor-agnostic Review'], ['biomarker', 'tumor agnostic', 'targeted therapy']],
+      ['Rare/Other mixed correction', 'Fix rare tumor, CUP, skin, sarcoma wrong-rate >=50%', ['Weakness Review'], ['weakness repair', 'wrong retest', 'rare']],
     ],
-    "priority": "High",
-    "completed": false
   },
   {
-    "id": 98,
-    "day": "Day 98",
-    "cancer": "Final Review",
-    "topic": "Algorithm recall",
-    "details": "NSCLC/Breast/GU/GYN/GI treatment sequencing flowchart",
-    "goldenTrials": [
-      "Algorithm Recall"
+    module: 'Supportive/Emergency/Stats', cancer: 'Supportive/Stats', days: 8, phase: 'Phase 2: Trap-topic progression', bossUnlockContribution: 'Supportive Readiness',
+    tasks: [
+      ['CINV and pain', 'Antiemetic risk groups, olanzapine, breakthrough nausea, opioid conversion', ['Supportive Review'], ['CINV', 'pain', 'supportive']],
+      ['Oncologic emergencies', 'TLS, SIADH, MSCC, IICP, hypercalcemia, neutropenic fever', ['Emergency Review'], ['emergency', 'supportive', 'algorithm']],
+      ['ICI toxicity', 'Pneumonitis, colitis, hepatitis, endocrine, myocarditis; hold vs steroid vs rechallenge', ['irAE Review'], ['ICI', 'toxicity', 'supportive']],
+      ['ADC/TKI/PARPi toxicity', 'ILD, neuropathy, ocular toxicity, cytopenia, hypertension, QTc', ['Toxicity Review'], ['ADC', 'TKI', 'PARPi']],
+      ['Biomarker mega-review', 'MSI/dMMR, PD-L1 CPS/TPS, HER2, BRCA/HRD, NTRK/RET, KRAS', ['Biomarker Review'], ['biomarker', 'tumor agnostic', 'rapid recall']],
+      ['Statistics essentials', 'HR/CI/KM, ITT, non-inferiority, crossover, subgroup forest plot', ['Stats Review'], ['statistics', 'endpoint', 'trial interpretation']],
+      ['Endpoint design drill', 'OS/PFS/EFS/DFS/iDFS/pCR/MRD definitions and exam traps', ['Endpoint Review'], ['endpoint', 'trial', 'flashcard']],
+      ['Supportive/Stats mixed correction', 'Fix supportive and statistics wrong-rate >=50% questions', ['Weakness Review'], ['weakness repair', 'wrong retest', 'statistics']],
     ],
-    "priority": "High",
-    "completed": false
   },
-  {
-    "id": 99,
-    "day": "Day 99",
-    "cancer": "Final Review",
-    "topic": "Weakness-only day",
-    "details": "只讀 wrong rate ≥50% 或 mastery ≤2 的題目",
-    "goldenTrials": [
-      "Weakness Review"
-    ],
-    "priority": "High",
-    "completed": false
-  },
-  {
-    "id": 100,
-    "day": "Day 100",
-    "cancer": "Final Review",
-    "topic": "Ultra rapid review",
-    "details": "biomarker、toxicity、trial endpoint、NCCN sequencing 最後總複習",
-    "goldenTrials": [
-      "Final Review"
-    ],
-    "priority": "High",
-    "completed": false
-  }
 ];
 
+const mockPlanTasks = [
+  ['Phase 3: First full mock cycle', 'Mock + correction', 'Mock', '112 first full mock', 'Complete 112 full exam under timed conditions; no explanations until finished', ['112 Exam'], ['mock', '112', 'timed'], 'Final Board Boss'],
+  ['Phase 3: First full mock cycle', 'Mock + correction', 'Mock', '112 correction', 'Classify every 112 wrong answer by error type and create cards for trial/biomarker/toxicity misses', ['112 Correction'], ['correction', 'error type', 'flashcard'], 'Final Board Boss'],
+  ['Phase 3: First full mock cycle', 'Mock + correction', 'Mock', '113 first full mock', 'Complete 113 full exam under timed conditions; no explanations until finished', ['113 Exam'], ['mock', '113', 'timed'], 'Final Board Boss'],
+  ['Phase 3: First full mock cycle', 'Mock + correction', 'Mock', '113 correction', 'Classify every 113 wrong answer and add high-confidence wrong to Critical Error Queue', ['113 Correction'], ['correction', 'critical error', 'flashcard'], 'Final Board Boss'],
+  ['Phase 3: First full mock cycle', 'Mock + correction', 'Mock', '114 first full mock', 'Complete 114 full exam under timed conditions; no explanations until finished', ['114 Exam'], ['mock', '114', 'timed'], 'Final Board Boss'],
+  ['Phase 3: First full mock cycle', 'Mock + correction', 'Mock', '114 correction', 'Classify every 114 wrong answer and tag score draggers by cancer/topic', ['114 Correction'], ['correction', 'score dragger', 'flashcard'], 'Final Board Boss'],
+  ['Phase 3: First full mock cycle', 'Mock + correction', 'Mock', 'Mixed correction A', 'Repair top Lung/Breast/GI score draggers from first mock cycle', ['Weakness Review'], ['weakness repair', 'Lung', 'Breast', 'GI'], 'Final Board Boss'],
+  ['Phase 3: First full mock cycle', 'Mock + correction', 'Mock', 'Mixed correction B', 'Repair Heme/GU/GYN/Head & Neck score draggers from first mock cycle', ['Weakness Review'], ['weakness repair', 'Heme', 'GU', 'GYN', 'Head & Neck'], 'Final Board Boss'],
+  ['Phase 3: First full mock cycle', 'Mock + correction', 'Mock', 'Trial card checkpoint', 'Generate or review at least 50 pivotal trial cards; endpoint recall target 85%', ['Trial Boss'], ['trial', 'flashcard', 'endpoint'], 'Trial Boss'],
+  ['Phase 3: First full mock cycle', 'Mock + correction', 'Mock', 'First cycle readiness audit', 'Review predicted score, volatility, red topics, and plan the weakness-only block', ['Readiness Audit'], ['readiness', 'volatility', 'red topic'], 'Final Board Boss'],
+  ['Phase 5: Second full mock cycle', 'Mock + correction', 'Mock', '112 full mock retest', 'Retest 112; require wrong-retest conversion trend toward 90%', ['112 Retest'], ['mock', 'retest', '112'], 'Final Board Boss'],
+  ['Phase 5: Second full mock cycle', 'Mock + correction', 'Mock', '113 full mock retest', 'Retest 113 and compare score volatility with first cycle', ['113 Retest'], ['mock', 'retest', '113'], 'Final Board Boss'],
+  ['Phase 5: Second full mock cycle', 'Mock + correction', 'Mock', '114 full mock retest', 'Retest 114; all high-confidence wrong must become cards or review tasks', ['114 Retest'], ['mock', 'retest', '114'], 'Final Board Boss'],
+  ['Phase 5: Second full mock cycle', 'Mock + correction', 'Mock', 'Wrong-retest 90 checkpoint', 'Only previously wrong questions; target wrong-retest conversion >=90%', ['Wrong Retest'], ['wrong retest', 'critical error', 'mastery'], 'Final Board Boss'],
+  ['Phase 5: Second full mock cycle', 'Mock + correction', 'Mock', 'Mixed retest correction', 'Repair any remaining red topics after 112-114 retest and regenerate cards for persistent misses', ['Mixed Correction'], ['correction', 'red topic', 'flashcard'], 'Final Board Boss'],
+  ['Phase 5: Second full mock cycle', 'Mock + correction', 'Mock', 'Final readiness lock', 'Confirm latest score trend, high-confidence wrong rate, and wrong-retest conversion before final rapid recall', ['Readiness Audit'], ['readiness', 'wrong retest', 'volatility'], 'Final Board Boss'],
+  ['Phase 5: Second full mock cycle', 'Mock + correction', 'Mock', 'Final Board Boss', 'Mixed board boss: latest full mock >=75% and wrong-retest >=90%', ['Final Board Boss'], ['boss', 'mock', 'readiness'], 'Final Board Boss'],
+];
+
+const weaknessPlanTasks = Array.from({ length: 15 }, (_, index) => ({
+  id: 76 + index,
+  day: `Day ${76 + index}`,
+  phase: 'Phase 4: Weakness repair only',
+  module: 'Weakness Repair',
+  cancer: 'Weakness Repair',
+  topic: [
+    'High-confidence wrong repair',
+    'Wrong-rate >=50% Lung/Breast/GI',
+    'Mastery <=2 trial endpoints',
+    'Critical Error Queue pass 1',
+    'Biomarker cutoff repair',
+    'ADC and toxicity repair',
+    'Heme/GU/GYN repair',
+    'Head & Neck/Rare repair',
+    'Statistics and trial interpretation repair',
+    'Algorithm blank recall',
+    'Previously wrong retest A',
+    'Previously wrong retest B',
+    'Red topic mini mocks',
+    'Boss rematch day',
+    'Readiness audit before retest cycle',
+  ][index],
+  details: 'Only study questions/topics matching wrongRate >=50%, mastery <=2, high-confidence wrong, repeated wrong, or failed boss categories.',
+  goldenTrials: ['Weakness Review'],
+  focusTags: ['wrongRate >=50', 'mastery <=2', 'high-confidence wrong', 'repeated wrong'],
+  requiredQuestionIds: [],
+  bossUnlockContribution: 'Final Board Boss',
+  priority: 'High',
+}));
+
+function buildStudyPlan100() {
+  const tasks = [];
+  const moduleOrder = ['Lung', 'Breast', 'GI', 'GU', 'GYN', 'Head & Neck', 'Heme', 'Rare/Skin/Sarcoma/CUP/Other', 'Supportive/Emergency/Stats'];
+  const orderedModules = [...planModules].sort((a, b) => moduleOrder.indexOf(a.module) - moduleOrder.indexOf(b.module));
+  orderedModules.forEach((module) => {
+    module.tasks.forEach(([topic, details, goldenTrials, focusTags]) => {
+      const id = tasks.length + 1;
+      const phase = id <= 45
+        ? 'Phase 1: High-frequency cancer progression'
+        : 'Phase 2: Trap-topic progression';
+      tasks.push({
+        id,
+        day: `Day ${id}`,
+        phase,
+        module: module.module,
+        cancer: module.cancer,
+        topic,
+        details,
+        goldenTrials,
+        focusTags,
+        requiredQuestionIds: [],
+        bossUnlockContribution: module.bossUnlockContribution,
+        priority: focusTags.includes('boss') || focusTags.includes('weakness repair') ? 'High' : 'High',
+      });
+    });
+  });
+
+  const withWeakness = [...tasks.slice(0, 75), ...weaknessPlanTasks];
+  mockPlanTasks.forEach(([phase, module, cancer, topic, details, goldenTrials, focusTags, bossUnlockContribution], index) => {
+    const id = index < 10 ? 66 + index : 91 + (index - 10);
+    withWeakness[id - 1] = {
+      id,
+      day: `Day ${id}`,
+      phase,
+      module,
+      cancer,
+      topic,
+      details,
+      goldenTrials,
+      focusTags,
+      requiredQuestionIds: [],
+      bossUnlockContribution,
+      priority: 'High',
+    };
+  });
+
+  [
+    ['Golden trial rapid recall', 'Blank recall population/intervention/endpoint/result for all golden trials', ['Golden Trial Recall'], ['trial', 'endpoint', 'rapid recall']],
+    ['Biomarker and toxicity rapid recall', 'MSI/dMMR, PD-L1 CPS/TPS, HER2, BRCA/HRD, NTRK/RET, ADC/ICI/PARPi/TKI toxicity', ['Biomarker Review', 'Toxicity Review'], ['biomarker', 'toxicity', 'rapid recall']],
+    ['Algorithm final sprint', 'NSCLC, Breast, GI, GU, GYN, Heme sequencing flowcharts from memory', ['Algorithm Recall'], ['algorithm', 'rapid recall', 'final review']],
+  ].forEach(([topic, details, goldenTrials, focusTags], index) => {
+    const id = 98 + index;
+    withWeakness[id - 1] = {
+      id,
+      day: `Day ${id}`,
+      phase: 'Phase 6: Final rapid recall',
+      module: 'Final Review',
+      cancer: 'Final Review',
+      topic,
+      details,
+      goldenTrials,
+      focusTags,
+      requiredQuestionIds: [],
+      bossUnlockContribution: 'Final Board Boss',
+      priority: 'High',
+    };
+  });
+
+  return withWeakness.slice(0, 100);
+}
+
+const studyPlan100 = buildStudyPlan100();
 
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? { ...defaultState, ...JSON.parse(raw) } : defaultState;
+    return normalizeState(raw ? { ...defaultState, ...JSON.parse(raw) } : defaultState);
   } catch {
     return defaultState;
   }
@@ -1326,9 +353,9 @@ function saveState(state) {
 }
 
 function mergeCloudState(localState, cloudState) {
-  if (!cloudState) return { ...defaultState, ...localState };
+  if (!cloudState) return normalizeState({ ...defaultState, ...localState });
 
-  return {
+  return normalizeState({
     ...defaultState,
     ...cloudState,
     ...localState,
@@ -1361,7 +388,7 @@ function mergeCloudState(localState, cloudState) {
       ...(cloudState.cloudMeta || {}),
       ...(localState.cloudMeta || {}),
     },
-  };
+  });
 }
 
 function getCloudDocRef(uid) {
@@ -1384,6 +411,84 @@ function addDays(dateString, days) {
   const date = new Date(`${dateString}T00:00:00`);
   date.setDate(date.getDate() + days);
   return date.toISOString().slice(0, 10);
+}
+
+function normalizeState(state) {
+  return {
+    ...defaultState,
+    ...state,
+    settings: {
+      ...defaultState.settings,
+      ...(state?.settings || {}),
+    },
+    flashcards: state?.flashcards || [],
+    game: {
+      ...defaultState.game,
+      ...(state?.game || {}),
+      badges: state?.game?.badges || [],
+      unlockedBosses: state?.game?.unlockedBosses || [],
+      defeatedBosses: state?.game?.defeatedBosses || [],
+      xpEvents: state?.game?.xpEvents || [],
+      dailyClaims: state?.game?.dailyClaims || {},
+    },
+  };
+}
+
+function daysBetween(fromDate, toDate) {
+  if (!fromDate || !toDate) return Number.POSITIVE_INFINITY;
+  const from = new Date(`${fromDate}T00:00:00`);
+  const to = new Date(`${toDate}T00:00:00`);
+  return Math.round((to - from) / 86400000);
+}
+
+function xpLevel(xp = 0) {
+  return Math.max(1, Math.floor(Math.sqrt(Math.max(0, xp) / 120)) + 1);
+}
+
+function awardXp(game = defaultState.game, amount, reason, meta = {}) {
+  if (!amount) return game;
+  const xp = (game.xp || 0) + amount;
+  const event = {
+    id: `xp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    amount,
+    reason,
+    meta,
+    createdAt: new Date().toISOString(),
+  };
+  return {
+    ...defaultState.game,
+    ...game,
+    xp,
+    level: xpLevel(xp),
+    xpEvents: [event, ...(game.xpEvents || [])].slice(0, 80),
+  };
+}
+
+function makeQuestionTags(question) {
+  const text = `${question.stem || ''} ${question.topic || ''} ${(question.trials || []).join(' ')}`.toLowerCase();
+  const includesAny = (items) => items.some((item) => text.includes(item.toLowerCase()));
+  return {
+    domain: question.cancer,
+    subtopic: question.topic || 'General',
+    trial: question.trials || [],
+    biomarker: [
+      ['EGFR', 'egfr'], ['ALK', 'alk'], ['KRAS', 'kras'], ['HER2', 'her2'], ['BRCA/HRD', 'brca', 'hrd'],
+      ['MSI/dMMR', 'msi', 'dmmr'], ['PD-L1', 'pd-l1', 'cps', 'tps'], ['FGFR', 'fgfr'], ['NTRK/RET', 'ntrk', 'ret'],
+    ].filter(([, ...terms]) => includesAny(terms)).map(([label]) => label),
+    treatmentLine: includesAny(['adjuvant']) ? 'adjuvant' : includesAny(['neoadjuvant']) ? 'neoadjuvant' : includesAny(['second-line', '2nd', 'salvage']) ? 'second-line' : includesAny(['first-line', '1st']) ? 'first-line' : '',
+    endpoint: ['OS', 'PFS', 'EFS', 'DFS', 'iDFS', 'pCR', 'ORR'].filter((endpoint) => text.includes(endpoint.toLowerCase())),
+    toxicity: [
+      ['ILD/pneumonitis', 'ild', 'pneumonitis'],
+      ['neuropathy', 'neuropathy'],
+      ['cytopenia', 'neutropenia', 'anemia', 'thrombocytopenia'],
+      ['hyperglycemia', 'hyperglycemia'],
+      ['hypertension', 'hypertension'],
+      ['CRS/ICANS', 'crs', 'icans'],
+    ].filter(([, ...terms]) => includesAny(terms)).map(([label]) => label),
+    guidelineConcept: question.topic || '',
+    examWeight: question.cancer === 'Lung' ? 5 : ['Breast', 'GI', 'Heme'].includes(question.cancer) ? 4 : ['GU', 'Head & Neck'].includes(question.cancer) ? 3 : 2,
+    cardEligible: Boolean(question.explanation || (question.trials || []).length || question.answer),
+  };
 }
 
 function findQuestionById(id) {
@@ -1410,7 +515,15 @@ function applyQuestionOverride(question, overrides = {}) {
 const getQuestionWithOverride = (id, state) => {
   const original = findQuestionById(id);
   if (!original) return null;
-  return applyQuestionOverride(original, state?.questionOverrides || {});
+  const question = applyQuestionOverride(original, state?.questionOverrides || {});
+  return {
+    ...question,
+    tags: {
+      ...makeQuestionTags(question),
+      ...(question.tags && !Array.isArray(question.tags) ? question.tags : {}),
+      raw: Array.isArray(question.tags) ? question.tags : question.tags?.raw || [],
+    },
+  };
 };
 
 function emptyStat() {
@@ -1539,13 +652,138 @@ function generateDailyQuestionIds(state) {
   result.push(...pickUnique(newQuestions, newCount, used));
   result.push(...pickUnique(bookmarked, bookmarkCount, used));
 
-  // fill remaining with regular items
   if (result.length < dailyCount) {
     const remaining = dailyCount - result.length;
     result.push(...pickUnique(regular, remaining, used));
   }
 
   return result.slice(0, dailyCount);
+}
+
+const BOSS_DEFINITIONS = [
+  { id: 'lung', name: 'Lung Boss', module: 'Lung', cancer: 'Lung', unlockPercent: 80, passScore: 80 },
+  { id: 'breast', name: 'Breast Boss', module: 'Breast', cancer: 'Breast', unlockPercent: 80, passScore: 80 },
+  { id: 'gi', name: 'GI Boss', module: 'GI', cancer: 'GI', unlockPercent: 80, passScore: 78 },
+  { id: 'head-neck', name: 'Head & Neck Boss', module: 'Head & Neck', cancer: 'Head & Neck', unlockPercent: 80, passScore: 78 },
+  { id: 'trial', name: 'Trial Boss', module: 'Trial Cards', cancer: 'Trial Cards', unlockPercent: 50, passScore: 85 },
+  { id: 'final-board', name: 'Final Board Boss', module: 'Final Board', cancer: 'Mock', unlockPercent: 100, passScore: 75 },
+];
+
+function getModuleProgress(planProgress = {}) {
+  return studyPlan100.reduce((acc, task) => {
+    if (!acc[task.module]) acc[task.module] = { module: task.module, total: 0, completed: 0 };
+    acc[task.module].total += 1;
+    if (planProgress[task.id]) acc[task.module].completed += 1;
+    return acc;
+  }, {});
+}
+
+function examMatchesBoss(exam, boss) {
+  if (!exam?.completedAt) return false;
+  if (boss.id === 'final-board') {
+    return exam.questionCount >= 50 && exam.score >= boss.passScore;
+  }
+  if (boss.id === 'trial') {
+    return exam.mode === 'trial-boss' && exam.score >= boss.passScore;
+  }
+  const cancerResults = (exam.results || []).filter((result) => result.cancer === boss.cancer);
+  return cancerResults.length >= 20 && exam.score >= boss.passScore && cancerResults.length / Math.max(1, exam.results?.length || 1) >= 0.75;
+}
+
+function getBossRows(state, readiness = getReadinessMetrics(state)) {
+  const progress = getModuleProgress(state.planProgress || {});
+  const trialCards = (state.flashcards || []).filter((card) => card.sourceType === 'trial').length;
+  const completedYears = new Set((state.mockExams || [])
+    .filter((exam) => exam.completedAt && exam.year)
+    .map((exam) => Number(exam.year)));
+  return BOSS_DEFINITIONS.map((boss) => {
+    let unlockValue;
+    let unlocked;
+    if (boss.id === 'trial') {
+      unlockValue = trialCards;
+      unlocked = trialCards >= 50;
+    } else if (boss.id === 'final-board') {
+      unlockValue = completedYears.size;
+      unlocked = [112, 113, 114].every((year) => completedYears.has(year));
+    } else {
+      const row = progress[boss.module] || { total: 0, completed: 0 };
+      unlockValue = row.total ? Math.round((row.completed / row.total) * 100) : 0;
+      unlocked = unlockValue >= boss.unlockPercent;
+    }
+    const defeated = boss.id === 'final-board'
+      ? unlocked && readiness.wrongRetestConversion >= 90 && (state.mockExams || []).some((exam) => exam.completedAt && exam.score >= boss.passScore && exam.questionCount >= 50)
+      : (state.mockExams || []).some((exam) => examMatchesBoss(exam, boss));
+    return { ...boss, unlockValue, unlocked, defeated };
+  });
+}
+
+function syncBossGameState(state, readiness = getReadinessMetrics(state)) {
+  const bosses = getBossRows(state, readiness);
+  const unlockedBosses = [...new Set([...(state.game?.unlockedBosses || []), ...bosses.filter((boss) => boss.unlocked).map((boss) => boss.id)])];
+  const previousDefeated = new Set(state.game?.defeatedBosses || []);
+  const newlyDefeated = bosses.filter((boss) => boss.defeated && !previousDefeated.has(boss.id));
+  const defeatedBosses = [...new Set([...(state.game?.defeatedBosses || []), ...newlyDefeated.map((boss) => boss.id)])];
+  const game = newlyDefeated.reduce(
+    (nextGame, boss) => awardXp(nextGame, boss.id === 'final-board' ? XP_RULES.fullMock75 : XP_RULES.cancerBoss, `${boss.name} defeated`, { bossId: boss.id }),
+    { ...(state.game || defaultState.game), unlockedBosses, defeatedBosses }
+  );
+  return { ...state, game: { ...game, unlockedBosses, defeatedBosses } };
+}
+
+function buildQuickCardFromQuestion(question, stat = emptyStat()) {
+  const answerText = question.options?.[stat.correctAnswer || question.answer] || '';
+  const trialText = (question.trials || []).join(', ');
+  return {
+    id: `card-${question.id}-${Date.now()}`,
+    sourceType: 'question',
+    sourceId: question.id,
+    cancer: question.cancer,
+    topic: question.topic || 'General',
+    front: `${question.id}｜${question.cancer}｜${question.topic}\n${question.stem}`,
+    back: [
+      `Answer: ${stat.correctAnswer || question.answer || '尚未輸入'}${answerText ? ` - ${answerText}` : ''}`,
+      trialText ? `Trials: ${trialText}` : '',
+      stat.explanation || question.explanation ? `Explanation: ${stat.explanation || question.explanation}` : '',
+      stat.wrongNotes ? `Weakness note: ${stat.wrongNotes}` : '',
+    ].filter(Boolean).join('\n\n'),
+    cloze: trialText ? `${trialText}: population / intervention / endpoint / exam trap?` : '',
+    trial: question.trials || [],
+    tags: question.tags || makeQuestionTags(question),
+    intervalDays: 1,
+    nextReviewDate: TODAY,
+    mastery: 0,
+    difficulty: stat.difficulty || question.tags?.examWeight || 3,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function buildTrialCardFromName(trialName, sourceQuestion = null) {
+  const cancer = sourceQuestion?.cancer || 'Trial Cards';
+  return {
+    id: `trial-card-${trialName.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-${Date.now()}`,
+    sourceType: 'trial',
+    sourceId: sourceQuestion?.id || null,
+    cancer,
+    topic: sourceQuestion?.topic || 'Pivotal trial',
+    front: `${trialName} 的 population / intervention / comparator / endpoint / exam trap？`,
+    back: 'Population:\nIntervention:\nComparator:\nPrimary endpoint:\nKey result:\nToxicity / exam trap:',
+    cloze: `${trialName} primary endpoint = {{c1::}}; key eligible population = {{c2::}}`,
+    trial: [trialName],
+    tags: sourceQuestion?.tags || { domain: cancer, subtopic: 'Pivotal trial', trial: [trialName], cardEligible: true, examWeight: 4 },
+    intervalDays: 1,
+    nextReviewDate: TODAY,
+    mastery: 0,
+    difficulty: 3,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function getDueFlashcards(state) {
+  return (state.flashcards || [])
+    .filter((card) => !card.nextReviewDate || card.nextReviewDate <= TODAY)
+    .sort((a, b) => (a.nextReviewDate || '').localeCompare(b.nextReviewDate || '') || (a.mastery || 0) - (b.mastery || 0));
 }
 
 function getCancerSummary(state) {
@@ -1748,7 +986,7 @@ function MetricCard({ label, value, sub }) {
 }
 
 
-function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswerUntilSubmit = false, practiceMode = false, practiceDraft = null, onPracticeChange = null, onEdit }) {
+function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswerUntilSubmit = false, practiceMode = false, practiceDraft = null, onPracticeChange = null, onEdit, onCreateFlashcard }) {
   const initialAnswer = stat.correctAnswer || question.answer || '';
   const [selected, setSelected] = useState(practiceMode ? '' : stat.userAnswer || '');
   const [correctAnswer, setCorrectAnswer] = useState(initialAnswer);
@@ -1919,6 +1157,11 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
     onUpdateStat(question.id, { ...stat, bookmarked: !stat.bookmarked });
   };
 
+  const createFlashcard = () => {
+    onCreateFlashcard?.(question, { ...stat, correctAnswer, explanation, wrongNotes });
+    setFeedback('已生成抽認卡。');
+  };
+
   return (
     <article className="question-card">
       <div className="question-top">
@@ -1937,6 +1180,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
             {question.notionUrl && (
               <button className="secondary" onClick={() => window.open(question.notionUrl, '_blank')}>Notion 詳解</button>
             )}
+            {onCreateFlashcard && <button className="secondary" onClick={createFlashcard}>生成抽認卡</button>}
             <button className={stat.bookmarked ? 'bookmark active' : 'bookmark'} onClick={toggleBookmark}>
               {stat.bookmarked ? '★ 已標記' : '☆ 標記'}
             </button>
@@ -2637,18 +1881,117 @@ function QuestionEditPanel({ state, onSaveOverride }) {
     </main>
   );
 }
+function FlashcardsPanel({ state, dueFlashcards, weakQuestions, onReviewCard, onCreateTrialCard, onGenerateWeakCards }) {
+  const [trialName, setTrialName] = useState('');
+  const trialCards = (state.flashcards || []).filter((card) => card.sourceType === 'trial');
+  const weakCards = (state.flashcards || []).filter((card) => (card.mastery || 0) <= 2);
+
+  const submitTrialCard = () => {
+    onCreateTrialCard(trialName);
+    setTrialName('');
+  };
+
+  return (
+    <main className="panel">
+      <div className="section-head">
+        <div>
+          <h2>Flashcards</h2>
+          <p className="muted">Quick Cards 來自題目/詳解；Trial Cards 用固定 pivotal trial 模板做 endpoint recall。</p>
+        </div>
+        <button className="primary" onClick={onGenerateWeakCards}>從錯題/高信心錯題生成卡片</button>
+      </div>
+
+      <section className="readiness-hero">
+        <MetricCard label="Cards total" value={(state.flashcards || []).length} sub={`${dueFlashcards.length} due today`} />
+        <MetricCard label="Trial cards" value={trialCards.length} sub="Trial Boss unlock target: 50" />
+        <MetricCard label="Weak cards" value={weakCards.length} sub="mastery <=2" />
+        <MetricCard label="Weak questions" value={weakQuestions.length} sub="wrong/bookmarked source pool" />
+      </section>
+
+      <div className="flashcard-create">
+        <label>
+          Trial Card
+          <input value={trialName} onChange={(e) => setTrialName(e.target.value)} placeholder="例如 KEYNOTE-671、PACIFIC、KATHERINE" />
+        </label>
+        <button className="secondary" onClick={submitTrialCard}>新增 Trial Card</button>
+      </div>
+
+      <div className="subsection">
+        <h3>Due Cards</h3>
+        {!dueFlashcards.length ? <p className="muted">今天沒有到期卡片。</p> : (
+          <div className="flashcard-grid">
+            {dueFlashcards.slice(0, 40).map((card) => (
+              <FlashcardCard key={card.id} card={card} onReviewCard={onReviewCard} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="subsection">
+        <h3>Trial Cards</h3>
+        {!trialCards.length ? <p className="muted">尚未建立 Trial Card。</p> : (
+          <div className="flashcard-grid">
+            {trialCards.slice(0, 20).map((card) => (
+              <FlashcardCard key={card.id} card={card} onReviewCard={onReviewCard} compact />
+            ))}
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}
+
+function FlashcardCard({ card, onReviewCard, compact = false }) {
+  const [showBack, setShowBack] = useState(false);
+  return (
+    <article className="flashcard-card">
+      <div className="question-top">
+        <div>
+          <span className="pill">{card.cancer}</span>
+          <span className="pill soft">{card.topic}</span>
+          {card.trial?.map((trial) => <span className="pill trial" key={trial}>{trial}</span>)}
+        </div>
+        <span className="priority">M{card.mastery || 0}</span>
+      </div>
+      <pre className="flashcard-front">{card.front}</pre>
+      {!compact && card.cloze && <p className="muted">{card.cloze}</p>}
+      {showBack && <pre className="flashcard-back">{card.back || '尚未填寫背面。'}</pre>}
+      <div className="inline-actions">
+        <button className="secondary" onClick={() => setShowBack(!showBack)}>{showBack ? '收合答案' : '顯示答案'}</button>
+        {Object.keys(FLASHCARD_RATINGS).map((rating) => (
+          <button key={rating} className={`tiny ${rating.toLowerCase()}`} onClick={() => onReviewCard(card.id, rating)}>{rating}</button>
+        ))}
+      </div>
+      <div className="stats-line">next review {card.nextReviewDate || 'today'} · interval {card.intervalDays || 1} days</div>
+    </article>
+  );
+}
+
 function MockExamPanel({ state, onFinishMock }) {
   const [questionCount, setQuestionCount] = useState(80);
   const [timerMinutes, setTimerMinutes] = useState(120);
+  const [examMode, setExamMode] = useState('mixed-mock');
+  const [examYear, setExamYear] = useState('All');
   const [exam, setExam] = useState(null);
   const [startedAt, setStartedAt] = useState(null);
   const [answers, setAnswers] = useState({});
   const [showResults, setShowResults] = useState(false);
 
   const startMock = () => {
-    const pool = shuffleStable(questionBank.map((q) => getQuestionWithOverride(q.id, state)).filter(Boolean));
+    const pool = shuffleStable(questionBank
+      .map((q) => getQuestionWithOverride(q.id, state))
+      .filter(Boolean)
+      .filter((q) => examYear === 'All' || Number(q.year) === Number(examYear))
+      .filter((q) => {
+        if (examMode === 'lung-boss') return q.cancer === 'Lung';
+        if (examMode === 'breast-boss') return q.cancer === 'Breast';
+        if (examMode === 'gi-boss') return q.cancer === 'GI';
+        if (examMode === 'head-neck-boss') return q.cancer === 'Head & Neck';
+        if (examMode === 'trial-boss') return (q.trials || []).length > 0 || ['Trial interpretation', 'Biomarker'].includes(q.topic);
+        return true;
+      }));
     const selected = pool.slice(0, Number(questionCount));
-    setExam({ id: `mock-${Date.now()}`, questions: selected });
+    setExam({ id: `mock-${Date.now()}`, questions: selected, mode: examMode, year: examYear === 'All' ? null : Number(examYear) });
     setStartedAt(Date.now());
     setAnswers({});
     setShowResults(false);
@@ -2701,7 +2044,8 @@ function MockExamPanel({ state, onFinishMock }) {
     const fastWrong = results.filter((row) => !row.isCorrect && row.timeSpentSec < 30).length;
     const completedExam = {
       id: exam.id,
-      mode: 'mixed-mock',
+      mode: exam.mode || examMode,
+      year: exam.year || null,
       questionCount: results.length,
       timerMinutes: Number(timerMinutes),
       elapsedSec,
@@ -2732,7 +2076,26 @@ function MockExamPanel({ state, onFinishMock }) {
         <div className="inline-actions">
           <label>題數
             <select value={questionCount} onChange={(e) => setQuestionCount(Number(e.target.value))}>
-              {[50, 80, 120].map((n) => <option key={n} value={n}>{n}</option>)}
+              {[20, 50, 80, 120].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
+          <label>Mode
+            <select value={examMode} onChange={(e) => setExamMode(e.target.value)}>
+              <option value="mixed-mock">Mixed mock</option>
+              <option value="lung-boss">Lung Boss</option>
+              <option value="breast-boss">Breast Boss</option>
+              <option value="gi-boss">GI Boss</option>
+              <option value="head-neck-boss">Head & Neck Boss</option>
+              <option value="trial-boss">Trial Boss</option>
+              <option value="final-board">Final Board Boss</option>
+            </select>
+          </label>
+          <label>Year
+            <select value={examYear} onChange={(e) => setExamYear(e.target.value)}>
+              <option>All</option>
+              <option>112</option>
+              <option>113</option>
+              <option>114</option>
             </select>
           </label>
           <label>Timer
@@ -2912,10 +2275,70 @@ export default function App() {
     return () => clearTimeout(timeout);
   }, [state, user, isApplyingCloudState]);
 
-  const updateState = (updater) => setState((prev) => typeof updater === 'function' ? updater(prev) : updater);
+  const updateState = (updater) => setState((prev) => normalizeState(typeof updater === 'function' ? updater(prev) : updater));
 
   const updateStat = (id, nextStat) => {
-    updateState((prev) => ({ ...prev, stats: { ...prev.stats, [id]: nextStat } }));
+    updateState((prev) => {
+      const previous = getStat(prev, id);
+      const latestEvent = (nextStat.answerHistory || [])[nextStat.answerHistory.length - 1];
+      let game = prev.game || defaultState.game;
+      if (latestEvent?.isCorrect && (previous.wrong || 0) > 0 && previous.lastRating === 'Again' && daysBetween(previous.lastAttemptAt, TODAY) <= 3) {
+        game = awardXp(game, XP_RULES.wrongAgainRecovery, 'Previously wrong question corrected within 3 days', { questionId: id });
+      }
+      if (latestEvent?.isCorrect && (previous.highConfidenceWrong || 0) > 0) {
+        game = awardXp(game, XP_RULES.highConfidenceWrongCorrected, 'High-confidence wrong corrected', { questionId: id });
+      }
+      return { ...prev, game, stats: { ...prev.stats, [id]: nextStat } };
+    });
+  };
+
+  const createFlashcardFromQuestion = (question, stat) => {
+    const card = buildQuickCardFromQuestion(question, stat);
+    updateState((prev) => ({
+      ...prev,
+      flashcards: [card, ...(prev.flashcards || [])],
+    }));
+  };
+
+  const createTrialCard = (trialName, sourceQuestion = null) => {
+    if (!trialName.trim()) return;
+    const card = buildTrialCardFromName(trialName.trim(), sourceQuestion);
+    updateState((prev) => ({
+      ...prev,
+      flashcards: [card, ...(prev.flashcards || [])],
+    }));
+  };
+
+  const reviewFlashcard = (cardId, rating) => {
+    updateState((prev) => ({
+      ...prev,
+      flashcards: (prev.flashcards || []).map((card) => {
+        if (card.id !== cardId) return card;
+        const rule = FLASHCARD_RATINGS[rating] || FLASHCARD_RATINGS.Good;
+        return {
+          ...card,
+          intervalDays: rule.interval,
+          nextReviewDate: addDays(TODAY, rule.interval),
+          mastery: Math.max(0, Math.min(5, (card.mastery || 0) + rule.masteryDelta)),
+          difficulty: rating === 'Again' ? Math.min(5, (card.difficulty || 3) + 0.5) : card.difficulty || 3,
+          updatedAt: new Date().toISOString(),
+          lastRating: rating,
+        };
+      }),
+    }));
+  };
+
+  const generateWeakFlashcards = () => {
+    updateState((prev) => {
+      const existingSources = new Set((prev.flashcards || []).map((card) => `${card.sourceType}:${card.sourceId}`));
+      const cards = questionBank
+        .map((q) => ({ q: getQuestionWithOverride(q.id, prev), stat: getStat(prev, q.id) }))
+        .filter(({ q, stat }) => q && (stat.wrong > 0 || stat.bookmarked || (stat.highConfidenceWrong || 0) > 0 || (stat.mastery || 0) <= 2))
+        .filter(({ q }) => !existingSources.has(`question:${q.id}`))
+        .slice(0, 30)
+        .map(({ q, stat }) => buildQuickCardFromQuestion(q, stat));
+      return { ...prev, flashcards: [...cards, ...(prev.flashcards || [])] };
+    });
   };
 
   const saveQuestionOverride = (id, override) => {
@@ -2995,6 +2418,7 @@ export default function App() {
   const todaySession = state.sessions[TODAY];
   const todayIds = todaySession?.questionIds || [];
   const todayQuestions = todayIds.map((id) => getQuestionWithOverride(id, state)).filter(Boolean);
+  const todayCompleted = todayIds.length > 0 && todayIds.every((id) => todaySession?.practiceDrafts?.[id]?.rated);
 
   const updatePracticeDraft = useCallback((questionId, patch) => {
     updateState((prev) => {
@@ -3043,6 +2467,22 @@ export default function App() {
     setTab('today');
   };
 
+  const claimDailyCompletion = () => {
+    if (!todayCompleted || state.game?.dailyClaims?.[TODAY]) return;
+    updateState((prev) => ({
+      ...prev,
+      sessions: {
+        ...(prev.sessions || {}),
+        [TODAY]: { ...(prev.sessions?.[TODAY] || {}), completed: true },
+      },
+      game: {
+        ...awardXp(prev.game || defaultState.game, XP_RULES.dailyComplete, 'Daily 10-15 questions completed', { date: TODAY }),
+        streak: (prev.game?.streak || 0) + 1,
+        dailyClaims: { ...(prev.game?.dailyClaims || {}), [TODAY]: true },
+      },
+    }));
+  };
+
   const regenerateTodaySession = () => {
     if (!window.confirm('重新抽題會覆蓋今天的題目清單，但不會刪除作答紀錄。確定？')) return;
     createTodaySession();
@@ -3069,6 +2509,8 @@ export default function App() {
 
   const cancerSummary = useMemo(() => getCancerSummary(state), [state]);
   const readiness = useMemo(() => getReadinessMetrics(state), [state]);
+  const bossRows = useMemo(() => getBossRows(state, readiness), [state, readiness]);
+  const dueFlashcards = useMemo(() => getDueFlashcards(state), [state]);
 
   const finishMockExam = (completedExam) => {
     updateState((prev) => {
@@ -3141,13 +2583,18 @@ export default function App() {
   }, [planProgress]);
 
   const togglePlanTask = (id) => {
-    updateState((prev) => ({
-      ...prev,
-      planProgress: {
-        ...(prev.planProgress || {}),
-        [id]: !prev.planProgress?.[id],
-      },
-    }));
+    updateState((prev) => {
+      const wasDone = Boolean(prev.planProgress?.[id]);
+      const nextState = {
+        ...prev,
+        game: wasDone ? prev.game : awardXp(prev.game || defaultState.game, XP_RULES.planTask, '100-Day task completed', { taskId: id }),
+        planProgress: {
+          ...(prev.planProgress || {}),
+          [id]: !wasDone,
+        },
+      };
+      return syncBossGameState(nextState);
+    });
   };
 
   const setPlanCancerCompleted = (cancer, completed) => {
@@ -3156,7 +2603,7 @@ export default function App() {
       studyPlan100.filter((task) => task.cancer === cancer).forEach((task) => {
         next[task.id] = completed;
       });
-      return { ...prev, planProgress: next };
+      return syncBossGameState({ ...prev, planProgress: next });
     });
   };
 
@@ -3230,6 +2677,8 @@ export default function App() {
         <MetricCard label="正確率" value={`${summary.accuracy}%`} sub={`${summary.correct} correct / ${summary.wrong} wrong`} />
         <MetricCard label="今日待複習" value={dueReview.length} sub="依 next review date" />
         <MetricCard label="≥80 機率" value={`${readiness.probability80}%`} sub={readiness.readinessLevel} />
+        <MetricCard label="Level / XP" value={`Lv ${state.game?.level || 1}`} sub={`${state.game?.xp || 0} XP · streak ${state.game?.streak || 0}`} />
+        <MetricCard label="Flashcards" value={(state.flashcards || []).length} sub={`${dueFlashcards.length} due today`} />
         <MetricCard label="同步狀態" value={user ? 'Cloud' : 'Local'} sub={user ? user.email : '尚未登入'} />
       </section>
 
@@ -3242,7 +2691,7 @@ export default function App() {
       )}
 
       <nav className="tabs">
-        {[['readiness', 'Board Readiness'], ['mock', 'Mock Exam'], ['critical', 'Critical Errors'], ['today', 'Daily Practice'], ['review', 'Review Queue'], ['bank', 'Question Bank'], ['manual', 'Manual Add'], ['question-edit', 'Question Edit'], ['analytics', 'Analytics'], ['plan', '100-Day Plan'], ['sync', 'Cloud Sync'], ['settings', 'Settings']].map(([key, label]) => (
+        {[['readiness', 'Board Readiness'], ['mock', 'Mock Exam'], ['critical', 'Critical Errors'], ['flashcards', 'Flashcards'], ['today', 'Daily Practice'], ['review', 'Review Queue'], ['bank', 'Question Bank'], ['manual', 'Manual Add'], ['question-edit', 'Question Edit'], ['analytics', 'Analytics'], ['plan', '100-Day Plan'], ['sync', 'Cloud Sync'], ['settings', 'Settings']].map(([key, label]) => (
           <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>
         ))}
       </nav>
@@ -3288,9 +2737,20 @@ export default function App() {
           <h2>Critical Error Queue</h2>
           <p className="muted">收錄 high confidence wrong、repeated wrong 與高錯誤率核心題；優先做 concept repair → similar question → 7-day retest。</p>
           {readiness.criticalErrors.length === 0 ? <p className="muted">目前沒有 critical errors。</p> : readiness.criticalErrors.slice(0, 40).map(({ q, stat }) => (
-            <QuestionCard key={q.id} question={q} stat={stat} onUpdateStat={updateStat} compact />
+            <QuestionCard key={q.id} question={q} stat={stat} onUpdateStat={updateStat} compact onCreateFlashcard={createFlashcardFromQuestion} />
           ))}
         </main>
+      )}
+
+      {tab === 'flashcards' && (
+        <FlashcardsPanel
+          state={state}
+          dueFlashcards={dueFlashcards}
+          weakQuestions={weakQuestions}
+          onReviewCard={reviewFlashcard}
+          onCreateTrialCard={createTrialCard}
+          onGenerateWeakCards={generateWeakFlashcards}
+        />
       )}
 
       {tab === 'today' && (
@@ -3302,6 +2762,9 @@ export default function App() {
             </div>
             <div className="inline-actions">
               <button className="secondary" onClick={regenerateTodaySession}>重新抽題</button>
+              <button className="good" disabled={!todayCompleted || state.game?.dailyClaims?.[TODAY]} onClick={claimDailyCompletion}>
+                {state.game?.dailyClaims?.[TODAY] ? '今日 XP 已領取' : '領取每日 XP'}
+              </button>
             </div>
           </div>
 
@@ -3323,6 +2786,7 @@ export default function App() {
                   practiceMode
                   practiceDraft={todaySession?.practiceDrafts?.[q.id]}
                   onPracticeChange={(patch) => updatePracticeDraft(q.id, patch)}
+                  onCreateFlashcard={createFlashcardFromQuestion}
                 />
               ))}
             </div>
@@ -3337,13 +2801,13 @@ export default function App() {
           <div className="subsection">
             <h3>今日到期複習</h3>
             {dueReview.length === 0 ? <p className="muted">目前沒有到期題目。</p> : dueReview.slice(0, 30).map(({ q, stat }) => (
-              <QuestionCard key={q.id} question={q} stat={stat} onUpdateStat={updateStat} compact />
+              <QuestionCard key={q.id} question={q} stat={stat} onUpdateStat={updateStat} compact onCreateFlashcard={createFlashcardFromQuestion} />
             ))}
           </div>
           <div className="subsection">
             <h3>高錯誤率 / 標記題</h3>
             {weakQuestions.slice(0, 30).map(({ q, stat }) => (
-              <QuestionCard key={q.id} question={q} stat={stat} onUpdateStat={updateStat} compact />
+              <QuestionCard key={q.id} question={q} stat={stat} onUpdateStat={updateStat} compact onCreateFlashcard={createFlashcardFromQuestion} />
             ))}
           </div>
         </main>
@@ -3380,6 +2844,7 @@ export default function App() {
                   onUpdateStat={updateStat}
                   compact
                   onEdit={(id) => setEditingQuestionId(id)}
+                  onCreateFlashcard={createFlashcardFromQuestion}
                 />
                 {editingQuestionId === q.id && (
                   <QuestionEditor
@@ -3451,7 +2916,23 @@ export default function App() {
             <MetricCard label="總完成率" value={`${planSummary.percent}%`} sub={`${planSummary.completed}/${planSummary.total} tasks`} />
             <MetricCard label="Golden trial 完成率" value={`${planSummary.goldenPercent}%`} sub={`${planSummary.goldenCompleted}/${planSummary.goldenTotal} trial tasks`} />
             <MetricCard label="今日建議" value={`Day ${Math.min(planSummary.completed + 1, 100)}`} sub="照順序推進，錯題用 Review Queue 補強" />
+            <MetricCard label="Game level" value={`Lv ${state.game?.level || 1}`} sub={`${state.game?.xp || 0} XP`} />
+            <MetricCard label="Boss defeated" value={(state.game?.defeatedBosses || []).length} sub={`${(state.game?.unlockedBosses || []).length} unlocked`} />
+            <MetricCard label="Trial cards" value={(state.flashcards || []).filter((card) => card.sourceType === 'trial').length} sub="Trial Boss target 50" />
           </section>
+
+          <div className="subsection">
+            <h3>破關狀態</h3>
+            <div className="boss-grid">
+              {bossRows.map((boss) => (
+                <div className={boss.defeated ? 'boss-card defeated' : boss.unlocked ? 'boss-card unlocked' : 'boss-card'} key={boss.id}>
+                  <strong>{boss.name}</strong>
+                  <span>{boss.defeated ? 'Defeated' : boss.unlocked ? 'Unlocked' : 'Locked'}</span>
+                  <small>{boss.id === 'trial' ? `${boss.unlockValue}/50 trial cards` : boss.id === 'final-board' ? `${boss.unlockValue}/3 annual mocks` : `${boss.unlockValue}% module complete`}</small>
+                </div>
+              ))}
+            </div>
+          </div>
 
           <div className="subsection">
             <h3>癌別完成度</h3>
@@ -3484,12 +2965,15 @@ export default function App() {
                       <div className="plan-task-title">
                         <span className="day-chip">{task.day}</span>
                         <strong>{task.topic}</strong>
+                        <span className="pill soft">{task.module}</span>
                         <span className="pill">{task.cancer}</span>
                         <span className={task.priority === 'High' ? 'priority high' : 'priority'}>{task.priority}</span>
                       </div>
+                      <p className="phase-line">{task.phase}</p>
                       <p>{task.details}</p>
                       <div className="trial-tags">
                         {(task.goldenTrials || []).map((trial) => <span key={trial}>{trial}</span>)}
+                        {(task.focusTags || []).map((tag) => <span key={tag}>{tag}</span>)}
                       </div>
                     </div>
                   </label>

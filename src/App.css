@@ -406,8 +406,111 @@ button.tiny,
   font-weight: 700;
 }
 
+.phase-line {
+  margin: 8px 0 0;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.boss-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.boss-card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel-soft);
+  padding: 14px;
+  display: grid;
+  gap: 6px;
+}
+
+.boss-card span {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.boss-card small {
+  color: var(--muted);
+}
+
+.boss-card.unlocked {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.boss-card.defeated {
+  border-color: rgba(21, 128, 61, 0.35);
+  background: #f0fdf4;
+}
+
+.boss-card.defeated span {
+  color: var(--good);
+}
+
+.flashcard-create {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  margin: 16px 0;
+}
+
+.flashcard-create label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.flashcard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.flashcard-card {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+  padding: 14px;
+}
+
+.flashcard-front,
+.flashcard-back {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  line-height: 1.55;
+  border-radius: 14px;
+  padding: 12px;
+  margin: 10px 0;
+}
+
+.flashcard-front {
+  background: var(--panel-soft);
+}
+
+.flashcard-back {
+  background: #f0fdf4;
+  border: 1px solid rgba(21, 128, 61, 0.22);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 @media (max-width: 768px) {
   .plan-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .flashcard-create {
     grid-template-columns: 1fr;
   }
 
