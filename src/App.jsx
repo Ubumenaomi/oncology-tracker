@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import './App.css';
 import { questionBank, cancerCategories } from './data/questionBank.js';
 import {
@@ -16,6 +16,17 @@ import {
 } from './firebase.js';
 
 const STORAGE_KEY = 'oncologyTracker.aiReview.v1';
+const ERROR_TYPE_OPTIONS = [
+  'Knowledge gap',
+  'Misread question',
+  'Trial confusion',
+  'Biomarker cutoff',
+  'Treatment sequence',
+  'Toxicity',
+  'Guideline outdated',
+  'Overconfidence',
+];
+
 const TODAY = (() => {
   const d = new Date();
   const y = d.getFullYear();
@@ -35,6 +46,7 @@ const defaultState = {
   },
   planProgress: {},
   questionOverrides: {},
+  mockExams: [],
   cloudMeta: {
     updatedAt: null,
     device: null,
@@ -1341,6 +1353,10 @@ function mergeCloudState(localState, cloudState) {
       ...(cloudState.questionOverrides || {}),
       ...(localState.questionOverrides || {}),
     },
+    mockExams: [
+      ...(cloudState.mockExams || []),
+      ...(localState.mockExams || []),
+    ].filter((exam, index, exams) => exam?.id && exams.findIndex((x) => x.id === exam.id) === index),
     cloudMeta: {
       ...(cloudState.cloudMeta || {}),
       ...(localState.cloudMeta || {}),
@@ -1390,10 +1406,6 @@ function applyQuestionOverride(question, overrides = {}) {
   };
 }
 
-function getQuestion(state, id) {
-  const base = findQuestionById(id);
-  return applyQuestionOverride(base, state?.questionOverrides || {});
-}
 
 const getQuestionWithOverride = (id, state) => {
   const original = findQuestionById(id);
@@ -1406,12 +1418,29 @@ function emptyStat() {
     attempts: 0,
     correct: 0,
     wrong: 0,
+
     lastResult: null,
+    lastRating: null,
     lastAttemptAt: null,
     nextReviewDate: null,
+
     mastery: 0,
+    intervalDays: 1,
+    difficulty: 3,
+
     userAnswer: null,
     correctAnswer: null,
+
+    confidenceHistory: [],
+    answerHistory: [],
+    timeHistory: [],
+
+    highConfidenceWrong: 0,
+    repeatedWrong: 0,
+    wrongRetestAttempts: 0,
+    wrongRetestCorrect: 0,
+
+    errorTypes: [],
     explanation: '',
     wrongNotes: '',
     bookmarked: false,
@@ -1427,14 +1456,6 @@ function wrongRate(stat) {
   return Math.round((stat.wrong / stat.attempts) * 100);
 }
 
-function nextInterval(result, mastery, rate) {
-  if (result === 'wrong') return mastery <= 1 ? 1 : 2;
-  if (rate >= 50) return 3;
-  if (mastery <= 1) return 3;
-  if (mastery === 2) return 7;
-  if (mastery === 3) return 14;
-  return 30;
-}
 
 function nextIntervalByRating(rating, stat) {
   const current = stat.intervalDays || 1;
@@ -1445,14 +1466,6 @@ function nextIntervalByRating(rating, stat) {
   return 3;
 }
 
-function classifyPriority(q, stat, today = TODAY) {
-  const due = stat.nextReviewDate && stat.nextReviewDate <= today;
-  if (due && stat.wrong > 0) return 0;
-  if (stat.wrong > 0 && wrongRate(stat) >= 50) return 1;
-  if (stat.bookmarked) return 2;
-  if (stat.attempts === 0) return 3;
-  return 4;
-}
 
 function shuffleStable(items) {
   return [...items].sort(() => Math.random() - 0.5);
@@ -1493,10 +1506,33 @@ function generateDailyQuestionIds(state) {
   const used = new Set();
   const result = [];
 
-  const dueCount = Math.ceil(dailyCount * 0.4);
-  const wrongCount = Math.ceil(dailyCount * 0.3);
-  const newCount = Math.ceil(dailyCount * 0.2);
-  const bookmarkCount = Math.max(1, dailyCount - dueCount - wrongCount - newCount);
+  const readiness = getReadinessMetrics(state);
+  let dueRatio = 0.4;
+  let wrongRatio = 0.3;
+  let newRatio = 0.2;
+  let bookmarkRatio = 0.1;
+
+  if (readiness.predictedScore < 70) {
+    dueRatio = 0.2;
+    wrongRatio = 0.3;
+    newRatio = 0.5;
+    bookmarkRatio = 0;
+  } else if (readiness.predictedScore >= 70 && readiness.predictedScore < 80) {
+    dueRatio = 0.35;
+    wrongRatio = 0.3;
+    newRatio = 0.25;
+    bookmarkRatio = 0.1;
+  } else if (readiness.predictedScore >= 80) {
+    dueRatio = 0.3;
+    wrongRatio = 0.4;
+    newRatio = 0.2;
+    bookmarkRatio = 0.1;
+  }
+
+  const dueCount = Math.ceil(dailyCount * dueRatio);
+  const wrongCount = Math.ceil(dailyCount * wrongRatio);
+  const newCount = Math.ceil(dailyCount * newRatio);
+  const bookmarkCount = Math.max(0, dailyCount - dueCount - wrongCount - newCount, Math.floor(dailyCount * bookmarkRatio));
 
   result.push(...pickUnique(due, dueCount, used));
   result.push(...pickUnique(highWrong, wrongCount, used));
@@ -1521,7 +1557,14 @@ function getCancerSummary(state) {
     const attempts = ids.reduce((sum, id) => sum + getStat(state, id).attempts, 0);
     const wrong = ids.reduce((sum, id) => sum + getStat(state, id).wrong, 0);
     const correct = ids.reduce((sum, id) => sum + getStat(state, id).correct, 0);
+    const retestAttempts = ids.reduce((sum, id) => sum + (getStat(state, id).wrongRetestAttempts || 0), 0);
+    const retestCorrect = ids.reduce((sum, id) => sum + (getStat(state, id).wrongRetestCorrect || 0), 0);
+    const highConfidenceWrong = ids.reduce((sum, id) => sum + (getStat(state, id).highConfidenceWrong || 0), 0);
     const attemptedQuestions = ids.filter((id) => getStat(state, id).attempts > 0).length;
+    const coverage = ids.length ? Math.round((attemptedQuestions / ids.length) * 100) : 0;
+    const accuracy = attempts ? Math.round((correct / attempts) * 100) : 0;
+    const retestAccuracy = retestAttempts ? Math.round((retestCorrect / retestAttempts) * 100) : 0;
+    const status = coverage >= 80 && accuracy >= 80 ? 'Green' : (coverage < 60 || accuracy < 70 ? 'Red' : 'Yellow');
     return {
       cancer,
       total: ids.length,
@@ -1529,9 +1572,159 @@ function getCancerSummary(state) {
       attempts,
       correct,
       wrong,
+      coverage,
+      accuracy,
+      retestAttempts,
+      retestAccuracy,
+      highConfidenceWrong,
+      status,
       wrongRate: attempts ? Math.round((wrong / attempts) * 100) : 0,
     };
-  }).sort((a, b) => b.wrongRate - a.wrongRate || b.attempts - a.attempts);
+  }).sort((a, b) => (a.status === 'Red' ? -1 : 1) - (b.status === 'Red' ? -1 : 1) || b.wrongRate - a.wrongRate || b.attempts - a.attempts);
+}
+
+
+function clampPercent(value) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function weightedRecentMockAccuracy(mockExams = []) {
+  const completed = [...mockExams]
+    .filter((exam) => exam?.completedAt && Number.isFinite(exam.score))
+    .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt))
+    .slice(0, 3);
+  if (!completed.length) return 0;
+  const weights = [0.5, 0.3, 0.2];
+  const totalWeight = completed.reduce((sum, _exam, index) => sum + weights[index], 0);
+  return clampPercent(completed.reduce((sum, exam, index) => sum + exam.score * weights[index], 0) / totalWeight);
+}
+
+function standardDeviation(values) {
+  if (values.length < 2) return 0;
+  const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+  const variance = values.reduce((sum, value) => sum + ((value - mean) ** 2), 0) / values.length;
+  return Math.round(Math.sqrt(variance) * 10) / 10;
+}
+
+function getCoreTopicNames() {
+  return new Set(studyPlan100.filter((task) => task.priority === 'High').map((task) => `${task.cancer}::${task.topic}`));
+}
+
+function getTopicMasteryRows(state) {
+  const topicMap = new Map();
+  questionBank
+    .map((q) => getQuestionWithOverride(q.id, state))
+    .filter(Boolean)
+    .forEach((q) => {
+      const key = `${q.cancer}::${q.topic || 'General'}`;
+      const stat = getStat(state, q.id);
+      const row = topicMap.get(key) || { key, cancer: q.cancer, topic: q.topic || 'General', total: 0, attempted: 0, attempts: 0, correct: 0, masterySum: 0, highConfidenceWrong: 0 };
+      row.total += 1;
+      row.attempts += stat.attempts || 0;
+      row.correct += stat.correct || 0;
+      row.masterySum += stat.mastery || 0;
+      row.highConfidenceWrong += stat.highConfidenceWrong || 0;
+      if ((stat.attempts || 0) > 0) row.attempted += 1;
+      topicMap.set(key, row);
+    });
+
+  const coreNames = getCoreTopicNames();
+  return [...topicMap.values()].map((row) => {
+    const coverage = row.total ? Math.round((row.attempted / row.total) * 100) : 0;
+    const accuracy = row.attempts ? Math.round((row.correct / row.attempts) * 100) : 0;
+    const avgMastery = row.total ? Math.round((row.masterySum / row.total) * 10) / 10 : 0;
+    const isCore = coreNames.has(row.key) || row.total >= 3;
+    const status = coverage >= 80 && accuracy >= 80 && avgMastery >= 4 ? 'Green' : (coverage < 60 || accuracy < 70 || row.highConfidenceWrong > 0 ? 'Red' : 'Yellow');
+    return { ...row, coverage, accuracy, avgMastery, isCore, status };
+  }).sort((a, b) => (a.status === 'Red' ? -1 : 1) - (b.status === 'Red' ? -1 : 1) || a.accuracy - b.accuracy || b.highConfidenceWrong - a.highConfidenceWrong);
+}
+
+function getCriticalErrorItems(state) {
+  return questionBank
+    .map((q) => ({ q: getQuestionWithOverride(q.id, state), stat: getStat(state, q.id) }))
+    .filter(({ q, stat }) => q && ((stat.highConfidenceWrong || 0) > 0 || (stat.repeatedWrong || 0) >= 2 || (stat.wrong || 0) >= 2))
+    .sort((a, b) => (b.stat.highConfidenceWrong || 0) - (a.stat.highConfidenceWrong || 0) || (b.stat.repeatedWrong || 0) - (a.stat.repeatedWrong || 0) || wrongRate(b.stat) - wrongRate(a.stat));
+}
+
+function getReadinessMetrics(state) {
+  const mockExams = state.mockExams || [];
+  const recentCompleted = [...mockExams]
+    .filter((exam) => exam?.completedAt && Number.isFinite(exam.score))
+    .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt));
+  const recentMockScores = recentCompleted.slice(0, 5).map((exam) => exam.score);
+  const recentMockAverage = recentMockScores.length ? clampPercent(recentMockScores.slice(0, 3).reduce((sum, score) => sum + score, 0) / Math.min(3, recentMockScores.length)) : 0;
+  const recentMixedMockAccuracy = weightedRecentMockAccuracy(mockExams);
+
+  const cancerRows = getCancerSummary(state);
+  const coveredCancers = cancerRows.filter((row) => row.total > 0 && row.coverage >= 80 && row.accuracy >= 80).length;
+  const cancerCoverageScore = cancerRows.length ? clampPercent((coveredCancers / cancerRows.length) * 100) : 0;
+
+  const stats = Object.values(state.stats || {}).map((stat) => ({ ...emptyStat(), ...stat }));
+  const wrongRetestAttempts = stats.reduce((sum, stat) => sum + (stat.wrongRetestAttempts || 0), 0);
+  const wrongRetestCorrect = stats.reduce((sum, stat) => sum + (stat.wrongRetestCorrect || 0), 0);
+  const wrongRetestConversion = wrongRetestAttempts ? clampPercent((wrongRetestCorrect / wrongRetestAttempts) * 100) : 0;
+  const highConfidenceWrong = stats.reduce((sum, stat) => sum + (stat.highConfidenceWrong || 0), 0);
+  const confidenceAttempts = stats.reduce((sum, stat) => sum + (stat.confidenceHistory || []).filter(Boolean).length, 0);
+  const highConfidenceWrongRate = confidenceAttempts ? clampPercent((highConfidenceWrong / confidenceAttempts) * 100) : 0;
+  const confidenceCalibrationScore = clampPercent(100 - highConfidenceWrongRate);
+
+  const topicRows = getTopicMasteryRows(state);
+  const coreTopics = topicRows.filter((row) => row.isCore);
+  const masteredCoreTopics = coreTopics.filter((row) => row.avgMastery >= 4 && row.coverage >= 70 && row.accuracy >= 75).length;
+  const topicMasteryScore = coreTopics.length ? clampPercent((masteredCoreTopics / coreTopics.length) * 100) : 0;
+  const redTopics = topicRows.filter((row) => row.status === 'Red');
+
+  const readinessScore = clampPercent(
+    0.35 * recentMixedMockAccuracy +
+    0.20 * cancerCoverageScore +
+    0.20 * wrongRetestConversion +
+    0.15 * confidenceCalibrationScore +
+    0.10 * topicMasteryScore
+  );
+
+  const scoreVolatility = standardDeviation(recentMockScores);
+  const minRecentMock = recentMockScores.length ? Math.min(...recentMockScores.slice(0, 3)) : 0;
+  let readinessLevel = 'Not ready';
+  let probability80 = clampPercent((readinessScore - 55) * 2);
+  if (readinessScore >= 82 && recentMockAverage >= 80 && highConfidenceWrongRate < 5) {
+    readinessLevel = 'High probability ≥80';
+    probability80 = clampPercent(78 + (readinessScore - 82) * 1.7 - scoreVolatility);
+  } else if (readinessScore >= 76 || recentMockAverage >= 78) {
+    readinessLevel = 'Borderline';
+    probability80 = clampPercent(45 + (readinessScore - 76) * 3 + (recentMockAverage - 78) * 2 - scoreVolatility);
+  }
+
+  const gates = [
+    { label: 'Mixed mock ≥80%', pass: recentMockAverage >= 80, value: `${recentMockAverage || 0}%` },
+    { label: 'Wrong retest ≥90%', pass: wrongRetestConversion >= 90, value: `${wrongRetestConversion}%` },
+    { label: 'High-confidence wrong <5%', pass: highConfidenceWrongRate < 5 && confidenceAttempts > 0, value: `${highConfidenceWrongRate}%` },
+    { label: 'Cancer coverage ≥80%', pass: cancerCoverageScore >= 80, value: `${cancerCoverageScore}%` },
+    { label: 'Red topics ≤3', pass: redTopics.length <= 3, value: `${redTopics.length}` },
+  ];
+
+  return {
+    recentMockScores,
+    recentMockAverage,
+    recentMixedMockAccuracy,
+    minRecentMock,
+    scoreVolatility,
+    cancerCoverageScore,
+    wrongRetestConversion,
+    highConfidenceWrongRate,
+    confidenceCalibrationScore,
+    topicMasteryScore,
+    readinessScore,
+    predictedScore: readinessScore,
+    probability80,
+    readinessLevel,
+    safeExamZone: gates.every((gate) => gate.pass),
+    gates,
+    cancerRows,
+    topicRows,
+    redTopics,
+    criticalErrors: getCriticalErrorItems(state),
+  };
 }
 
 function buildAiPrompt(state) {
@@ -1561,6 +1754,8 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
   const [correctAnswer, setCorrectAnswer] = useState(initialAnswer);
   const [explanation, setExplanation] = useState(stat.explanation || question.explanation || '');
   const [wrongNotes, setWrongNotes] = useState(stat.wrongNotes || '');
+  const [confidence, setConfidence] = useState(practiceDraft?.confidence || stat.lastConfidence || 3);
+  const [errorType, setErrorType] = useState(practiceDraft?.errorType || stat.lastErrorType || '');
   const [open, setOpen] = useState(!compact);
   const [revealed, setRevealed] = useState(
     practiceMode ? false : (!hideAnswerUntilSubmit || Boolean(stat.lastAttemptAt))
@@ -1575,12 +1770,16 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
       setCorrectAnswer(practiceDraft.correctAnswer ?? nextAnswer);
       setExplanation(practiceDraft.explanation ?? (stat.explanation || question.explanation || ''));
       setWrongNotes(practiceDraft.wrongNotes ?? (stat.wrongNotes || ''));
+      setConfidence(practiceDraft.confidence ?? stat.lastConfidence ?? 3);
+      setErrorType(practiceDraft.errorType ?? stat.lastErrorType ?? '');
       setRevealed(practiceDraft.revealed ?? false);
     } else {
       setSelected(practiceMode ? '' : stat.userAnswer || '');
       setCorrectAnswer(nextAnswer);
       setExplanation(stat.explanation || question.explanation || '');
       setWrongNotes(stat.wrongNotes || '');
+      setConfidence(stat.lastConfidence || 3);
+      setErrorType(stat.lastErrorType || '');
       setRevealed(
         practiceMode ? false : (!hideAnswerUntilSubmit || Boolean(stat.lastAttemptAt))
       );
@@ -1601,6 +1800,8 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
       correctAnswer,
       explanation,
       wrongNotes,
+      confidence,
+      errorType,
     };
 
     const same =
@@ -1608,12 +1809,14 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
       current.revealed === patch.revealed &&
       current.correctAnswer === patch.correctAnswer &&
       current.explanation === patch.explanation &&
-      current.wrongNotes === patch.wrongNotes;
+      current.wrongNotes === patch.wrongNotes &&
+      current.confidence === patch.confidence &&
+      current.errorType === patch.errorType;
 
     if (!same) {
       onPracticeChangeRef.current(patch);
     }
-  }, [selected, revealed, correctAnswer, explanation, wrongNotes, practiceMode]);
+  }, [selected, revealed, correctAnswer, explanation, wrongNotes, confidence, errorType, practiceMode]);
 
   const answerIsSingleChoice = /^[A-E]$/.test(String(correctAnswer || '').trim().toUpperCase());
   const isCorrectSelection = selected && answerIsSingleChoice && selected === String(correctAnswer).trim().toUpperCase();
@@ -1643,13 +1846,25 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
     if (rating === 'Easy') nextMastery = Math.min(5, nextMastery + 2);
 
     const interval = nextIntervalByRating(rating, previous);
+    const normalizedConfidence = Number(confidence) || 3;
+    const wasPreviouslyWrong = (previous.wrong || 0) > 0;
+    const answerEvent = {
+      date: TODAY,
+      mode: practiceMode ? 'daily' : 'review',
+      selected: selected || null,
+      correctAnswer: correctAnswer || previous.correctAnswer || question.answer || null,
+      isCorrect,
+      confidence: normalizedConfidence,
+      rating,
+      errorType: isCorrect ? '' : errorType,
+    };
 
     onUpdateStat(question.id, {
       ...previous,
       attempts: newAttempts,
       correct: newCorrect,
       wrong: newWrong,
-      lastResult: rating,
+      lastResult: isCorrect ? 'correct' : 'wrong',
       lastAttemptAt: TODAY,
       nextReviewDate: addDays(TODAY, interval),
       mastery: nextMastery,
@@ -1660,6 +1875,15 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
       explanation,
       wrongNotes,
       lastRating: rating,
+      lastConfidence: normalizedConfidence,
+      lastErrorType: isCorrect ? '' : errorType,
+      confidenceHistory: [...(previous.confidenceHistory || []), normalizedConfidence].slice(-50),
+      answerHistory: [...(previous.answerHistory || []), answerEvent].slice(-50),
+      highConfidenceWrong: (previous.highConfidenceWrong || 0) + (!isCorrect && normalizedConfidence >= 4 ? 1 : 0),
+      repeatedWrong: isCorrect ? 0 : (previous.repeatedWrong || 0) + 1,
+      wrongRetestAttempts: (previous.wrongRetestAttempts || 0) + (wasPreviouslyWrong ? 1 : 0),
+      wrongRetestCorrect: (previous.wrongRetestCorrect || 0) + (wasPreviouslyWrong && isCorrect ? 1 : 0),
+      errorTypes: isCorrect || !errorType ? (previous.errorTypes || []) : [...(previous.errorTypes || []), errorType].slice(-20),
     });
 
     setFeedback(`紀錄：${rating}，下次複習 ${interval} 天後`);
@@ -1669,8 +1893,6 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
       onPracticeChange({ rated: true, rating });
     }
   };
-
-  const record = (result) => recordRating(result === 'correct' ? 'Good' : 'Again');
 
   const submitAnswer = () => {
     if (!selected) {
@@ -1787,6 +2009,25 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                   </select>
                 </label>
                 <label>
+                  Confidence
+                  <select value={confidence} onChange={(e) => setConfidence(Number(e.target.value))}>
+                    <option value={1}>1 完全猜</option>
+                    <option value={2}>2 不太確定</option>
+                    <option value={3}>3 有印象</option>
+                    <option value={4}>4 有把握</option>
+                    <option value={5}>5 非常確定</option>
+                  </select>
+                </label>
+                {!isCorrectSelection && (
+                  <label>
+                    Error type
+                    <select value={errorType} onChange={(e) => setErrorType(e.target.value)}>
+                      <option value="">選擇錯因</option>
+                      {ERROR_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{type}</option>)}
+                    </select>
+                  </label>
+                )}
+                <label>
                   Mastery
                   <select value={stat.mastery || 0} onChange={(e) => onUpdateStat(question.id, { ...stat, mastery: Number(e.target.value) })}>
                     {[0, 1, 2, 3, 4, 5].map((x) => <option key={x} value={x}>{x}</option>)}
@@ -1859,7 +2100,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
       )}
 
       <div className="stats-line">
-        attempts {stat.attempts} · correct {stat.correct} · wrong {stat.wrong} · wrong rate {wrongRate(stat)}% · next review {stat.nextReviewDate || 'not scheduled'}
+        attempts {stat.attempts} · correct {stat.correct} · wrong {stat.wrong} · wrong rate {wrongRate(stat)}% · high-confidence wrong {stat.highConfidenceWrong || 0} · next review {stat.nextReviewDate || 'not scheduled'}
       </div>
     </article>
   );
@@ -2396,9 +2637,178 @@ function QuestionEditPanel({ state, onSaveOverride }) {
     </main>
   );
 }
+function MockExamPanel({ state, onFinishMock }) {
+  const [questionCount, setQuestionCount] = useState(80);
+  const [timerMinutes, setTimerMinutes] = useState(120);
+  const [exam, setExam] = useState(null);
+  const [startedAt, setStartedAt] = useState(null);
+  const [answers, setAnswers] = useState({});
+  const [showResults, setShowResults] = useState(false);
+
+  const startMock = () => {
+    const pool = shuffleStable(questionBank.map((q) => getQuestionWithOverride(q.id, state)).filter(Boolean));
+    const selected = pool.slice(0, Number(questionCount));
+    setExam({ id: `mock-${Date.now()}`, questions: selected });
+    setStartedAt(Date.now());
+    setAnswers({});
+    setShowResults(false);
+  };
+
+  const updateAnswer = (questionId, patch) => {
+    setAnswers((prev) => ({
+      ...prev,
+      [questionId]: {
+        confidence: 3,
+        selected: '',
+        timeSpentSec: startedAt ? Math.round((Date.now() - startedAt) / 1000) : 0,
+        ...prev[questionId],
+        ...patch,
+      },
+    }));
+  };
+
+  const finishMock = () => {
+    if (!exam) return;
+    const elapsedSec = startedAt ? Math.round((Date.now() - startedAt) / 1000) : 0;
+    const results = exam.questions.map((q) => {
+      const draft = answers[q.id] || {};
+      const correctAnswer = String(q.answer || '').trim().toUpperCase();
+      const selected = String(draft.selected || '').trim().toUpperCase();
+      const isCorrect = Boolean(selected && correctAnswer && selected === correctAnswer);
+      return {
+        questionId: q.id,
+        selected: selected || null,
+        correctAnswer: correctAnswer || null,
+        isCorrect,
+        confidence: Number(draft.confidence) || 3,
+        timeSpentSec: draft.timeSpentSec || 0,
+        cancer: q.cancer,
+        topic: q.topic,
+        trials: q.trials || [],
+        submittedAt: new Date().toISOString(),
+      };
+    });
+    const correct = results.filter((row) => row.isCorrect).length;
+    const score = results.length ? Math.round((correct / results.length) * 100) : 0;
+    const cancerLoss = results.filter((row) => !row.isCorrect).reduce((acc, row) => {
+      const key = `${row.cancer} · ${row.topic || 'General'}`;
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    const topScoreLoss = Object.entries(cancerLoss).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([label, count]) => ({ label, count }));
+    const highConfidenceWrong = results.filter((row) => !row.isCorrect && row.confidence >= 4).length;
+    const slowCorrect = results.filter((row) => row.isCorrect && row.timeSpentSec > 90).length;
+    const fastWrong = results.filter((row) => !row.isCorrect && row.timeSpentSec < 30).length;
+    const completedExam = {
+      id: exam.id,
+      mode: 'mixed-mock',
+      questionCount: results.length,
+      timerMinutes: Number(timerMinutes),
+      elapsedSec,
+      score,
+      correct,
+      highConfidenceWrong,
+      slowCorrect,
+      fastWrong,
+      topScoreLoss,
+      results,
+      startedAt: new Date(startedAt || Date.now()).toISOString(),
+      completedAt: new Date().toISOString(),
+    };
+    onFinishMock(completedExam);
+    setExam({ ...exam, completedExam });
+    setShowResults(true);
+  };
+
+  const completed = exam?.completedExam;
+
+  return (
+    <main className="panel">
+      <div className="section-head">
+        <div>
+          <h2>Mock Exam Mode</h2>
+          <p className="muted">全癌別混合、隨機排序、結束後才顯示分數；每題記錄 confidence，供 Readiness Score 使用。</p>
+        </div>
+        <div className="inline-actions">
+          <label>題數
+            <select value={questionCount} onChange={(e) => setQuestionCount(Number(e.target.value))}>
+              {[50, 80, 120].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
+          <label>Timer
+            <select value={timerMinutes} onChange={(e) => setTimerMinutes(Number(e.target.value))}>
+              {[60, 90, 120, 180].map((n) => <option key={n} value={n}>{n} min</option>)}
+            </select>
+          </label>
+          <button className="primary" onClick={startMock}>Start mixed mock</button>
+        </div>
+      </div>
+
+      {completed && showResults && (
+        <section className="readiness-hero">
+          <MetricCard label="Score" value={`${completed.score}%`} sub={`${completed.correct}/${completed.questionCount} correct`} />
+          <MetricCard label="Predicted range" value={`${Math.max(0, completed.score - 5)}–${Math.min(100, completed.score + 5)}%`} sub="mock sampling band" />
+          <MetricCard label="High-confidence wrong" value={completed.highConfidenceWrong} sub="confidence 4–5 but wrong" />
+          <MetricCard label="Fast wrong / Slow correct" value={`${completed.fastWrong}/${completed.slowCorrect}`} sub="speed diagnostics" />
+          <div className="subsection full-span">
+            <h3>Top score loss</h3>
+            {completed.topScoreLoss.length ? completed.topScoreLoss.map((item) => <div className="weak-row" key={item.label}>{item.label} · lost {item.count}</div>) : <p className="muted">沒有錯題。</p>}
+          </div>
+        </section>
+      )}
+
+      {exam && !showResults && (
+        <>
+          <div className="mock-toolbar">
+            <strong>{exam.questions.length} questions</strong>
+            <span className="muted">已作答 {Object.values(answers).filter((a) => a.selected).length}/{exam.questions.length}</span>
+            <button className="good" onClick={finishMock}>Finish exam and score</button>
+          </div>
+          <div className="question-list">
+            {exam.questions.map((q, index) => {
+              const draft = answers[q.id] || { confidence: 3, selected: '' };
+              return (
+                <article className="question-card" key={q.id}>
+                  <div className="question-top">
+                    <div><span className="qid">{index + 1}. {q.id}</span><span className="pill">{q.cancer}</span><span className="pill soft">{q.topic}</span></div>
+                  </div>
+                  <p className="stem">{q.stem}</p>
+                  <div className="options">
+                    {Object.entries(q.options || {}).map(([key, value]) => (
+                      <label key={key} className={draft.selected === key ? 'option selected' : 'option'}>
+                        <input type="radio" name={`mock-${q.id}`} checked={draft.selected === key} onChange={() => updateAnswer(q.id, { selected: key, timeSpentSec: startedAt ? Math.round((Date.now() - startedAt) / 1000) : 0 })} />
+                        <span className="option-key">{key}</span>
+                        <span>{value}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="answer-row">
+                    <label>Confidence
+                      <select value={draft.confidence} onChange={(e) => updateAnswer(q.id, { confidence: Number(e.target.value) })}>
+                        <option value={1}>1 完全猜</option><option value={2}>2 不太確定</option><option value={3}>3 有印象</option><option value={4}>4 有把握</option><option value={5}>5 非常確定</option>
+                      </select>
+                    </label>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {!exam && (
+        <div className="empty-state">
+          <h3>正式模擬考規格</h3>
+          <p>50 / 80 / 120 題、不可看詳解、全癌別混合。完成後匯入 stats、mock trend、critical error queue。</p>
+        </div>
+      )}
+    </main>
+  );
+}
+
 export default function App() {
   const [state, setState] = useState(loadState);
-  const [tab, setTab] = useState('today');
+  const [tab, setTab] = useState('readiness');
   const [search, setSearch] = useState('');
   const [bankCancer, setBankCancer] = useState('All');
   const [bankYear, setBankYear] = useState('All');
@@ -2599,6 +3009,8 @@ export default function App() {
         current.correctAnswer === nextDraft.correctAnswer &&
         current.explanation === nextDraft.explanation &&
         current.wrongNotes === nextDraft.wrongNotes &&
+        current.confidence === nextDraft.confidence &&
+        current.errorType === nextDraft.errorType &&
         current.rated === nextDraft.rated &&
         current.rating === nextDraft.rating;
 
@@ -2656,6 +3068,46 @@ export default function App() {
   }, [state]);
 
   const cancerSummary = useMemo(() => getCancerSummary(state), [state]);
+  const readiness = useMemo(() => getReadinessMetrics(state), [state]);
+
+  const finishMockExam = (completedExam) => {
+    updateState((prev) => {
+      const nextStats = { ...(prev.stats || {}) };
+      completedExam.results.forEach((result) => {
+        const previous = getStat(prev, result.questionId);
+        const wasPreviouslyWrong = (previous.wrong || 0) > 0;
+        const interval = result.isCorrect ? nextIntervalByRating(result.confidence >= 4 ? 'Easy' : 'Good', previous) : 1;
+        const event = { ...result, date: TODAY, mode: 'mock', rating: result.isCorrect ? 'Good' : 'Again' };
+        nextStats[result.questionId] = {
+          ...previous,
+          attempts: (previous.attempts || 0) + 1,
+          correct: (previous.correct || 0) + (result.isCorrect ? 1 : 0),
+          wrong: (previous.wrong || 0) + (result.isCorrect ? 0 : 1),
+          lastResult: result.isCorrect ? 'correct' : 'wrong',
+          lastRating: result.isCorrect ? 'Good' : 'Again',
+          lastAttemptAt: TODAY,
+          nextReviewDate: addDays(TODAY, interval),
+          mastery: result.isCorrect ? Math.min(5, (previous.mastery || 0) + 1) : Math.max(0, (previous.mastery || 0) - 1),
+          intervalDays: interval,
+          userAnswer: result.selected,
+          correctAnswer: result.correctAnswer,
+          lastConfidence: result.confidence,
+          confidenceHistory: [...(previous.confidenceHistory || []), result.confidence].slice(-50),
+          answerHistory: [...(previous.answerHistory || []), event].slice(-50),
+          timeHistory: [...(previous.timeHistory || []), result.timeSpentSec].slice(-50),
+          highConfidenceWrong: (previous.highConfidenceWrong || 0) + (!result.isCorrect && result.confidence >= 4 ? 1 : 0),
+          repeatedWrong: result.isCorrect ? 0 : (previous.repeatedWrong || 0) + 1,
+          wrongRetestAttempts: (previous.wrongRetestAttempts || 0) + (wasPreviouslyWrong ? 1 : 0),
+          wrongRetestCorrect: (previous.wrongRetestCorrect || 0) + (wasPreviouslyWrong && result.isCorrect ? 1 : 0),
+        };
+      });
+      return {
+        ...prev,
+        stats: nextStats,
+        mockExams: [completedExam, ...(prev.mockExams || [])].slice(0, 20),
+      };
+    });
+  };
 
   const planProgress = state.planProgress || {};
 
@@ -2763,8 +3215,8 @@ export default function App() {
       <header className="app-header">
         <div>
           <div className="eyebrow">Oncology Tracker</div>
-          <h1>AI Review System</h1>
-          <p>112–114 腫專考古題每日練習、錯題率追蹤、spaced repetition、詳解庫。</p>
+          <h1>Board Readiness Engine</h1>
+          <p>112–114 腫專考古題、mixed mock、confidence calibration、critical error queue、≥80 分預測。</p>
         </div>
         <div className="header-actions">
           <button className="primary" onClick={createTodaySession}>產生今日 10–15 題</button>
@@ -2777,6 +3229,7 @@ export default function App() {
         <MetricCard label="已練題目" value={summary.reviewed} sub={`${summary.attempts} total attempts`} />
         <MetricCard label="正確率" value={`${summary.accuracy}%`} sub={`${summary.correct} correct / ${summary.wrong} wrong`} />
         <MetricCard label="今日待複習" value={dueReview.length} sub="依 next review date" />
+        <MetricCard label="≥80 機率" value={`${readiness.probability80}%`} sub={readiness.readinessLevel} />
         <MetricCard label="同步狀態" value={user ? 'Cloud' : 'Local'} sub={user ? user.email : '尚未登入'} />
       </section>
 
@@ -2789,10 +3242,56 @@ export default function App() {
       )}
 
       <nav className="tabs">
-        {[['today', 'Daily Practice'], ['review', 'Review Queue'], ['bank', 'Question Bank'], ['manual', 'Manual Add'], ['question-edit', 'Question Edit'], ['analytics', 'Analytics'], ['plan', '100-Day Plan'], ['sync', 'Cloud Sync'], ['settings', 'Settings']].map(([key, label]) => (
+        {[['readiness', 'Board Readiness'], ['mock', 'Mock Exam'], ['critical', 'Critical Errors'], ['today', 'Daily Practice'], ['review', 'Review Queue'], ['bank', 'Question Bank'], ['manual', 'Manual Add'], ['question-edit', 'Question Edit'], ['analytics', 'Analytics'], ['plan', '100-Day Plan'], ['sync', 'Cloud Sync'], ['settings', 'Settings']].map(([key, label]) => (
           <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>
         ))}
       </nav>
+
+      {tab === 'readiness' && (
+        <main className="panel">
+          <div className="section-head">
+            <div>
+              <h2>Board Readiness Dashboard</h2>
+              <p className="muted">每天回答：今天正式考，≥80 分機率多少？哪些癌別與 topic 會拖分？</p>
+            </div>
+            <button className="primary" onClick={() => setTab('mock')}>Start mixed mock</button>
+          </div>
+          <section className="readiness-hero">
+            <MetricCard label="Predicted Board Score" value={`${readiness.predictedScore}%`} sub="weighted readiness score" />
+            <MetricCard label="Probability ≥80" value={`${readiness.probability80}%`} sub={readiness.readinessLevel} />
+            <MetricCard label="Safe Exam Zone" value={readiness.safeExamZone ? 'Yes' : 'Not yet'} sub={`volatility SD ${readiness.scoreVolatility}`} />
+            <MetricCard label="Mock average" value={`${readiness.recentMockAverage}%`} sub={readiness.recentMockScores.join(' / ') || 'No mock yet'} />
+          </section>
+          <div className="gate-grid">
+            {readiness.gates.map((gate) => (
+              <div className={gate.pass ? 'gate-card pass' : 'gate-card fail'} key={gate.label}>
+                <strong>{gate.pass ? '✅' : '❌'} {gate.label}</strong>
+                <span>{gate.value}</span>
+              </div>
+            ))}
+          </div>
+          <div className="subsection">
+            <h3>Main score draggers</h3>
+            {readiness.redTopics.slice(0, 8).map((row) => (
+              <div className="weak-row" key={row.key}>{row.cancer} · {row.topic} · accuracy {row.accuracy}% · coverage {row.coverage}% · HC wrong {row.highConfidenceWrong}</div>
+            ))}
+          </div>
+        </main>
+      )}
+
+      {tab === 'mock' && (
+        <MockExamPanel state={state} onFinishMock={finishMockExam} />
+      )}
+
+      {tab === 'critical' && (
+        <main className="panel">
+          <h2>Critical Error Queue</h2>
+          <p className="muted">收錄 high confidence wrong、repeated wrong 與高錯誤率核心題；優先做 concept repair → similar question → 7-day retest。</p>
+          {readiness.criticalErrors.length === 0 ? <p className="muted">目前沒有 critical errors。</p> : readiness.criticalErrors.slice(0, 40).map(({ q, stat }) => (
+            <QuestionCard key={q.id} question={q} stat={stat} onUpdateStat={updateStat} compact />
+          ))}
+        </main>
+      )}
 
       {tab === 'today' && (
         <main className="panel">
@@ -2909,17 +3408,24 @@ export default function App() {
         <main className="panel">
           <h2>Analytics</h2>
           <div className="analytics-table">
-            <div className="table-row header"><span>Cancer</span><span>Total</span><span>Attempted</span><span>Attempts</span><span>Wrong rate</span></div>
+            <div className="table-row readiness-table header"><span>Cancer</span><span>Coverage</span><span>Accuracy</span><span>Retest</span><span>HC wrong</span><span>Status</span></div>
             {cancerSummary.map((row) => (
-              <div className="table-row" key={row.cancer}>
+              <div className="table-row readiness-table" key={row.cancer}>
                 <span>{row.cancer}</span>
-                <span>{row.total}</span>
-                <span>{row.attemptedQuestions}</span>
-                <span>{row.attempts}</span>
-                <span><strong>{row.wrongRate}%</strong></span>
+                <span>{row.coverage}% ({row.attemptedQuestions}/{row.total})</span>
+                <span>{row.accuracy}%</span>
+                <span>{row.retestAccuracy}%</span>
+                <span>{row.highConfidenceWrong}</span>
+                <span><strong>{row.status}</strong></span>
               </div>
             ))}
           </div>
+          <section className="readiness-hero subsection">
+            <MetricCard label="Predicted Board Score" value={`${readiness.predictedScore}%`} sub="composite score" />
+            <MetricCard label="Wrong retest conversion" value={`${readiness.wrongRetestConversion}%`} sub="previously wrong now correct" />
+            <MetricCard label="High-confidence wrong rate" value={`${readiness.highConfidenceWrongRate}%`} sub="confidence 4–5 but wrong" />
+            <MetricCard label="Topic mastery" value={`${readiness.topicMasteryScore}%`} sub="core topics mastered" />
+          </section>
           <div className="subsection">
             <h3>Top weak questions</h3>
             {weakQuestions.slice(0, 12).map(({ q, stat }) => (
