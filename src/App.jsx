@@ -64,17 +64,6 @@ const defaultState = {
   planProgress: {},
   questionOverrides: {},
   mockExams: [],
-  flashcards: [],
-  game: {
-    xp: 0,
-    level: 1,
-    streak: 0,
-    badges: [],
-    unlockedBosses: [],
-    defeatedBosses: [],
-    xpEvents: [],
-    dailyClaims: {},
-  },
   cloudMeta: {
     updatedAt: null,
     device: null,
@@ -395,28 +384,6 @@ function mergeCloudState(localState, cloudState) {
       ...(cloudState.mockExams || []),
       ...(localState.mockExams || []),
     ].filter((exam, index, exams) => exam?.id && exams.findIndex((x) => x.id === exam.id) === index),
-    flashcards: [
-      ...(cloudState.flashcards || []),
-      ...(localState.flashcards || []),
-    ].filter((card, index, cards) => card?.id && cards.findIndex((x) => x.id === card.id) === index),
-    game: {
-      ...defaultState.game,
-      ...(cloudState.game || {}),
-      ...(localState.game || {}),
-      xp: Math.max(cloudState.game?.xp || 0, localState.game?.xp || 0),
-      level: xpLevel(Math.max(cloudState.game?.xp || 0, localState.game?.xp || 0)),
-      badges: [...new Set([...(cloudState.game?.badges || []), ...(localState.game?.badges || [])])],
-      unlockedBosses: [...new Set([...(cloudState.game?.unlockedBosses || []), ...(localState.game?.unlockedBosses || [])])],
-      defeatedBosses: [...new Set([...(cloudState.game?.defeatedBosses || []), ...(localState.game?.defeatedBosses || [])])],
-      xpEvents: [
-        ...(cloudState.game?.xpEvents || []),
-        ...(localState.game?.xpEvents || []),
-      ].filter((event, index, events) => event?.id && events.findIndex((x) => x.id === event.id) === index).slice(0, 80),
-      dailyClaims: {
-        ...(cloudState.game?.dailyClaims || {}),
-        ...(localState.game?.dailyClaims || {}),
-      },
-    },
     cloudMeta: {
       ...(cloudState.cloudMeta || {}),
       ...(localState.cloudMeta || {}),
@@ -680,18 +647,52 @@ function generateDailyQuestionIds(state) {
   const newCount = Math.ceil(dailyCount * newRatio);
   const bookmarkCount = Math.max(0, dailyCount - dueCount - wrongCount - newCount, Math.floor(dailyCount * bookmarkRatio));
 
-  result.push(...pickUnique(due, dueCount, used));
-  result.push(...pickUnique(highWrong, wrongCount, used));
-  result.push(...pickUnique(newQuestions, newCount, used));
-  result.push(...pickUnique(bookmarked, bookmarkCount, used));
+function getModuleProgress(planProgress = {}) {
+  return studyPlan100.reduce((acc, task) => {
+    if (!acc[task.module]) acc[task.module] = { module: task.module, total: 0, completed: 0 };
+    acc[task.module].total += 1;
+    if (planProgress[task.id]) acc[task.module].completed += 1;
+    return acc;
+  }, {});
+}
 
-  // fill remaining with regular items
-  if (result.length < dailyCount) {
-    const remaining = dailyCount - result.length;
-    result.push(...pickUnique(regular, remaining, used));
+function examMatchesBoss(exam, boss) {
+  if (!exam?.completedAt) return false;
+  if (boss.id === 'final-board') {
+    return exam.questionCount >= 50 && exam.score >= boss.passScore;
   }
+  if (boss.id === 'trial') {
+    return exam.mode === 'trial-boss' && exam.score >= boss.passScore;
+  }
+  const cancerResults = (exam.results || []).filter((result) => result.cancer === boss.cancer);
+  return cancerResults.length >= 20 && exam.score >= boss.passScore && cancerResults.length / Math.max(1, exam.results?.length || 1) >= 0.75;
+}
 
-  return result.slice(0, dailyCount);
+function getBossRows(state, readiness = getReadinessMetrics(state)) {
+  const progress = getModuleProgress(state.planProgress || {});
+  const trialCards = (state.flashcards || []).filter((card) => card.sourceType === 'trial').length;
+  const completedYears = new Set((state.mockExams || [])
+    .filter((exam) => exam.completedAt && exam.year)
+    .map((exam) => Number(exam.year)));
+  return BOSS_DEFINITIONS.map((boss) => {
+    let unlockValue;
+    let unlocked;
+    if (boss.id === 'trial') {
+      unlockValue = trialCards;
+      unlocked = trialCards >= 50;
+    } else if (boss.id === 'final-board') {
+      unlockValue = completedYears.size;
+      unlocked = [112, 113, 114].every((year) => completedYears.has(year));
+    } else {
+      const row = progress[boss.module] || { total: 0, completed: 0 };
+      unlockValue = row.total ? Math.round((row.completed / row.total) * 100) : 0;
+      unlocked = unlockValue >= boss.unlockPercent;
+    }
+    const defeated = boss.id === 'final-board'
+      ? unlocked && readiness.wrongRetestConversion >= 90 && (state.mockExams || []).some((exam) => exam.completedAt && exam.score >= boss.passScore && exam.questionCount >= 50)
+      : (state.mockExams || []).some((exam) => examMatchesBoss(exam, boss));
+    return { ...boss, unlockValue, unlocked, defeated };
+  });
 }
 
 function getCancerSummary(state) {
@@ -871,132 +872,6 @@ function getReadinessMetrics(state) {
     redTopics,
     criticalErrors: getCriticalErrorItems(state),
   };
-}
-
-const BOSS_DEFINITIONS = [
-  { id: 'lung', name: 'Lung Boss', module: 'Lung', cancer: 'Lung', unlockPercent: 80, passScore: 80 },
-  { id: 'breast', name: 'Breast Boss', module: 'Breast', cancer: 'Breast', unlockPercent: 80, passScore: 80 },
-  { id: 'gi', name: 'GI Boss', module: 'GI', cancer: 'GI', unlockPercent: 80, passScore: 78 },
-  { id: 'head-neck', name: 'Head & Neck Boss', module: 'Head & Neck', cancer: 'Head & Neck', unlockPercent: 80, passScore: 78 },
-  { id: 'trial', name: 'Trial Boss', module: 'Trial Cards', cancer: 'Trial Cards', unlockPercent: 50, passScore: 85 },
-  { id: 'final-board', name: 'Final Board Boss', module: 'Final Board', cancer: 'Mock', unlockPercent: 100, passScore: 75 },
-];
-
-function getModuleProgress(planProgress = {}) {
-  return studyPlan100.reduce((acc, task) => {
-    if (!acc[task.module]) acc[task.module] = { module: task.module, total: 0, completed: 0 };
-    acc[task.module].total += 1;
-    if (planProgress[task.id]) acc[task.module].completed += 1;
-    return acc;
-  }, {});
-}
-
-function examMatchesBoss(exam, boss) {
-  if (!exam?.completedAt) return false;
-  if (boss.id === 'final-board') {
-    return exam.questionCount >= 50 && exam.score >= boss.passScore;
-  }
-  if (boss.id === 'trial') {
-    return exam.mode === 'trial-boss' && exam.score >= boss.passScore;
-  }
-  const cancerResults = (exam.results || []).filter((result) => result.cancer === boss.cancer);
-  return cancerResults.length >= 20 && exam.score >= boss.passScore && cancerResults.length / Math.max(1, exam.results?.length || 1) >= 0.75;
-}
-
-function getBossRows(state, readiness = getReadinessMetrics(state)) {
-  const progress = getModuleProgress(state.planProgress || {});
-  const trialCards = (state.flashcards || []).filter((card) => card.sourceType === 'trial').length;
-  const completedYears = new Set((state.mockExams || [])
-    .filter((exam) => exam.completedAt && exam.year)
-    .map((exam) => Number(exam.year)));
-  return BOSS_DEFINITIONS.map((boss) => {
-    let unlockValue;
-    let unlocked;
-    if (boss.id === 'trial') {
-      unlockValue = trialCards;
-      unlocked = trialCards >= 50;
-    } else if (boss.id === 'final-board') {
-      unlockValue = completedYears.size;
-      unlocked = [112, 113, 114].every((year) => completedYears.has(year));
-    } else {
-      const row = progress[boss.module] || { total: 0, completed: 0 };
-      unlockValue = row.total ? Math.round((row.completed / row.total) * 100) : 0;
-      unlocked = unlockValue >= boss.unlockPercent;
-    }
-    const defeated = boss.id === 'final-board'
-      ? unlocked && readiness.wrongRetestConversion >= 90 && (state.mockExams || []).some((exam) => exam.completedAt && exam.score >= boss.passScore && exam.questionCount >= 50)
-      : (state.mockExams || []).some((exam) => examMatchesBoss(exam, boss));
-    return { ...boss, unlockValue, unlocked, defeated };
-  });
-}
-
-function syncBossGameState(state, readiness = getReadinessMetrics(state)) {
-  const bosses = getBossRows(state, readiness);
-  const unlockedBosses = [...new Set([...(state.game?.unlockedBosses || []), ...bosses.filter((boss) => boss.unlocked).map((boss) => boss.id)])];
-  const previousDefeated = new Set(state.game?.defeatedBosses || []);
-  const newlyDefeated = bosses.filter((boss) => boss.defeated && !previousDefeated.has(boss.id));
-  const defeatedBosses = [...new Set([...(state.game?.defeatedBosses || []), ...newlyDefeated.map((boss) => boss.id)])];
-  const game = newlyDefeated.reduce(
-    (nextGame, boss) => awardXp(nextGame, boss.id === 'final-board' ? XP_RULES.fullMock75 : XP_RULES.cancerBoss, `${boss.name} defeated`, { bossId: boss.id }),
-    { ...(state.game || defaultState.game), unlockedBosses, defeatedBosses }
-  );
-  return { ...state, game: { ...game, unlockedBosses, defeatedBosses } };
-}
-
-function buildQuickCardFromQuestion(question, stat = emptyStat()) {
-  const answerText = question.options?.[stat.correctAnswer || question.answer] || '';
-  const trialText = (question.trials || []).join(', ');
-  return {
-    id: `card-${question.id}-${Date.now()}`,
-    sourceType: 'question',
-    sourceId: question.id,
-    cancer: question.cancer,
-    topic: question.topic || 'General',
-    front: `${question.id}｜${question.cancer}｜${question.topic}\n${question.stem}`,
-    back: [
-      `Answer: ${stat.correctAnswer || question.answer || '尚未輸入'}${answerText ? ` - ${answerText}` : ''}`,
-      trialText ? `Trials: ${trialText}` : '',
-      stat.explanation || question.explanation ? `Explanation: ${stat.explanation || question.explanation}` : '',
-      stat.wrongNotes ? `Weakness note: ${stat.wrongNotes}` : '',
-    ].filter(Boolean).join('\n\n'),
-    cloze: trialText ? `${trialText}: population / intervention / endpoint / exam trap?` : '',
-    trial: question.trials || [],
-    tags: question.tags || makeQuestionTags(question),
-    intervalDays: 1,
-    nextReviewDate: TODAY,
-    mastery: 0,
-    difficulty: stat.difficulty || question.tags?.examWeight || 3,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-}
-
-function buildTrialCardFromName(trialName, sourceQuestion = null) {
-  const cancer = sourceQuestion?.cancer || 'Trial Cards';
-  return {
-    id: `trial-card-${trialName.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-${Date.now()}`,
-    sourceType: 'trial',
-    sourceId: sourceQuestion?.id || null,
-    cancer,
-    topic: sourceQuestion?.topic || 'Pivotal trial',
-    front: `${trialName} 的 population / intervention / comparator / endpoint / exam trap？`,
-    back: 'Population:\nIntervention:\nComparator:\nPrimary endpoint:\nKey result:\nToxicity / exam trap:',
-    cloze: `${trialName} primary endpoint = {{c1::}}; key eligible population = {{c2::}}`,
-    trial: [trialName],
-    tags: sourceQuestion?.tags || { domain: cancer, subtopic: 'Pivotal trial', trial: [trialName], cardEligible: true, examWeight: 4 },
-    intervalDays: 1,
-    nextReviewDate: TODAY,
-    mastery: 0,
-    difficulty: 3,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-}
-
-function getDueFlashcards(state) {
-  return (state.flashcards || [])
-    .filter((card) => !card.nextReviewDate || card.nextReviewDate <= TODAY)
-    .sort((a, b) => (a.nextReviewDate || '').localeCompare(b.nextReviewDate || '') || (a.mastery || 0) - (b.mastery || 0));
 }
 
 function buildAiPrompt(state) {
@@ -1915,117 +1790,18 @@ function QuestionEditPanel({ state, onSaveOverride }) {
     </main>
   );
 }
-function FlashcardsPanel({ state, dueFlashcards, weakQuestions, onReviewCard, onCreateTrialCard, onGenerateWeakCards }) {
-  const [trialName, setTrialName] = useState('');
-  const trialCards = (state.flashcards || []).filter((card) => card.sourceType === 'trial');
-  const weakCards = (state.flashcards || []).filter((card) => (card.mastery || 0) <= 2);
-
-  const submitTrialCard = () => {
-    onCreateTrialCard(trialName);
-    setTrialName('');
-  };
-
-  return (
-    <main className="panel">
-      <div className="section-head">
-        <div>
-          <h2>Flashcards</h2>
-          <p className="muted">Quick Cards 來自題目/詳解；Trial Cards 用固定 pivotal trial 模板做 endpoint recall。</p>
-        </div>
-        <button className="primary" onClick={onGenerateWeakCards}>從錯題/高信心錯題生成卡片</button>
-      </div>
-
-      <section className="readiness-hero">
-        <MetricCard label="Cards total" value={(state.flashcards || []).length} sub={`${dueFlashcards.length} due today`} />
-        <MetricCard label="Trial cards" value={trialCards.length} sub="Trial Boss unlock target: 50" />
-        <MetricCard label="Weak cards" value={weakCards.length} sub="mastery <=2" />
-        <MetricCard label="Weak questions" value={weakQuestions.length} sub="wrong/bookmarked source pool" />
-      </section>
-
-      <div className="flashcard-create">
-        <label>
-          Trial Card
-          <input value={trialName} onChange={(e) => setTrialName(e.target.value)} placeholder="例如 KEYNOTE-671、PACIFIC、KATHERINE" />
-        </label>
-        <button className="secondary" onClick={submitTrialCard}>新增 Trial Card</button>
-      </div>
-
-      <div className="subsection">
-        <h3>Due Cards</h3>
-        {!dueFlashcards.length ? <p className="muted">今天沒有到期卡片。</p> : (
-          <div className="flashcard-grid">
-            {dueFlashcards.slice(0, 40).map((card) => (
-              <FlashcardCard key={card.id} card={card} onReviewCard={onReviewCard} />
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="subsection">
-        <h3>Trial Cards</h3>
-        {!trialCards.length ? <p className="muted">尚未建立 Trial Card。</p> : (
-          <div className="flashcard-grid">
-            {trialCards.slice(0, 20).map((card) => (
-              <FlashcardCard key={card.id} card={card} onReviewCard={onReviewCard} compact />
-            ))}
-          </div>
-        )}
-      </div>
-    </main>
-  );
-}
-
-function FlashcardCard({ card, onReviewCard, compact = false }) {
-  const [showBack, setShowBack] = useState(false);
-  return (
-    <article className="flashcard-card">
-      <div className="question-top">
-        <div>
-          <span className="pill">{card.cancer}</span>
-          <span className="pill soft">{card.topic}</span>
-          {card.trial?.map((trial) => <span className="pill trial" key={trial}>{trial}</span>)}
-        </div>
-        <span className="priority">M{card.mastery || 0}</span>
-      </div>
-      <pre className="flashcard-front">{card.front}</pre>
-      {!compact && card.cloze && <p className="muted">{card.cloze}</p>}
-      {showBack && <pre className="flashcard-back">{card.back || '尚未填寫背面。'}</pre>}
-      <div className="inline-actions">
-        <button className="secondary" onClick={() => setShowBack(!showBack)}>{showBack ? '收合答案' : '顯示答案'}</button>
-        {Object.keys(FLASHCARD_RATINGS).map((rating) => (
-          <button key={rating} className={`tiny ${rating.toLowerCase()}`} onClick={() => onReviewCard(card.id, rating)}>{rating}</button>
-        ))}
-      </div>
-      <div className="stats-line">next review {card.nextReviewDate || 'today'} · interval {card.intervalDays || 1} days</div>
-    </article>
-  );
-}
-
 function MockExamPanel({ state, onFinishMock }) {
   const [questionCount, setQuestionCount] = useState(80);
   const [timerMinutes, setTimerMinutes] = useState(120);
-  const [examMode, setExamMode] = useState('mixed-mock');
-  const [examYear, setExamYear] = useState('All');
   const [exam, setExam] = useState(null);
   const [startedAt, setStartedAt] = useState(null);
   const [answers, setAnswers] = useState({});
   const [showResults, setShowResults] = useState(false);
 
   const startMock = () => {
-    const pool = shuffleStable(questionBank
-      .map((q) => getQuestionWithOverride(q.id, state))
-      .filter(Boolean)
-      .filter((q) => examYear === 'All' || Number(q.year) === Number(examYear))
-      .filter((q) => {
-        if (examMode === 'lung-boss') return q.cancer === 'Lung';
-        if (examMode === 'breast-boss') return q.cancer === 'Breast';
-        if (examMode === 'gi-boss') return q.cancer === 'GI';
-        if (examMode === 'head-neck-boss') return q.cancer === 'Head & Neck';
-        if (examMode === 'trial-boss') return (q.trials || []).length > 0 || ['Trial interpretation', 'Biomarker'].includes(q.topic);
-        return true;
-      }));
+    const pool = shuffleStable(questionBank.map((q) => getQuestionWithOverride(q.id, state)).filter(Boolean));
     const selected = pool.slice(0, Number(questionCount));
-    setExam({ id: `mock-${Date.now()}`, questions: selected, mode: examMode, year: examYear === 'All' ? null : Number(examYear) });
+    setExam({ id: `mock-${Date.now()}`, questions: selected });
     setStartedAt(Date.now());
     setAnswers({});
     setShowResults(false);
@@ -2078,8 +1854,7 @@ function MockExamPanel({ state, onFinishMock }) {
     const fastWrong = results.filter((row) => !row.isCorrect && row.timeSpentSec < 30).length;
     const completedExam = {
       id: exam.id,
-      mode: exam.mode || examMode,
-      year: exam.year || null,
+      mode: 'mixed-mock',
       questionCount: results.length,
       timerMinutes: Number(timerMinutes),
       elapsedSec,
@@ -2110,26 +1885,7 @@ function MockExamPanel({ state, onFinishMock }) {
         <div className="inline-actions">
           <label>題數
             <select value={questionCount} onChange={(e) => setQuestionCount(Number(e.target.value))}>
-              {[20, 50, 80, 120].map((n) => <option key={n} value={n}>{n}</option>)}
-            </select>
-          </label>
-          <label>Mode
-            <select value={examMode} onChange={(e) => setExamMode(e.target.value)}>
-              <option value="mixed-mock">Mixed mock</option>
-              <option value="lung-boss">Lung Boss</option>
-              <option value="breast-boss">Breast Boss</option>
-              <option value="gi-boss">GI Boss</option>
-              <option value="head-neck-boss">Head & Neck Boss</option>
-              <option value="trial-boss">Trial Boss</option>
-              <option value="final-board">Final Board Boss</option>
-            </select>
-          </label>
-          <label>Year
-            <select value={examYear} onChange={(e) => setExamYear(e.target.value)}>
-              <option>All</option>
-              <option>112</option>
-              <option>113</option>
-              <option>114</option>
+              {[50, 80, 120].map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
           </label>
           <label>Timer
@@ -2543,13 +2299,10 @@ export default function App() {
 
   const cancerSummary = useMemo(() => getCancerSummary(state), [state]);
   const readiness = useMemo(() => getReadinessMetrics(state), [state]);
-  const bossRows = useMemo(() => getBossRows(state, readiness), [state, readiness]);
-  const dueFlashcards = useMemo(() => getDueFlashcards(state), [state]);
 
   const finishMockExam = (completedExam) => {
     updateState((prev) => {
       const nextStats = { ...(prev.stats || {}) };
-      let game = prev.game || defaultState.game;
       completedExam.results.forEach((result) => {
         const previous = getStat(prev, result.questionId);
         const wasPreviouslyWrong = (previous.wrong || 0) > 0;
@@ -2577,34 +2330,12 @@ export default function App() {
           wrongRetestAttempts: (previous.wrongRetestAttempts || 0) + (wasPreviouslyWrong ? 1 : 0),
           wrongRetestCorrect: (previous.wrongRetestCorrect || 0) + (wasPreviouslyWrong && result.isCorrect ? 1 : 0),
         };
-        if (result.isCorrect && wasPreviouslyWrong && previous.lastRating === 'Again' && daysBetween(previous.lastAttemptAt, TODAY) <= 3) {
-          game = awardXp(game, XP_RULES.wrongAgainRecovery, 'Previously wrong question corrected within 3 days', { questionId: result.questionId, mode: 'mock' });
-        }
-        if (result.isCorrect && (previous.highConfidenceWrong || 0) > 0) {
-          game = awardXp(game, XP_RULES.highConfidenceWrongCorrected, 'High-confidence wrong corrected', { questionId: result.questionId, mode: 'mock' });
-        }
       });
-      if (completedExam.score >= 75 && completedExam.questionCount >= 50) {
-        game = awardXp(game, XP_RULES.fullMock75, 'Full mock score >=75%', { mockId: completedExam.id, score: completedExam.score });
-      }
-      const nextState = {
+      return {
         ...prev,
-        game,
         stats: nextStats,
         mockExams: [completedExam, ...(prev.mockExams || [])].slice(0, 20),
       };
-      const nextReadiness = getReadinessMetrics(nextState);
-      let synced = syncBossGameState(nextState, nextReadiness);
-      if (nextReadiness.wrongRetestConversion >= 90 && !(synced.game?.badges || []).includes('wrong-retest-90')) {
-        synced = {
-          ...synced,
-          game: {
-            ...awardXp(synced.game, XP_RULES.wrongRetest90, 'Wrong-retest conversion >=90%', { mockId: completedExam.id }),
-            badges: [...(synced.game?.badges || []), 'wrong-retest-90'],
-          },
-        };
-      }
-      return synced;
     });
   };
 
@@ -2734,8 +2465,6 @@ export default function App() {
         <MetricCard label="正確率" value={`${summary.accuracy}%`} sub={`${summary.correct} correct / ${summary.wrong} wrong`} />
         <MetricCard label="今日待複習" value={dueReview.length} sub="依 next review date" />
         <MetricCard label="≥80 機率" value={`${readiness.probability80}%`} sub={readiness.readinessLevel} />
-        <MetricCard label="Level / XP" value={`Lv ${state.game?.level || 1}`} sub={`${state.game?.xp || 0} XP · streak ${state.game?.streak || 0}`} />
-        <MetricCard label="Flashcards" value={(state.flashcards || []).length} sub={`${dueFlashcards.length} due today`} />
         <MetricCard label="同步狀態" value={user ? 'Cloud' : 'Local'} sub={user ? user.email : '尚未登入'} />
       </section>
 
@@ -2748,7 +2477,7 @@ export default function App() {
       )}
 
       <nav className="tabs">
-        {[['readiness', 'Board Readiness'], ['mock', 'Mock Exam'], ['critical', 'Critical Errors'], ['flashcards', 'Flashcards'], ['today', 'Daily Practice'], ['review', 'Review Queue'], ['bank', 'Question Bank'], ['manual', 'Manual Add'], ['question-edit', 'Question Edit'], ['analytics', 'Analytics'], ['plan', '100-Day Plan'], ['sync', 'Cloud Sync'], ['settings', 'Settings']].map(([key, label]) => (
+        {[['readiness', 'Board Readiness'], ['mock', 'Mock Exam'], ['critical', 'Critical Errors'], ['today', 'Daily Practice'], ['review', 'Review Queue'], ['bank', 'Question Bank'], ['manual', 'Manual Add'], ['question-edit', 'Question Edit'], ['analytics', 'Analytics'], ['plan', '100-Day Plan'], ['sync', 'Cloud Sync'], ['settings', 'Settings']].map(([key, label]) => (
           <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>
         ))}
       </nav>
@@ -2782,18 +2511,6 @@ export default function App() {
               <div className="weak-row" key={row.key}>{row.cancer} · {row.topic} · accuracy {row.accuracy}% · coverage {row.coverage}% · HC wrong {row.highConfidenceWrong}</div>
             ))}
           </div>
-          <div className="subsection">
-            <h3>Boss Progress</h3>
-            <div className="boss-grid">
-              {bossRows.map((boss) => (
-                <div className={boss.defeated ? 'boss-card defeated' : boss.unlocked ? 'boss-card unlocked' : 'boss-card'} key={boss.id}>
-                  <strong>{boss.name}</strong>
-                  <span>{boss.defeated ? 'Defeated' : boss.unlocked ? 'Unlocked' : 'Locked'}</span>
-                  <small>{boss.id === 'trial' ? `${boss.unlockValue}/50 trial cards` : boss.id === 'final-board' ? `${boss.unlockValue}/3 annual mocks` : `${boss.unlockValue}% module complete`}</small>
-                </div>
-              ))}
-            </div>
-          </div>
         </main>
       )}
 
@@ -2806,20 +2523,9 @@ export default function App() {
           <h2>Critical Error Queue</h2>
           <p className="muted">收錄 high confidence wrong、repeated wrong 與高錯誤率核心題；優先做 concept repair → similar question → 7-day retest。</p>
           {readiness.criticalErrors.length === 0 ? <p className="muted">目前沒有 critical errors。</p> : readiness.criticalErrors.slice(0, 40).map(({ q, stat }) => (
-            <QuestionCard key={q.id} question={q} stat={stat} onUpdateStat={updateStat} compact onCreateFlashcard={createFlashcardFromQuestion} />
+            <QuestionCard key={q.id} question={q} stat={stat} onUpdateStat={updateStat} compact />
           ))}
         </main>
-      )}
-
-      {tab === 'flashcards' && (
-        <FlashcardsPanel
-          state={state}
-          dueFlashcards={dueFlashcards}
-          weakQuestions={weakQuestions}
-          onReviewCard={reviewFlashcard}
-          onCreateTrialCard={createTrialCard}
-          onGenerateWeakCards={generateWeakFlashcards}
-        />
       )}
 
       {tab === 'today' && (
