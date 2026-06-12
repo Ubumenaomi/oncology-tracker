@@ -2357,10 +2357,12 @@ function QuestPanel({
   );
 }
 
-function FlashcardsPanel({ state, dueFlashcards, weakQuestions, onReviewCard, onCreateTrialCard, onGenerateWeakCards, onImportFlashcards }) {
+function FlashcardsPanel({ state, dueFlashcards, weakQuestions, onReviewCard, onCreateTrialCard, onImportFlashcards }) {
   const [trialName, setTrialName] = useState('');
   const [importJson, setImportJson] = useState('');
   const [importMessage, setImportMessage] = useState('');
+  const [cardPrompt, setCardPrompt] = useState('');
+  const [cardPromptMessage, setCardPromptMessage] = useState('');
   const allFlashcards = getFlashcardList(state);
   const trialCards = allFlashcards.filter((card) => card.sourceType === 'trial');
   const weakCards = allFlashcards.filter((card) => (card.mastery || 0) <= 2);
@@ -2376,14 +2378,212 @@ function FlashcardsPanel({ state, dueFlashcards, weakQuestions, onReviewCard, on
     if (result.ok) setImportJson('');
   };
 
+  const copyCardPrompt = async () => {
+    if (!cardPrompt) return;
+    try {
+      await navigator.clipboard.writeText(cardPrompt);
+      setCardPromptMessage('已複製 prompt，可以貼到 ChatGPT。');
+    } catch {
+      setCardPromptMessage('瀏覽器無法自動複製，請手動選取 prompt 複製。');
+    }
+  };
+
+  const buildAiCardPromptFromWeakQuestions = () => {
+    const promptSourceQuestions = questionBank
+      .map((q) => getQuestionWithOverride(q.id, state))
+      .filter(Boolean)
+      .map((q) => ({ q, stat: getStat(state, q.id) }))
+      .filter(({ stat }) => (
+        stat.wrong > 0 ||
+        stat.bookmarked ||
+        (stat.nextReviewDate && stat.nextReviewDate <= TODAY) ||
+        (stat.highConfidenceWrong || 0) > 0 ||
+        stat.mastery <= 2
+      ))
+      .sort((a, b) => {
+        const aScore =
+          (a.stat.nextReviewDate && a.stat.nextReviewDate <= TODAY ? 100 : 0) +
+          a.stat.wrong * 10 +
+          (a.stat.bookmarked ? 20 : 0) +
+          (a.stat.highConfidenceWrong || 0) * 15 +
+          (2 - Math.min(a.stat.mastery || 0, 2)) * 5;
+
+        const bScore =
+          (b.stat.nextReviewDate && b.stat.nextReviewDate <= TODAY ? 100 : 0) +
+          b.stat.wrong * 10 +
+          (b.stat.bookmarked ? 20 : 0) +
+          (b.stat.highConfidenceWrong || 0) * 15 +
+          (2 - Math.min(b.stat.mastery || 0, 2)) * 5;
+
+        return bScore - aScore;
+      })
+      .slice(0, 12);
+
+    const sourceText = promptSourceQuestions
+      .map(({ q, stat }, index) => {
+        const optionsText = Object.entries(q.options || {})
+          .map(([key, value]) => `(${key}) ${value}`)
+          .join('\n');
+
+        return `
+[${index + 1}] ${q.id}
+Cancer: ${q.cancer || ''}
+Topic: ${q.topic || ''}
+Year: ${q.year || ''}
+Trials: ${(q.trials || []).join(', ') || 'none'}
+Attempts: ${stat.attempts}
+Wrong: ${stat.wrong}
+Wrong rate: ${wrongRate(stat)}%
+Mastery: ${stat.mastery}
+Bookmarked: ${stat.bookmarked ? 'yes' : 'no'}
+
+Stem:
+${q.stem || ''}
+
+Options:
+${optionsText}
+
+Correct answer:
+${q.answer || stat.correctAnswer || ''}
+
+Explanation:
+${q.explanation || stat.explanation || ''}
+
+User wrong note:
+${stat.wrongNotes || ''}
+`;
+      })
+      .join('\n\n---\n\n');
+
+    const prompt = `
+你是一位 hematology-oncology board exam coach。請根據以下錯題與 due questions 資料，幫我產生高品質 Anki-style flashcards。
+
+請只輸出 JSON array，不要加 markdown，不要加說明文字。
+
+每張卡格式如下：
+{
+  "front": "...",
+  "back": "...",
+  "type": "Basic" | "Trial" | "Cloze" | "Exam Trap" | "Toxicity" | "Biomarker",
+  "cancer": "...",
+  "topic": "...",
+  "sourceQuestionId": "...",
+  "tags": ["...", "..."]
+}
+
+製卡規則：
+1. 不要把整個題目貼到 front。
+2. 每張卡只測一個核心知識點。
+3. 優先產生 trial endpoint、patient population、biomarker cutoff、toxicity、contraindication、exam trap。
+4. Trial card 必須包含：population、regimen、endpoint、key result、board trap。
+5. Cloze card 適合數字、cutoff、duration、HR、PFS/OS。
+6. 每題產生 2–4 張卡。
+7. 醫學名詞與藥名保留英文，其餘用繁體中文。
+8. back 要 concise，但要足夠讓我考前複習。
+
+以下是錯題與 due questions 來源資料：
+
+${sourceText || '目前沒有符合條件的錯題或 due questions。'}
+`.trim();
+
+    setCardPrompt(prompt);
+    setCardPromptMessage(`已產生 ${promptSourceQuestions.length} 題 due / weak questions 的 AI card prompt。`);
+  };
+
+  const buildTrialCardPromptFromWeakQuestions = () => {
+    const trialSourceQuestions = questionBank
+      .map((q) => getQuestionWithOverride(q.id, state))
+      .filter(Boolean)
+      .map((q) => ({ q, stat: getStat(state, q.id) }))
+      .filter(({ q, stat }) => (
+        q.trials &&
+        q.trials.length > 0 &&
+        (stat.wrong > 0 || stat.bookmarked || stat.mastery <= 2 || (stat.highConfidenceWrong || 0) > 0)
+      ));
+
+    const trialMap = new Map();
+
+    trialSourceQuestions.forEach(({ q, stat }) => {
+      (q.trials || []).forEach((trial) => {
+        if (!trialMap.has(trial)) {
+          trialMap.set(trial, []);
+        }
+        trialMap.get(trial).push({
+          id: q.id,
+          cancer: q.cancer,
+          topic: q.topic,
+          stem: q.stem,
+          answer: q.answer,
+          explanation: q.explanation || stat.explanation || '',
+          wrongRate: wrongRate(stat),
+        });
+      });
+    });
+
+    const trialText = Array.from(trialMap.entries())
+      .slice(0, 20)
+      .map(([trial, sources]) => {
+        const sourceText = sources
+          .slice(0, 3)
+          .map((s) => `
+Source question: ${s.id}
+Cancer: ${s.cancer || ''}
+Topic: ${s.topic || ''}
+Wrong rate: ${s.wrongRate}%
+Stem: ${s.stem || ''}
+Answer: ${s.answer || ''}
+Explanation: ${s.explanation || ''}
+`)
+          .join('\n');
+
+        return `
+Trial: ${trial}
+${sourceText}
+`;
+      })
+      .join('\n---\n');
+
+    const prompt = `
+你是一位 hematology-oncology board exam coach。請根據以下 trial list 與錯題來源，產生高品質 Trial Cards。
+
+請只輸出 JSON array，不要加 markdown，不要加說明文字。
+
+每張卡格式如下：
+{
+  "front": "...",
+  "back": "...",
+  "type": "Trial",
+  "cancer": "...",
+  "topic": "...",
+  "sourceQuestionId": "...",
+  "tags": ["trial", "..."]
+}
+
+每個 trial 至少產生 1–2 張卡。Trial card 的 back 必須包含：
+- Disease setting / population
+- Regimen / comparator
+- Primary endpoint
+- Key result
+- Board exam trap
+
+醫學名詞與藥名保留英文，其餘用繁體中文。
+
+Trial sources:
+
+${trialText || '目前沒有符合條件的 trial 來源。'}
+`.trim();
+
+    setCardPrompt(prompt);
+    setCardPromptMessage(`已產生 ${trialMap.size} 個 trial 的 Trial Cards prompt。`);
+  };
+
   return (
     <main className="panel">
       <div className="section-head">
         <div>
           <h2>Flashcards</h2>
-          <p className="muted">Quick Cards 來自題目/詳解；Trial Cards 用固定 pivotal trial 模板做 endpoint recall。</p>
+          <p className="muted">錯題只整理來源素材；先產生 ChatGPT prompt，再匯入 AI 產出的 JSON cards。</p>
         </div>
-        <button className="primary" onClick={onGenerateWeakCards}>從錯題/高信心錯題生成卡片</button>
       </div>
 
       <section className="readiness-hero">
@@ -2395,10 +2595,27 @@ function FlashcardsPanel({ state, dueFlashcards, weakQuestions, onReviewCard, on
 
       <div className="flashcard-create">
         <label>
-          Trial Card
+          Quick Add Trial Name
           <input value={trialName} onChange={(e) => setTrialName(e.target.value)} placeholder="例如 KEYNOTE-671、PACIFIC、KATHERINE" />
         </label>
-        <button className="secondary" onClick={submitTrialCard}>新增 Trial Card</button>
+        <button className="secondary" onClick={submitTrialCard}>新增空白 Trial Card</button>
+      </div>
+
+      <div className="subsection import-card-panel">
+        <h3>AI Card Prompt Generator</h3>
+        <p className="muted">從 Due / weak questions 整理成 ChatGPT prompt，再貼回 ChatGPT 產生高品質 JSON cards。</p>
+        <div className="inline-actions">
+          <button className="secondary" onClick={buildAiCardPromptFromWeakQuestions}>產生今日 Due Cards Prompt</button>
+          <button className="secondary" onClick={buildTrialCardPromptFromWeakQuestions}>產生 Trial Cards Prompt</button>
+          <button className="primary" onClick={copyCardPrompt} disabled={!cardPrompt}>複製 Prompt</button>
+        </div>
+        {cardPromptMessage && <p className="save-message">{cardPromptMessage}</p>}
+        <textarea
+          className="prompt-box"
+          value={cardPrompt}
+          onChange={(e) => setCardPrompt(e.target.value)}
+          placeholder="產生的 ChatGPT prompt 會出現在這裡。"
+        />
       </div>
 
       <div className="subsection import-card-panel">
@@ -2498,7 +2715,7 @@ function FlashcardReviewPanel({ dueFlashcards, allFlashcards, onReviewCard, onOp
       {!card ? (
         <section className="empty-state">
           <h3>沒有可複習的卡片</h3>
-          <p className="muted">先到 Flashcards → Import Flashcards 貼上 ChatGPT 產生的 JSON card，或用錯題生成卡片。</p>
+          <p className="muted">先到 Flashcards → 產生 AI Card Prompt，貼到 ChatGPT 後再 Import JSON cards。</p>
           <button className="primary" onClick={onOpenImport}>去匯入卡片</button>
         </section>
       ) : (
@@ -2955,26 +3172,6 @@ export default function App() {
     } catch (error) {
       return { ok: false, message: error.message || 'JSON 格式錯誤，沒有匯入任何卡片。' };
     }
-  };
-
-  const generateWeakFlashcards = () => {
-    updateState((prev) => {
-      const existingSources = new Set(getFlashcardList(prev).map((card) => `${card.sourceType}:${card.sourceId}`));
-      const cards = questionBank
-        .map((q) => ({ q: getQuestionWithOverride(q.id, prev), stat: getStat(prev, q.id) }))
-        .filter(({ q, stat }) => q && (stat.wrong > 0 || stat.bookmarked || (stat.highConfidenceWrong || 0) > 0 || (stat.mastery || 0) <= 2))
-        .filter(({ q }) => !existingSources.has(`question:${q.id}`))
-        .slice(0, 30)
-        .map(({ q, stat }) => buildQuickCardFromQuestion(q, stat));
-      return {
-        ...prev,
-        flashcards: { ...normalizeFlashcards(prev.flashcards), ...cardsToMap(cards) },
-        flashcardStats: {
-          ...(prev.flashcardStats || {}),
-          ...Object.fromEntries(cards.map((card) => [card.id, makeFlashcardStats(card)])),
-        },
-      };
-    });
   };
 
   const saveQuestionOverride = (id, override) => {
@@ -3547,7 +3744,6 @@ export default function App() {
           weakQuestions={weakQuestions}
           onReviewCard={reviewFlashcard}
           onCreateTrialCard={createTrialCard}
-          onGenerateWeakCards={generateWeakFlashcards}
           onImportFlashcards={importFlashcards}
         />
       )}
