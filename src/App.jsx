@@ -449,37 +449,13 @@ function addDays(dateString, days) {
   return date.toISOString().slice(0, 10);
 }
 
-function normalizeTextList(value = []) {
-  if (Array.isArray(value)) {
-    return value.flatMap((item) => normalizeTextList(item));
-  }
-  if (value && typeof value === 'object') {
-    return Object.entries(value).flatMap(([key, item]) => {
-      if (item === true) return [key];
-      if (item === false || item == null) return [];
-      return normalizeTextList(item);
-    });
-  }
-  if (value == null || value === false) return [];
-  return [String(value).trim()].filter(Boolean);
-}
-
-function normalizeFlashcard(card) {
-  return {
-    ...card,
-    front: String(card.front || ''),
-    back: String(card.back || ''),
-    tags: [...new Set(normalizeTextList(card.tags))],
-    trial: [...new Set(normalizeTextList(card.trial))],
-  };
-}
 
 function normalizeFlashcards(flashcards = {}) {
   if (Array.isArray(flashcards)) {
-    return Object.fromEntries(flashcards.filter((card) => card?.id).map((card) => [card.id, normalizeFlashcard(card)]));
+    return Object.fromEntries(flashcards.filter((card) => card?.id).map((card) => [card.id, card]));
   }
   if (flashcards && typeof flashcards === 'object') {
-    return Object.fromEntries(Object.values(flashcards).filter((card) => card?.id).map((card) => [card.id, normalizeFlashcard(card)]));
+    return Object.fromEntries(Object.values(flashcards).filter((card) => card?.id).map((card) => [card.id, card]));
   }
   return {};
 }
@@ -525,7 +501,7 @@ function getFlashcardList(stateOrFlashcards = {}, statsOverride = null) {
 }
 
 function cardsToMap(cards = []) {
-  return Object.fromEntries(cards.filter((card) => card?.id).map((card) => [card.id, normalizeFlashcard(card)]));
+  return Object.fromEntries(cards.filter((card) => card?.id).map((card) => [card.id, card]));
 }
 
 function makeFlashcardStats(card, now = new Date().toISOString()) {
