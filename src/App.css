@@ -498,6 +498,45 @@ button.tiny,
   background: #f0fdf4;
 }
 
+.quest-star-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.quest-star-token {
+  min-height: 92px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #ffffff;
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  padding: 12px;
+  text-align: center;
+}
+
+.quest-star-token.done {
+  border-color: rgba(245, 158, 11, 0.45);
+  background: #fffbeb;
+}
+
+.quest-star-icon {
+  color: #94a3b8;
+  font-size: 38px;
+  line-height: 1;
+}
+
+.quest-star-token.done .quest-star-icon {
+  color: #f59e0b;
+}
+
+.quest-star-label {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 850;
+}
+
 .quest-star-grid,
 .recall-grid,
 .boss-challenge-grid {
@@ -628,6 +667,10 @@ button:disabled {
 
 @media (max-width: 768px) {
   .quest-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .quest-star-strip {
     grid-template-columns: 1fr;
   }
 

@@ -2132,6 +2132,15 @@ function QuestPanel({
         </div>
       </div>
 
+      <section className="quest-star-strip" aria-label="Today quest star progress">
+        {starRows.map((star, index) => (
+          <div className={star.done ? 'quest-star-token done' : 'quest-star-token'} key={star.key}>
+            <span className="quest-star-icon">{star.done ? '★' : '☆'}</span>
+            <span className="quest-star-label">{index + 1}. {star.title.replace(' Star', '')}</span>
+          </div>
+        ))}
+      </section>
+
       <section className="quest-star-grid">
         {starRows.map((star) => (
           <div className={star.done ? 'quest-star done' : 'quest-star'} key={star.key}>
