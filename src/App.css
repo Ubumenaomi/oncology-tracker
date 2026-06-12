@@ -665,6 +665,29 @@ button:disabled {
   cursor: not-allowed;
 }
 
+.single-review-card {
+  max-width: 840px;
+  margin: 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: #ffffff;
+  padding: 22px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+}
+
+.flashcard-front.large,
+.flashcard-back.large {
+  font-size: 18px;
+  line-height: 1.7;
+  padding: 18px;
+}
+
+.review-actions {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+  margin-top: 14px;
+}
+
 @media (max-width: 768px) {
   .quest-hero {
     grid-template-columns: 1fr;
