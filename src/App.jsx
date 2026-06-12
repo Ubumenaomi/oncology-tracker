@@ -1025,10 +1025,12 @@ function getQuestMemoryCards(state, task) {
   const allCards = getFlashcardList(state);
   const taskText = `${task?.cancer || ''} ${task?.module || ''} ${task?.topic || ''} ${task?.details || ''} ${(task?.focusTags || []).join(' ')} ${(task?.goldenTrials || []).join(' ')}`.toLowerCase();
   const matchesTask = (card) => {
-    const cardText = `${card.cancer || ''} ${card.topic || ''} ${card.type || ''} ${(card.tags || []).join(' ')} ${(card.trial || []).join(' ')}`.toLowerCase();
+    const cardTags = normalizeTextList(card.tags);
+    const cardTrials = normalizeTextList(card.trial);
+    const cardText = `${card.cancer || ''} ${card.topic || ''} ${card.type || ''} ${cardTags.join(' ')} ${cardTrials.join(' ')}`.toLowerCase();
     return Boolean(card.cancer && card.cancer === task?.cancer)
       || Boolean(card.topic && taskText.includes(String(card.topic).toLowerCase()))
-      || (card.tags || []).some((tag) => taskText.includes(String(tag).toLowerCase()))
+      || cardTags.some((tag) => taskText.includes(String(tag).toLowerCase()))
       || (task?.goldenTrials || []).some((trial) => cardText.includes(String(trial).toLowerCase()));
   };
   const due = allCards.filter((card) => !card.nextReviewDate || card.nextReviewDate <= TODAY);
