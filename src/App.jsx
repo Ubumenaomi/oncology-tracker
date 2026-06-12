@@ -2826,7 +2826,7 @@ export default function App() {
   };
 
   const createFlashcardFromQuestion = (question, stat) => {
-    const card = buildQuickCardFromQuestion(question, stat);
+    const card = normalizeFlashcard(buildQuickCardFromQuestion(question, stat));
     updateState((prev) => ({
       ...prev,
       flashcards: { ...normalizeFlashcards(prev.flashcards), [card.id]: card },
@@ -2836,7 +2836,7 @@ export default function App() {
 
   const createTrialCard = (trialName, sourceQuestion = null) => {
     if (!trialName.trim()) return;
-    const card = buildTrialCardFromName(trialName.trim(), sourceQuestion);
+    const card = normalizeFlashcard(buildTrialCardFromName(trialName.trim(), sourceQuestion));
     updateState((prev) => ({
       ...prev,
       flashcards: { ...normalizeFlashcards(prev.flashcards), [card.id]: card },
@@ -2905,8 +2905,8 @@ export default function App() {
           front: String(item.front),
           back: String(item.back),
           cloze: item.cloze || '',
-          trial: item.trial ? (Array.isArray(item.trial) ? item.trial : [item.trial]) : [],
-          tags: item.tags || [],
+          trial: normalizeTextList(item.trial),
+          tags: normalizeTextList(item.tags),
           intervalDays: 1,
           nextReviewDate: TODAY,
           mastery: 0,
