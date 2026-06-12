@@ -67,7 +67,7 @@ const defaultState = {
   bossProgress: {},
   questionOverrides: {},
   mockExams: [],
-  flashcards: [],
+  flashcards: {},
   flashcardStats: {},
   game: {
     xp: 0,
@@ -413,10 +413,7 @@ function mergeCloudState(localState, cloudState) {
       ...(cloudState.mockExams || []),
       ...(localState.mockExams || []),
     ].filter((exam, index, exams) => exam?.id && exams.findIndex((x) => x.id === exam.id) === index),
-    flashcards: [
-      ...(cloudState.flashcards || []),
-      ...(localState.flashcards || []),
-    ].filter((card, index, cards) => card?.id && cards.findIndex((x) => x.id === card.id) === index),
+    flashcards: mergeFlashcardMaps(cloudState.flashcards, localState.flashcards),
     flashcardStats: {
       ...(cloudState.flashcardStats || {}),
       ...(localState.flashcardStats || {}),
@@ -450,6 +447,76 @@ function addDays(dateString, days) {
   const date = new Date(`${dateString}T00:00:00`);
   date.setDate(date.getDate() + days);
   return date.toISOString().slice(0, 10);
+}
+
+
+function normalizeFlashcards(flashcards = {}) {
+  if (Array.isArray(flashcards)) {
+    return Object.fromEntries(flashcards.filter((card) => card?.id).map((card) => [card.id, card]));
+  }
+  if (flashcards && typeof flashcards === 'object') {
+    return Object.fromEntries(Object.values(flashcards).filter((card) => card?.id).map((card) => [card.id, card]));
+  }
+  return {};
+}
+
+function normalizeFlashcardStats(stats = {}, flashcards = {}) {
+  const cards = normalizeFlashcards(flashcards);
+  const normalized = stats && typeof stats === 'object' && !Array.isArray(stats) ? { ...stats } : {};
+  Object.values(cards).forEach((card) => {
+    normalized[card.id] = {
+      attempts: 0,
+      correct: 0,
+      wrong: 0,
+      mastery: card.mastery || 0,
+      intervalDays: card.intervalDays || 1,
+      nextReviewDate: card.nextReviewDate || null,
+      lastReviewedAt: card.lastReviewedAt || null,
+      ...(normalized[card.id] || {}),
+    };
+  });
+  return normalized;
+}
+
+function mergeFlashcardMaps(cloudFlashcards = {}, localFlashcards = {}) {
+  return {
+    ...normalizeFlashcards(cloudFlashcards),
+    ...normalizeFlashcards(localFlashcards),
+  };
+}
+
+function getFlashcardList(stateOrFlashcards = {}, statsOverride = null) {
+  const rawFlashcards = stateOrFlashcards?.flashcards !== undefined ? stateOrFlashcards.flashcards : stateOrFlashcards;
+  const stats = statsOverride || stateOrFlashcards?.flashcardStats || {};
+  return Object.values(normalizeFlashcards(rawFlashcards))
+    .map((card) => ({
+      ...card,
+      ...(stats?.[card.id] || {}),
+      id: card.id,
+      mastery: stats?.[card.id]?.mastery ?? card.mastery ?? 0,
+      intervalDays: stats?.[card.id]?.intervalDays ?? card.intervalDays ?? 1,
+      nextReviewDate: stats?.[card.id]?.nextReviewDate ?? card.nextReviewDate ?? TODAY,
+    }))
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+}
+
+function cardsToMap(cards = []) {
+  return Object.fromEntries(cards.filter((card) => card?.id).map((card) => [card.id, card]));
+}
+
+function makeFlashcardStats(card, now = new Date().toISOString()) {
+  return {
+    attempts: 0,
+    correct: 0,
+    wrong: 0,
+    mastery: card.mastery || 0,
+    intervalDays: card.intervalDays || 1,
+    nextReviewDate: card.nextReviewDate || TODAY,
+    lastReviewedAt: null,
+    sourceType: card.sourceType,
+    createdAt: now,
+    updatedAt: now,
+  };
 }
 
 function mergeGameState(cloudGame = {}, localGame = {}) {
@@ -516,8 +583,8 @@ function normalizeState(state) {
     },
     dailyQuestProgress: state?.dailyQuestProgress || {},
     bossProgress: state?.bossProgress || {},
-    flashcards: state?.flashcards || [],
-    flashcardStats: state?.flashcardStats || {},
+    flashcards: normalizeFlashcards(state?.flashcards),
+    flashcardStats: normalizeFlashcardStats(state?.flashcardStats, state?.flashcards),
     game: { ...game, xp, level: xpLevel(xp), streak: player.streak, badges: player.badges },
     player,
   };
@@ -781,7 +848,7 @@ function examMatchesBoss(exam, boss) {
 
 function getBossRows(state, readiness = getReadinessMetrics(state)) {
   const progress = getModuleProgress(state.planProgress || {});
-  const trialCards = (state.flashcards || []).filter((card) => card.sourceType === 'trial').length;
+  const trialCards = getFlashcardList(state).filter((card) => card.sourceType === 'trial').length;
   const completedYears = new Set((state.mockExams || [])
     .filter((exam) => exam.completedAt && exam.year)
     .map((exam) => Number(exam.year)));
@@ -870,7 +937,7 @@ function buildTrialCardFromName(trialName, sourceQuestion = null) {
 }
 
 function getDueFlashcards(state) {
-  return (state.flashcards || [])
+  return getFlashcardList(state)
     .filter((card) => !card.nextReviewDate || card.nextReviewDate <= TODAY)
     .sort((a, b) => (a.nextReviewDate || '').localeCompare(b.nextReviewDate || '') || (a.mastery || 0) - (b.mastery || 0));
 }
@@ -903,27 +970,81 @@ function getDailyQuestProgress(state, date = TODAY, task = getTodayPlanTask(stat
 
 function buildTopicRecallCards(task) {
   const firstTrial = task?.goldenTrials?.[0] || 'Golden Trial';
+  const secondTrial = task?.goldenTrials?.[1] || firstTrial;
   const focus = (task?.focusTags || []).join(', ') || task?.topic || 'core trap';
   return [
     {
       id: `recall-${task?.id || 'x'}-topic`,
+      sourceType: 'topic-recall',
       type: 'Topic Recall',
+      cancer: task?.cancer || 'Today',
+      topic: task?.topic || 'Today topic',
       front: `${task?.topic || 'Today topic'} 的核心考點是什麼？`,
       back: task?.details || '用自己的話說出適應症、治療順序、endpoint 與常見陷阱。',
     },
     {
       id: `recall-${task?.id || 'x'}-trial`,
+      sourceType: 'topic-recall',
       type: 'Golden Trial',
+      cancer: task?.cancer || 'Today',
+      topic: task?.topic || 'Golden trial',
       front: `${firstTrial} 的 population / endpoint / implication？`,
       back: `${firstTrial}: population、intervention、primary endpoint、臨床意義與常考陷阱。`,
     },
     {
-      id: `recall-${task?.id || 'x'}-trap`,
-      type: 'Exam Trap',
-      front: `今天最容易掉分的 trap / focus tag？`,
+      id: `recall-${task?.id || 'x'}-focus`,
+      sourceType: 'topic-recall',
+      type: 'Focus Tags',
+      cancer: task?.cancer || 'Today',
+      topic: task?.topic || 'Focus',
+      front: `今天 ${task?.module || task?.cancer || 'topic'} 要主動回想哪些 focus tags？`,
       back: focus,
     },
+    {
+      id: `recall-${task?.id || 'x'}-algorithm`,
+      sourceType: 'topic-recall',
+      type: 'Algorithm Recall',
+      cancer: task?.cancer || 'Today',
+      topic: task?.topic || 'Algorithm',
+      front: `${task?.topic || 'Today topic'} 的 treatment sequencing / algorithm 怎麼走？`,
+      back: task?.details || '先說 staging / biomarker，再說 first choice、contraindication、progression next step。',
+    },
+    {
+      id: `recall-${task?.id || 'x'}-trap`,
+      sourceType: 'topic-recall',
+      type: 'Exam Trap',
+      cancer: task?.cancer || 'Today',
+      topic: task?.topic || 'Exam trap',
+      front: `${secondTrial} 或今日主題最容易被考成什麼陷阱？`,
+      back: `${secondTrial}: endpoint、eligibility、toxicity、或和相似 trial 的差異。Focus: ${focus}`,
+    },
   ];
+}
+
+function getQuestMemoryCards(state, task) {
+  const allCards = getFlashcardList(state);
+  const taskText = `${task?.cancer || ''} ${task?.module || ''} ${task?.topic || ''} ${task?.details || ''} ${(task?.focusTags || []).join(' ')} ${(task?.goldenTrials || []).join(' ')}`.toLowerCase();
+  const matchesTask = (card) => {
+    const cardText = `${card.cancer || ''} ${card.topic || ''} ${card.type || ''} ${(card.tags || []).join(' ')} ${(card.trial || []).join(' ')}`.toLowerCase();
+    return Boolean(card.cancer && card.cancer === task?.cancer)
+      || Boolean(card.topic && taskText.includes(String(card.topic).toLowerCase()))
+      || (card.tags || []).some((tag) => taskText.includes(String(tag).toLowerCase()))
+      || (task?.goldenTrials || []).some((trial) => cardText.includes(String(trial).toLowerCase()));
+  };
+  const due = allCards.filter((card) => !card.nextReviewDate || card.nextReviewDate <= TODAY);
+  const topicDue = due.filter(matchesTask);
+  const topicCards = allCards.filter(matchesTask);
+  const picked = [];
+  const used = new Set();
+  [...topicDue, ...due, ...topicCards].forEach((card) => {
+    if (picked.length >= 5 || used.has(card.id)) return;
+    picked.push(card);
+    used.add(card.id);
+  });
+  buildTopicRecallCards(task).forEach((card) => {
+    if (picked.length < 5 && !used.has(card.id)) picked.push(card);
+  });
+  return picked.slice(0, 5);
 }
 
 function getWeaknessQuestion(state, task) {
@@ -2096,7 +2217,7 @@ function QuestPanel({
       key: 'memory',
       title: 'Memory Star',
       done: progress.memoryDone,
-      text: '完成三張 Topic Recall 卡。',
+      text: '完成今日 5 張 topic / due flashcards。',
       action: null,
       actionText: '',
     },
@@ -2159,7 +2280,7 @@ function QuestPanel({
       )}
 
       <section className="subsection">
-        <h3>Topic Recall</h3>
+        <h3>Memory Star｜Topic Recall / Flashcard Review</h3>
         <div className="recall-grid">
           {recallCards.map((card) => {
             const rating = progress.recallRatings?.[card.id];
@@ -2175,7 +2296,7 @@ function QuestPanel({
                 <div className="inline-actions">
                   <button className="secondary" onClick={() => setOpenRecallId(open ? '' : card.id)}>{open ? '收合' : '翻卡'}</button>
                   {Object.keys(FLASHCARD_RATINGS).map((ratingOption) => (
-                    <button className="tiny" key={ratingOption} onClick={() => onMarkRecall(card.id, ratingOption)}>{ratingOption}</button>
+                    <button className="tiny" key={ratingOption} onClick={() => onMarkRecall(card, ratingOption)}>{ratingOption}</button>
                   ))}
                 </div>
               </article>
@@ -2214,8 +2335,9 @@ function FlashcardsPanel({ state, dueFlashcards, weakQuestions, onReviewCard, on
   const [trialName, setTrialName] = useState('');
   const [importJson, setImportJson] = useState('');
   const [importMessage, setImportMessage] = useState('');
-  const trialCards = (state.flashcards || []).filter((card) => card.sourceType === 'trial');
-  const weakCards = (state.flashcards || []).filter((card) => (card.mastery || 0) <= 2);
+  const allFlashcards = getFlashcardList(state);
+  const trialCards = allFlashcards.filter((card) => card.sourceType === 'trial');
+  const weakCards = allFlashcards.filter((card) => (card.mastery || 0) <= 2);
 
   const submitTrialCard = () => {
     onCreateTrialCard(trialName);
@@ -2239,7 +2361,7 @@ function FlashcardsPanel({ state, dueFlashcards, weakQuestions, onReviewCard, on
       </div>
 
       <section className="readiness-hero">
-        <MetricCard label="Cards total" value={(state.flashcards || []).length} sub={`${dueFlashcards.length} due today`} />
+        <MetricCard label="Cards total" value={allFlashcards.length} sub={`${dueFlashcards.length} due today`} />
         <MetricCard label="Trial cards" value={trialCards.length} sub="Trial Boss unlock target: 50" />
         <MetricCard label="Weak cards" value={weakCards.length} sub="mastery <=2" />
         <MetricCard label="Weak questions" value={weakQuestions.length} sub="wrong/bookmarked source pool" />
@@ -2315,6 +2437,66 @@ function FlashcardCard({ card, onReviewCard, compact = false }) {
       </div>
       <div className="stats-line">next review {card.nextReviewDate || 'today'} · interval {card.intervalDays || 1} days</div>
     </article>
+  );
+}
+
+
+function FlashcardReviewPanel({ dueFlashcards, allFlashcards, onReviewCard, onOpenImport }) {
+  const [queueMode, setQueueMode] = useState('due');
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [showBack, setShowBack] = useState(false);
+  const queue = queueMode === 'all' ? allFlashcards : dueFlashcards;
+  const card = queue[activeIndex] || null;
+
+  const rateCard = (rating) => {
+    if (!card) return;
+    onReviewCard(card.id, rating);
+    setShowBack(false);
+    setActiveIndex((index) => Math.min(index + 1, Math.max(0, queue.length - 1)));
+  };
+
+  return (
+    <main className="panel flashcard-review-panel">
+      <div className="section-head">
+        <div>
+          <h2>Flashcard Review</h2>
+          <p className="muted">最小可行版：Front → Show Answer → Again / Hard / Good / Easy。這個 review queue 會餵給 Memory Star。</p>
+        </div>
+        <div className="inline-actions">
+          <button className={queueMode === 'due' ? 'primary' : 'secondary'} onClick={() => { setQueueMode('due'); setActiveIndex(0); setShowBack(false); }}>Due Cards</button>
+          <button className={queueMode === 'all' ? 'primary' : 'secondary'} onClick={() => { setQueueMode('all'); setActiveIndex(0); setShowBack(false); }}>All Cards</button>
+          <button className="secondary" onClick={onOpenImport}>Import</button>
+        </div>
+      </div>
+
+      {!card ? (
+        <section className="empty-state">
+          <h3>沒有可複習的卡片</h3>
+          <p className="muted">先到 Flashcards → Import Flashcards 貼上 ChatGPT 產生的 JSON card，或用錯題生成卡片。</p>
+          <button className="primary" onClick={onOpenImport}>去匯入卡片</button>
+        </section>
+      ) : (
+        <section className="single-review-card">
+          <div className="question-top">
+            <div>
+              <span className="pill">{card.type || card.sourceType || 'Flashcard'}</span>
+              <span className="pill soft">{card.cancer}</span>
+              <span className="pill soft">{card.topic}</span>
+            </div>
+            <span className="priority">{activeIndex + 1}/{queue.length} · M{card.mastery || 0}</span>
+          </div>
+          <pre className="flashcard-front large">{card.front}</pre>
+          {showBack && <pre className="flashcard-back large">{card.back}</pre>}
+          <div className="inline-actions review-actions">
+            <button className="secondary" onClick={() => setShowBack(!showBack)}>{showBack ? 'Hide Answer' : 'Show Answer'}</button>
+            {Object.keys(FLASHCARD_RATINGS).map((rating) => (
+              <button key={rating} className={`tiny ${rating.toLowerCase()}`} disabled={!showBack} onClick={() => rateCard(rating)}>{rating}</button>
+            ))}
+          </div>
+          <div className="stats-line">next review {card.nextReviewDate || 'today'} · attempts {card.attempts || 0} · correct {card.correct || 0} / wrong {card.wrong || 0}</div>
+        </section>
+      )}
+    </main>
   );
 }
 
@@ -2647,7 +2829,8 @@ export default function App() {
     const card = buildQuickCardFromQuestion(question, stat);
     updateState((prev) => ({
       ...prev,
-      flashcards: [card, ...(prev.flashcards || [])],
+      flashcards: { ...normalizeFlashcards(prev.flashcards), [card.id]: card },
+      flashcardStats: { ...(prev.flashcardStats || {}), [card.id]: makeFlashcardStats(card) },
     }));
   };
 
@@ -2656,39 +2839,48 @@ export default function App() {
     const card = buildTrialCardFromName(trialName.trim(), sourceQuestion);
     updateState((prev) => ({
       ...prev,
-      flashcards: [card, ...(prev.flashcards || [])],
+      flashcards: { ...normalizeFlashcards(prev.flashcards), [card.id]: card },
+      flashcardStats: { ...(prev.flashcardStats || {}), [card.id]: makeFlashcardStats(card) },
     }));
   };
 
   const reviewFlashcard = (cardId, rating) => {
-    updateState((prev) => ({
-      ...prev,
-      flashcards: (prev.flashcards || []).map((card) => {
-        if (card.id !== cardId) return card;
-        const rule = FLASHCARD_RATINGS[rating] || FLASHCARD_RATINGS.Good;
-        return {
-          ...card,
-          intervalDays: rule.interval,
-          nextReviewDate: addDays(TODAY, rule.interval),
-          mastery: Math.max(0, Math.min(5, (card.mastery || 0) + rule.masteryDelta)),
-          difficulty: rating === 'Again' ? Math.min(5, (card.difficulty || 3) + 0.5) : card.difficulty || 3,
-          updatedAt: new Date().toISOString(),
-          lastRating: rating,
-        };
-      }),
-      flashcardStats: {
-        ...(prev.flashcardStats || {}),
-        [cardId]: {
-          ...(prev.flashcardStats?.[cardId] || {}),
-          attempts: (prev.flashcardStats?.[cardId]?.attempts || 0) + 1,
-          lastRating: rating,
-          lastReviewedAt: TODAY,
-          nextReviewDate: addDays(TODAY, (FLASHCARD_RATINGS[rating] || FLASHCARD_RATINGS.Good).interval),
-          mastery: Math.max(0, Math.min(5, ((prev.flashcardStats?.[cardId]?.mastery ?? (prev.flashcards || []).find((card) => card.id === cardId)?.mastery) || 0) + (FLASHCARD_RATINGS[rating] || FLASHCARD_RATINGS.Good).masteryDelta)),
-          updatedAt: new Date().toISOString(),
+    const rule = FLASHCARD_RATINGS[rating] || FLASHCARD_RATINGS.Good;
+    const isWrong = rating === 'Again';
+    updateState((prev) => {
+      const cards = normalizeFlashcards(prev.flashcards);
+      const card = cards[cardId];
+      if (!card) return prev;
+      const previousStats = prev.flashcardStats?.[cardId] || makeFlashcardStats(card);
+      const mastery = Math.max(0, Math.min(5, (previousStats.mastery ?? card.mastery ?? 0) + rule.masteryDelta));
+      return {
+        ...prev,
+        flashcards: {
+          ...cards,
+          [cardId]: {
+            ...card,
+            difficulty: rating === 'Again' ? Math.min(5, (card.difficulty || 3) + 0.5) : card.difficulty || 3,
+            updatedAt: new Date().toISOString(),
+            lastRating: rating,
+          },
         },
-      },
-    }));
+        flashcardStats: {
+          ...(prev.flashcardStats || {}),
+          [cardId]: {
+            ...previousStats,
+            attempts: (previousStats.attempts || 0) + 1,
+            correct: (previousStats.correct || 0) + (isWrong ? 0 : 1),
+            wrong: (previousStats.wrong || 0) + (isWrong ? 1 : 0),
+            lastRating: rating,
+            lastReviewedAt: TODAY,
+            intervalDays: rule.interval,
+            nextReviewDate: addDays(TODAY, rule.interval),
+            mastery,
+            updatedAt: new Date().toISOString(),
+          },
+        },
+      };
+    });
   };
 
   const importFlashcards = (rawJson) => {
@@ -2704,9 +2896,10 @@ export default function App() {
           throw new Error(`第 ${index + 1} 張卡缺少 front/back。`);
         }
         return {
-          id: `import-card-${Date.now()}-${index}`,
+          id: `fc-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`,
           sourceType: item.sourceType || (String(item.type || '').toLowerCase().includes('trial') ? 'trial' : 'manual'),
           sourceId: item.sourceQuestionId || item.sourceId || null,
+          sourceQuestionId: item.sourceQuestionId || item.sourceId || null,
           cancer: item.cancer || 'Imported',
           topic: item.topic || item.type || 'Imported flashcard',
           front: String(item.front),
@@ -2726,17 +2919,10 @@ export default function App() {
 
       updateState((prev) => ({
         ...prev,
-        flashcards: [...cards, ...(prev.flashcards || [])],
+        flashcards: { ...normalizeFlashcards(prev.flashcards), ...cardsToMap(cards) },
         flashcardStats: {
           ...(prev.flashcardStats || {}),
-          ...Object.fromEntries(cards.map((card) => [card.id, {
-            attempts: 0,
-            mastery: 0,
-            nextReviewDate: TODAY,
-            sourceType: card.sourceType,
-            createdAt: now,
-            updatedAt: now,
-          }])),
+          ...Object.fromEntries(cards.map((card) => [card.id, makeFlashcardStats(card, now)])),
         },
       }));
       return { ok: true, message: `已匯入 ${cards.length} 張卡。` };
@@ -2747,14 +2933,21 @@ export default function App() {
 
   const generateWeakFlashcards = () => {
     updateState((prev) => {
-      const existingSources = new Set((prev.flashcards || []).map((card) => `${card.sourceType}:${card.sourceId}`));
+      const existingSources = new Set(getFlashcardList(prev).map((card) => `${card.sourceType}:${card.sourceId}`));
       const cards = questionBank
         .map((q) => ({ q: getQuestionWithOverride(q.id, prev), stat: getStat(prev, q.id) }))
         .filter(({ q, stat }) => q && (stat.wrong > 0 || stat.bookmarked || (stat.highConfidenceWrong || 0) > 0 || (stat.mastery || 0) <= 2))
         .filter(({ q }) => !existingSources.has(`question:${q.id}`))
         .slice(0, 30)
         .map(({ q, stat }) => buildQuickCardFromQuestion(q, stat));
-      return { ...prev, flashcards: [...cards, ...(prev.flashcards || [])] };
+      return {
+        ...prev,
+        flashcards: { ...normalizeFlashcards(prev.flashcards), ...cardsToMap(cards) },
+        flashcardStats: {
+          ...(prev.flashcardStats || {}),
+          ...Object.fromEntries(cards.map((card) => [card.id, makeFlashcardStats(card)])),
+        },
+      };
     });
   };
 
@@ -2839,7 +3032,7 @@ export default function App() {
   const baseQuestTask = useMemo(() => getTodayPlanTask(state), [state]);
   const questProgress = useMemo(() => getDailyQuestProgress(state, TODAY, baseQuestTask, todayCompleted), [state, baseQuestTask, todayCompleted]);
   const questTask = useMemo(() => studyPlan100.find((task) => task.id === questProgress.planTaskId) || baseQuestTask, [questProgress.planTaskId, baseQuestTask]);
-  const questRecallCards = useMemo(() => buildTopicRecallCards(questTask), [questTask]);
+  const questRecallCards = useMemo(() => getQuestMemoryCards(state, questTask), [state, questTask]);
   const questBossChallenges = useMemo(() => buildBossChallenges(questTask, state), [questTask, state]);
 
   const updatePracticeDraft = useCallback((questionId, patch) => {
@@ -2905,19 +3098,64 @@ export default function App() {
     }));
   };
 
-  const markQuestRecall = (cardId, rating) => {
+  const markQuestRecall = (card, rating) => {
+    const cardId = typeof card === 'string' ? card : card.id;
+    const isPersistentCard = typeof card !== 'string' && card.sourceType !== 'topic-recall' && normalizeFlashcards(state.flashcards)[card.id];
+    const rule = FLASHCARD_RATINGS[rating] || FLASHCARD_RATINGS.Good;
     updateState((prev) => {
       const current = getDailyQuestProgress(prev, TODAY, questTask, todayCompleted);
       const nextRatings = { ...(current.recallRatings || {}), [cardId]: rating };
-      const memoryDone = questRecallCards.every((card) => nextRatings[card.id]);
+      const reviewedCount = questRecallCards.filter((memoryCard) => nextRatings[memoryCard.id]).length;
+      const memoryDone = reviewedCount >= Math.min(5, questRecallCards.length);
       const next = {
         ...current,
         recallRatings: nextRatings,
+        memoryCardsReviewed: reviewedCount,
         memoryDone,
       };
       next.stars = [next.practiceDone, next.memoryDone, next.bossDone].filter(Boolean).length;
+
+      if (!isPersistentCard) {
+        return {
+          ...prev,
+          dailyQuestProgress: {
+            ...(prev.dailyQuestProgress || {}),
+            [TODAY]: next,
+          },
+        };
+      }
+
+      const cards = normalizeFlashcards(prev.flashcards);
+      const persistedCard = cards[cardId];
+      const previousStats = prev.flashcardStats?.[cardId] || makeFlashcardStats(persistedCard);
+      const isWrong = rating === 'Again';
+      const mastery = Math.max(0, Math.min(5, (previousStats.mastery ?? persistedCard.mastery ?? 0) + rule.masteryDelta));
       return {
         ...prev,
+        flashcards: {
+          ...cards,
+          [cardId]: {
+            ...persistedCard,
+            difficulty: rating === 'Again' ? Math.min(5, (persistedCard.difficulty || 3) + 0.5) : persistedCard.difficulty || 3,
+            updatedAt: new Date().toISOString(),
+            lastRating: rating,
+          },
+        },
+        flashcardStats: {
+          ...(prev.flashcardStats || {}),
+          [cardId]: {
+            ...previousStats,
+            attempts: (previousStats.attempts || 0) + 1,
+            correct: (previousStats.correct || 0) + (isWrong ? 0 : 1),
+            wrong: (previousStats.wrong || 0) + (isWrong ? 1 : 0),
+            lastRating: rating,
+            lastReviewedAt: TODAY,
+            intervalDays: rule.interval,
+            nextReviewDate: addDays(TODAY, rule.interval),
+            mastery,
+            updatedAt: new Date().toISOString(),
+          },
+        },
         dailyQuestProgress: {
           ...(prev.dailyQuestProgress || {}),
           [TODAY]: next,
@@ -3029,6 +3267,7 @@ export default function App() {
   const cancerSummary = useMemo(() => getCancerSummary(state), [state]);
   const readiness = useMemo(() => getReadinessMetrics(state), [state]);
   const bossRows = useMemo(() => getBossRows(state, readiness), [state, readiness]);
+  const allFlashcards = useMemo(() => getFlashcardList(state), [state]);
   const dueFlashcards = useMemo(() => getDueFlashcards(state), [state]);
 
   const finishMockExam = (completedExam) => {
@@ -3163,7 +3402,7 @@ export default function App() {
     reader.onload = () => {
       try {
         const data = JSON.parse(reader.result);
-        setState({ ...defaultState, ...data });
+        setState(normalizeState({ ...defaultState, ...data }));
       } catch {
         alert('JSON 匯入失敗');
       }
@@ -3197,7 +3436,7 @@ export default function App() {
         <MetricCard label="今日待複習" value={dueReview.length} sub="依 next review date" />
         <MetricCard label="≥80 機率" value={`${readiness.probability80}%`} sub={readiness.readinessLevel} />
         <MetricCard label="Level / XP" value={`Lv ${state.game?.level || 1}`} sub={`${state.game?.xp || 0} XP · streak ${state.game?.streak || 0}`} />
-        <MetricCard label="Flashcards" value={(state.flashcards || []).length} sub={`${dueFlashcards.length} due today`} />
+        <MetricCard label="Flashcards" value={getFlashcardList(state).length} sub={`${dueFlashcards.length} due today`} />
         <MetricCard label="同步狀態" value={user ? 'Cloud' : 'Local'} sub={user ? user.email : '尚未登入'} />
       </section>
 
@@ -3210,7 +3449,7 @@ export default function App() {
       )}
 
       <nav className="tabs">
-        {[['quest', 'Quest'], ['readiness', 'Board Readiness'], ['mock', 'Mock Exam'], ['critical', 'Critical Errors'], ['flashcards', 'Flashcards'], ['today', 'Daily Practice'], ['review', 'Review Queue'], ['bank', 'Question Bank'], ['manual', 'Manual Add'], ['question-edit', 'Question Edit'], ['analytics', 'Analytics'], ['plan', '100-Day Plan'], ['sync', 'Cloud Sync'], ['settings', 'Settings']].map(([key, label]) => (
+        {[['quest', 'Quest'], ['readiness', 'Board Readiness'], ['mock', 'Mock Exam'], ['critical', 'Critical Errors'], ['flashcards', 'Flashcards'], ['flashcard-review', 'Card Review'], ['today', 'Daily Practice'], ['review', 'Review Queue'], ['bank', 'Question Bank'], ['manual', 'Manual Add'], ['question-edit', 'Question Edit'], ['analytics', 'Analytics'], ['plan', '100-Day Plan'], ['sync', 'Cloud Sync'], ['settings', 'Settings']].map(([key, label]) => (
           <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>
         ))}
       </nav>
@@ -3284,6 +3523,16 @@ export default function App() {
           onCreateTrialCard={createTrialCard}
           onGenerateWeakCards={generateWeakFlashcards}
           onImportFlashcards={importFlashcards}
+        />
+      )}
+
+
+      {tab === 'flashcard-review' && (
+        <FlashcardReviewPanel
+          dueFlashcards={dueFlashcards}
+          allFlashcards={allFlashcards}
+          onReviewCard={reviewFlashcard}
+          onOpenImport={() => setTab('flashcards')}
         />
       )}
 
@@ -3452,7 +3701,7 @@ export default function App() {
             <MetricCard label="今日建議" value={`Day ${Math.min(planSummary.completed + 1, 100)}`} sub="照順序推進，錯題用 Review Queue 補強" />
             <MetricCard label="Game level" value={`Lv ${state.game?.level || 1}`} sub={`${state.game?.xp || 0} XP`} />
             <MetricCard label="Boss defeated" value={(state.game?.defeatedBosses || []).length} sub={`${(state.game?.unlockedBosses || []).length} unlocked`} />
-            <MetricCard label="Trial cards" value={(state.flashcards || []).filter((card) => card.sourceType === 'trial').length} sub="Trial Boss target 50" />
+            <MetricCard label="Trial cards" value={getFlashcardList(state).filter((card) => card.sourceType === 'trial').length} sub="Trial Boss target 50" />
           </section>
 
           <div className="subsection">
