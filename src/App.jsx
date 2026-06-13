@@ -3507,15 +3507,19 @@ export default function App() {
     });
   }, []);
 
-  const createTodaySession = () => {
+  const createTodaySession = ({ force = false } = {}) => {
     const ids = generateDailyQuestionIds(state);
-    updateState((prev) => ({
-      ...prev,
-      sessions: {
-        ...prev.sessions,
-        [TODAY]: { date: TODAY, questionIds: ids, createdAt: new Date().toISOString(), completed: false, practiceDrafts: {} },
-      },
-    }));
+    updateState((prev) => {
+      const existing = prev.sessions?.[TODAY];
+      if (!force && existing?.questionIds?.length) return prev;
+      return {
+        ...prev,
+        sessions: {
+          ...prev.sessions,
+          [TODAY]: { date: TODAY, questionIds: ids, createdAt: new Date().toISOString(), completed: false, practiceDrafts: {} },
+        },
+      };
+    });
     setTab('today');
   };
 
@@ -3669,7 +3673,7 @@ export default function App() {
 
   const regenerateTodaySession = () => {
     if (!window.confirm('重新抽題會覆蓋今天的題目清單，但不會刪除作答紀錄。確定？')) return;
-    createTodaySession();
+    createTodaySession({ force: true });
   };
 
   const dueReview = useMemo(() => questionBank
