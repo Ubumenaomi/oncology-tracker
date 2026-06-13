@@ -992,6 +992,21 @@ function getDailyQuestProgress(state, date = TODAY, task = getTodayPlanTask(stat
   };
 }
 
+function updateDailyQuestMemoryProgress(state, date, task, practiceDone, cardId, rating) {
+  const current = getDailyQuestProgress(state, date, task, practiceDone);
+  const nextRatings = { ...(current.recallRatings || {}), [cardId]: rating };
+  const reviewedCount = Object.keys(nextRatings).length;
+  const memoryDone = current.memoryDone || reviewedCount >= 5;
+  const next = {
+    ...current,
+    recallRatings: nextRatings,
+    memoryCardsReviewed: reviewedCount,
+    memoryDone,
+  };
+  next.stars = [next.practiceDone, next.memoryDone, next.bossDone].filter(Boolean).length;
+  return next;
+}
+
 function buildTopicRecallCards(task) {
   const firstTrial = task?.goldenTrials?.[0] || 'Golden Trial';
   const secondTrial = task?.goldenTrials?.[1] || firstTrial;
@@ -3253,6 +3268,9 @@ export default function App() {
       if (!card) return prev;
       const previousStats = prev.flashcardStats?.[cardId] || makeFlashcardStats(card);
       const mastery = Math.max(0, Math.min(5, (previousStats.mastery ?? card.mastery ?? 0) + rule.masteryDelta));
+      const currentQuest = getDailyQuestProgress(prev, TODAY, getTodayPlanTask(prev), todayCompleted);
+      const currentTask = studyPlan100.find((task) => task.id === currentQuest.planTaskId) || getTodayPlanTask(prev);
+      const dailyQuestProgress = updateDailyQuestMemoryProgress(prev, TODAY, currentTask, todayCompleted, cardId, rating);
       return {
         ...prev,
         flashcards: {
@@ -3278,6 +3296,10 @@ export default function App() {
             mastery,
             updatedAt: new Date().toISOString(),
           },
+        },
+        dailyQuestProgress: {
+          ...(prev.dailyQuestProgress || {}),
+          [TODAY]: dailyQuestProgress,
         },
       };
     });
@@ -3518,17 +3540,7 @@ export default function App() {
     const isPersistentCard = typeof card !== 'string' && card.sourceType !== 'topic-recall' && normalizeFlashcards(state.flashcards)[card.id];
     const rule = FLASHCARD_RATINGS[rating] || FLASHCARD_RATINGS.Good;
     updateState((prev) => {
-      const current = getDailyQuestProgress(prev, TODAY, questTask, todayCompleted);
-      const nextRatings = { ...(current.recallRatings || {}), [cardId]: rating };
-      const reviewedCount = questRecallCards.filter((memoryCard) => nextRatings[memoryCard.id]).length;
-      const memoryDone = reviewedCount >= Math.min(5, questRecallCards.length);
-      const next = {
-        ...current,
-        recallRatings: nextRatings,
-        memoryCardsReviewed: reviewedCount,
-        memoryDone,
-      };
-      next.stars = [next.practiceDone, next.memoryDone, next.bossDone].filter(Boolean).length;
+      const next = updateDailyQuestMemoryProgress(prev, TODAY, questTask, todayCompleted, cardId, rating);
 
       if (!isPersistentCard) {
         return {
