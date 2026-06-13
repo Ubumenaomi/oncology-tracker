@@ -3601,10 +3601,13 @@ export default function App() {
   };
 
   const todaySession = state.sessions[TODAY];
-  const todayIds = todaySession?.questionIds || [];
-  const todayQuestions = todayIds.map((id) => getQuestionWithOverride(id, state)).filter(Boolean);
-  const todayCompleted = todayIds.length > 0 && todayIds.every((id) => todaySession?.practiceDrafts?.[id]?.rated);
   const baseQuestTask = getTodayPlanTask(state);
+  const rawTodayIds = todaySession?.questionIds || [];
+  const todaySessionPlanTaskId = todaySession?.planTaskId || null;
+  const todaySessionMatchesQuest = Number(todaySessionPlanTaskId) === Number(baseQuestTask?.id);
+  const todayIds = todaySessionMatchesQuest ? rawTodayIds : [];
+  const todayQuestions = todayIds.map((id) => getQuestionWithOverride(id, state)).filter(Boolean);
+  const todayCompleted = todaySessionMatchesQuest && todayIds.length > 0 && todayIds.every((id) => todaySession?.practiceDrafts?.[id]?.rated);
   const questProgress = getDailyQuestProgress(state, TODAY, baseQuestTask, todayCompleted);
   const questTask = studyPlan100.find((task) => task.id === questProgress.planTaskId) || baseQuestTask;
   const questRecallCards = useMemo(() => getQuestMemoryCards(state, questTask), [state, questTask]);
@@ -3649,12 +3652,21 @@ export default function App() {
     const ids = generateDailyQuestionIds(state, questTask);
     updateState((prev) => {
       const existing = prev.sessions?.[TODAY];
-      if (!force && existing?.questionIds?.length) return prev;
+      const existingMatchesQuest = Number(existing?.planTaskId) === Number(questTask.id);
+      if (!force && existing?.questionIds?.length && existingMatchesQuest) return prev;
       return {
         ...prev,
         sessions: {
           ...prev.sessions,
-          [TODAY]: { date: TODAY, questionIds: ids, createdAt: new Date().toISOString(), completed: false, practiceDrafts: {} },
+          [TODAY]: {
+            date: TODAY,
+            planTaskId: questTask.id,
+            planTopic: questTask.topic,
+            questionIds: ids,
+            createdAt: new Date().toISOString(),
+            completed: false,
+            practiceDrafts: {},
+          },
         },
       };
     });
@@ -3667,7 +3679,7 @@ export default function App() {
       ...prev,
       sessions: {
         ...(prev.sessions || {}),
-        [TODAY]: { ...(prev.sessions?.[TODAY] || {}), completed: true },
+        [TODAY]: { ...(prev.sessions?.[TODAY] || {}), planTaskId: questTask.id, planTopic: questTask.topic, completed: true },
       },
       game: {
         ...awardXp(prev.game || defaultState.game, XP_RULES.dailyComplete, 'Daily 10-15 questions completed', { date: TODAY }),
