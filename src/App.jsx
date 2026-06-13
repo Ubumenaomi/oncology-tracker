@@ -764,7 +764,90 @@ function shuffleStable(items) {
   return [...items].sort(() => Math.random() - 0.5);
 }
 
-function generateDailyQuestionIds(state) {
+function getTaskSearchText(task) {
+  if (!task) return '';
+  return [
+    task.cancer,
+    task.module,
+    task.topic,
+    task.details,
+    ...(task.goldenTrials || []),
+    ...(task.focusTags || []),
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+
+function getTaskKeywords(task) {
+  const text = getTaskSearchText(task);
+  return [...new Set(text
+    .split(/[^a-z0-9+/-]+/i)
+    .map((word) => word.trim().toLowerCase())
+    .filter((word) => word.length >= 3 && !['and', 'the', 'with', 'for', 'from', 'what', 'each', 'this', 'that'].includes(word)))];
+}
+
+function getQuestionContentText(question) {
+  return [
+    question?.id,
+    question?.topic,
+    question?.stem,
+    ...(question?.trials || []),
+    ...Object.values(question?.options || {}),
+    question?.explanation,
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+
+function getQuestionPromptText(question) {
+  return [
+    question?.id,
+    question?.topic,
+    question?.stem,
+    ...(question?.trials || []),
+    ...Object.values(question?.options || {}),
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+
+function getCancerAliases(cancer) {
+  const aliases = {
+    Breast: ['breast', '乳癌'],
+    Lung: ['lung', '肺', 'nsclc', 'sclc'],
+    GI: ['gi', 'gastro', 'colon', 'rectal', 'crc', 'gastric', 'esophageal', 'hcc', 'biliary', 'pancreas', '大腸', '直腸', '胃', '食道', '肝', '膽', '胰'],
+    GU: ['gu', 'rcc', 'renal', 'urothelial', 'prostate', 'seminoma', 'kidney', '膀胱', '攝護腺', '腎', '泌尿'],
+    GYN: ['gyn', 'endometrial', 'cervical', 'ovarian', '子宮', '卵巢', '婦癌'],
+    Heme: ['heme', 'lymphoma', 'leukemia', 'myeloma', '淋巴', '白血', '骨髓'],
+    'Head & Neck': ['head', 'neck', 'hnscc', 'npc', 'oropharyngeal', 'nasopharyngeal', '頭頸', '鼻咽', '口咽'],
+  };
+  return aliases[cancer] || [String(cancer || '').toLowerCase()];
+}
+
+function scoreQuestionForTask(question, task) {
+  if (!question || !task) return 0;
+  const questionText = getQuestionContentText(question);
+  const keywords = getTaskKeywords(task);
+  const trialHits = (task.goldenTrials || []).filter((trial) => questionText.includes(String(trial).toLowerCase())).length;
+  const focusHits = (task.focusTags || []).filter((tag) => questionText.includes(String(tag).toLowerCase())).length;
+  const keywordHits = keywords.filter((keyword) => questionText.includes(keyword)).length;
+  const sameCancer = question.cancer === task.cancer;
+  const topicHit = question.topic && getTaskSearchText(task).includes(String(question.topic).toLowerCase());
+
+  return (sameCancer ? 100 : 0)
+    + (topicHit ? 20 : 0)
+    + (trialHits * 35)
+    + (focusHits * 18)
+    + keywordHits;
+}
+
+function questionMatchesTask(question, task, minScore = 120) {
+  const promptText = getQuestionPromptText(question);
+  const trialHits = (task?.goldenTrials || []).filter((trial) => promptText.includes(String(trial).toLowerCase())).length;
+  const focusHits = (task?.focusTags || []).filter((tag) => promptText.includes(String(tag).toLowerCase())).length;
+  const keywordHits = getTaskKeywords(task).filter((keyword) => promptText.includes(keyword)).length;
+  const hasCancerSignal = getCancerAliases(task?.cancer).some((alias) => promptText.includes(alias));
+  const hasTaskSpecificHit = trialHits > 0 || focusHits > 0 || keywordHits >= 2;
+  const hasEnoughPromptEvidence = hasCancerSignal || trialHits > 0 || focusHits >= 2 || keywordHits >= 4;
+  if (!hasTaskSpecificHit || !hasEnoughPromptEvidence) return false;
+  return hasTaskSpecificHit && scoreQuestionForTask(question, task) >= minScore;
+}
+
+function generateDailyQuestionIds(state, task = getTodayPlanTask(state)) {
   const { dailyCount, preferredYears, preferredCancers } = state.settings;
 
   const pool = questionBank
@@ -777,6 +860,10 @@ function generateDailyQuestionIds(state) {
     });
 
   const withStats = pool.map((q) => ({ q, stat: getStat(state, q.id) }));
+  const topical = withStats
+    .map((item) => ({ ...item, taskScore: scoreQuestionForTask(item.q, task) }))
+    .filter((item) => questionMatchesTask(item.q, task))
+    .sort((a, b) => b.taskScore - a.taskScore);
 
   const due = withStats.filter(({ stat }) => stat.nextReviewDate && stat.nextReviewDate <= TODAY);
   const highWrong = withStats.filter(({ stat }) => stat.wrong > 0 && wrongRate(stat) >= 50);
@@ -795,9 +882,21 @@ function generateDailyQuestionIds(state) {
     }
     return selected;
   };
+  const pickOrdered = (source, count, used) => {
+    const selected = [];
+    for (const item of source) {
+      if (selected.length >= count) break;
+      if (used.has(item.q.id)) continue;
+      selected.push(item.q.id);
+      used.add(item.q.id);
+    }
+    return selected;
+  };
 
   const used = new Set();
   const result = [];
+  const topicalCount = Math.max(3, Math.ceil(dailyCount * 0.45));
+  result.push(...pickOrdered(topical, topicalCount, used));
 
   const readiness = getReadinessMetrics(state);
   let dueRatio = 0.4;
@@ -827,6 +926,9 @@ function generateDailyQuestionIds(state) {
   const newCount = Math.ceil(dailyCount * newRatio);
   const bookmarkCount = Math.max(0, dailyCount - dueCount - wrongCount - newCount, Math.floor(dailyCount * bookmarkRatio));
 
+  result.push(...pickUnique(due.filter(({ q }) => questionMatchesTask(q, task)), Math.ceil(dueCount / 2), used));
+  result.push(...pickUnique(highWrong.filter(({ q }) => questionMatchesTask(q, task)), Math.ceil(wrongCount / 2), used));
+  result.push(...pickUnique(newQuestions.filter(({ q }) => questionMatchesTask(q, task)), Math.ceil(newCount / 2), used));
   result.push(...pickUnique(due, dueCount, used));
   result.push(...pickUnique(highWrong, wrongCount, used));
   result.push(...pickUnique(newQuestions, newCount, used));
@@ -972,10 +1074,13 @@ function getTodayPlanTask(state) {
 
 function getDailyQuestProgress(state, date = TODAY, task = getTodayPlanTask(state), practiceDone = false) {
   const saved = state.dailyQuestProgress?.[date] || {};
-  const planTaskId = saved.planTaskId || task?.id || 1;
-  const memoryDone = Boolean(saved.memoryDone);
-  const bossDone = Boolean(saved.bossDone);
-  const practiceStar = Boolean(saved.practiceDone || practiceDone);
+  const hasLockedProgress = Boolean(saved.xpClaimed || saved.stageClearedAt);
+  const planTaskId = hasLockedProgress ? (saved.planTaskId || task?.id || 1) : (task?.id || saved.planTaskId || 1);
+  const sameTask = !saved.planTaskId || saved.planTaskId === planTaskId;
+  const activeSaved = hasLockedProgress || sameTask ? saved : {};
+  const memoryDone = Boolean(activeSaved.memoryDone);
+  const bossDone = Boolean(activeSaved.bossDone);
+  const practiceStar = Boolean(activeSaved.practiceDone || practiceDone);
   const stars = [practiceStar, memoryDone, bossDone].filter(Boolean).length;
   return {
     planTaskId,
@@ -983,12 +1088,12 @@ function getDailyQuestProgress(state, date = TODAY, task = getTodayPlanTask(stat
     memoryDone,
     bossDone,
     stars,
-    xpClaimed: Boolean(saved.xpClaimed),
-    stageClearedAt: saved.stageClearedAt || null,
-    recallRatings: saved.recallRatings || {},
-    bossResults: saved.bossResults || {},
-    failedMasteryReviewDate: saved.failedMasteryReviewDate || null,
-    perfectClear: Boolean(saved.perfectClear),
+    xpClaimed: Boolean(activeSaved.xpClaimed),
+    stageClearedAt: activeSaved.stageClearedAt || null,
+    recallRatings: activeSaved.recallRatings || {},
+    bossResults: activeSaved.bossResults || {},
+    failedMasteryReviewDate: activeSaved.failedMasteryReviewDate || null,
+    perfectClear: Boolean(activeSaved.perfectClear),
   };
 }
 
@@ -1062,28 +1167,32 @@ function buildTopicRecallCards(task) {
 
 function getQuestMemoryCards(state, task) {
   const allCards = getFlashcardList(state);
-  const taskText = `${task?.cancer || ''} ${task?.module || ''} ${task?.topic || ''} ${task?.details || ''} ${(task?.focusTags || []).join(' ')} ${(task?.goldenTrials || []).join(' ')}`.toLowerCase();
+  const taskText = getTaskSearchText(task);
   const matchesTask = (card) => {
     const cardTags = normalizeTextList(card.tags);
     const cardTrials = normalizeTextList(card.trial);
-    const cardText = `${card.cancer || ''} ${card.topic || ''} ${card.type || ''} ${cardTags.join(' ')} ${cardTrials.join(' ')}`.toLowerCase();
-    return Boolean(card.cancer && card.cancer === task?.cancer)
+    const cardText = `${card.cancer || ''} ${card.topic || ''} ${card.type || ''} ${card.front || ''} ${card.back || ''} ${cardTags.join(' ')} ${cardTrials.join(' ')}`.toLowerCase();
+    const trialHit = (task?.goldenTrials || []).some((trial) => cardText.includes(String(trial).toLowerCase()));
+    const focusHit = (task?.focusTags || []).some((tag) => cardText.includes(String(tag).toLowerCase()));
+    const keywordHits = getTaskKeywords(task).filter((keyword) => cardText.includes(keyword)).length;
+    return (Boolean(card.cancer && card.cancer === task?.cancer) && (focusHit || trialHit || keywordHits >= 2))
       || Boolean(card.topic && taskText.includes(String(card.topic).toLowerCase()))
-      || cardTags.some((tag) => taskText.includes(String(tag).toLowerCase()))
-      || (task?.goldenTrials || []).some((trial) => cardText.includes(String(trial).toLowerCase()));
+      || trialHit;
   };
   const due = allCards.filter((card) => !card.nextReviewDate || card.nextReviewDate <= TODAY);
   const topicDue = due.filter(matchesTask);
   const topicCards = allCards.filter(matchesTask);
   const picked = [];
   const used = new Set();
-  [...topicDue, ...due, ...topicCards].forEach((card) => {
+  buildTopicRecallCards(task).forEach((card) => {
     if (picked.length >= 5 || used.has(card.id)) return;
     picked.push(card);
     used.add(card.id);
   });
-  buildTopicRecallCards(task).forEach((card) => {
-    if (picked.length < 5 && !used.has(card.id)) picked.push(card);
+  [...topicDue, ...topicCards, ...due].forEach((card) => {
+    if (picked.length >= 5 || used.has(card.id)) return;
+    picked.push(card);
+    used.add(card.id);
   });
   return picked.slice(0, 5);
 }
@@ -1092,34 +1201,37 @@ function getWeaknessQuestion(state, task) {
   const rows = questionBank
     .map((q) => ({ q: getQuestionWithOverride(q.id, state), stat: getStat(state, q.id) }))
     .filter(({ q }) => q)
+    .map((row) => ({ ...row, taskScore: scoreQuestionForTask(row.q, task) }))
     .filter(({ q, stat }) => (
-      q.cancer === task?.cancer ||
-      q.topic === task?.topic ||
-      (task?.focusTags || []).some((tag) => `${q.stem} ${q.topic} ${(q.trials || []).join(' ')}`.toLowerCase().includes(String(tag).toLowerCase()))
+      questionMatchesTask(q, task)
     ) && ((stat.wrong || 0) > 0 || (stat.highConfidenceWrong || 0) > 0 || (stat.repeatedWrong || 0) > 0))
-    .sort((a, b) => (b.stat.highConfidenceWrong || 0) - (a.stat.highConfidenceWrong || 0) || wrongRate(b.stat) - wrongRate(a.stat));
+    .sort((a, b) => (b.stat.highConfidenceWrong || 0) - (a.stat.highConfidenceWrong || 0) || wrongRate(b.stat) - wrongRate(a.stat) || b.taskScore - a.taskScore);
 
   if (rows[0]) return rows[0].q;
 
   return questionBank
     .map((q) => getQuestionWithOverride(q.id, state))
-    .find((q) => q?.cancer === task?.cancer || q?.topic === task?.topic) || null;
+    .filter(Boolean)
+    .map((q) => ({ q, taskScore: scoreQuestionForTask(q, task) }))
+    .filter(({ q }) => questionMatchesTask(q, task))
+    .sort((a, b) => b.taskScore - a.taskScore)[0]?.q || null;
 }
 
 function buildBossChallenges(task, state) {
   const firstTrial = task?.goldenTrials?.[0] || 'today golden trial';
   const weakness = getWeaknessQuestion(state, task);
+  const topicLabel = `${task?.day || 'Today'}｜${task?.topic || 'today topic'}`;
   return [
     {
       id: 'trial',
       title: 'Boss 1｜Trial Recall',
-      prompt: `${firstTrial}: population / endpoint / implication`,
+      prompt: `${topicLabel}\n${firstTrial}: population / endpoint / implication`,
       answerHint: '說出 P/I/C/O、primary endpoint，以及正式考最可能改寫的陷阱。',
     },
     {
       id: 'algorithm',
       title: 'Boss 2｜Algorithm Recall',
-      prompt: `${task?.topic || 'today topic'} treatment sequencing`,
+      prompt: `${topicLabel} treatment sequencing / decision algorithm`,
       answerHint: task?.details || '從 first-line 到 relapse/salvage 用空白回想講一次。',
     },
     {
@@ -3466,9 +3578,9 @@ export default function App() {
   const todayIds = todaySession?.questionIds || [];
   const todayQuestions = todayIds.map((id) => getQuestionWithOverride(id, state)).filter(Boolean);
   const todayCompleted = todayIds.length > 0 && todayIds.every((id) => todaySession?.practiceDrafts?.[id]?.rated);
-  const baseQuestTask = useMemo(() => getTodayPlanTask(state), [state]);
-  const questProgress = useMemo(() => getDailyQuestProgress(state, TODAY, baseQuestTask, todayCompleted), [state, baseQuestTask, todayCompleted]);
-  const questTask = useMemo(() => studyPlan100.find((task) => task.id === questProgress.planTaskId) || baseQuestTask, [questProgress.planTaskId, baseQuestTask]);
+  const baseQuestTask = getTodayPlanTask(state);
+  const questProgress = getDailyQuestProgress(state, TODAY, baseQuestTask, todayCompleted);
+  const questTask = studyPlan100.find((task) => task.id === questProgress.planTaskId) || baseQuestTask;
   const questRecallCards = useMemo(() => getQuestMemoryCards(state, questTask), [state, questTask]);
   const questBossChallenges = useMemo(() => buildBossChallenges(questTask, state), [questTask, state]);
 
@@ -3508,7 +3620,7 @@ export default function App() {
   }, []);
 
   const createTodaySession = ({ force = false } = {}) => {
-    const ids = generateDailyQuestionIds(state);
+    const ids = generateDailyQuestionIds(state, questTask);
     updateState((prev) => {
       const existing = prev.sessions?.[TODAY];
       if (!force && existing?.questionIds?.length) return prev;
@@ -3855,7 +3967,7 @@ export default function App() {
           <p>112–114 腫專考古題、mixed mock、confidence calibration、critical error queue、≥80 分預測。</p>
         </div>
         <div className="header-actions">
-          <button className="primary" onClick={createTodaySession}>產生今日 10–15 題</button>
+          <button className="primary" onClick={() => createTodaySession()}>產生今日 10–15 題</button>
           <button className="secondary" onClick={() => setAiPromptOpen(!aiPromptOpen)}>AI Review Prompt</button>
         </div>
       </header>
@@ -3975,7 +4087,7 @@ export default function App() {
           <div className="section-head">
             <div>
               <h2>今日練習：{TODAY}</h2>
-              <p className="muted">每日建議 10–15 題。系統會優先抽「到期複習題 + 高錯誤率題 + 新題」。</p>
+              <p className="muted">每日建議 10–15 題。系統會優先抽 100-Day Plan 今日主題，再補到期複習題、高錯誤率題與新題。</p>
             </div>
             <div className="inline-actions">
               <button className="secondary" onClick={regenerateTodaySession}>重新抽題</button>
@@ -3989,7 +4101,7 @@ export default function App() {
             <div className="empty-state">
               <h3>今天尚未產生題目</h3>
               <p>按下「產生今日 10–15 題」開始。若你已有大量錯題，系統會自動提高錯題複習比例。</p>
-              <button className="primary" onClick={createTodaySession}>產生今日題目</button>
+              <button className="primary" onClick={() => createTodaySession()}>產生今日題目</button>
             </div>
           ) : (
             <div className="question-list">
