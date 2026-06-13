@@ -778,6 +778,7 @@ function emptyStat() {
 
     errorTypes: [],
     explanation: '',
+    explanationImages: [],
     wrongNotes: '',
     bookmarked: false,
   };
@@ -1053,34 +1054,6 @@ function syncBossGameState(state, readiness = getReadinessMetrics(state)) {
     { ...(state.game || defaultState.game), unlockedBosses, defeatedBosses }
   );
   return { ...state, game: { ...game, unlockedBosses, defeatedBosses } };
-}
-
-function buildQuickCardFromQuestion(question, stat = emptyStat()) {
-  const answerText = question.options?.[stat.correctAnswer || question.answer] || '';
-  const trialText = (question.trials || []).join(', ');
-  return {
-    id: `card-${question.id}-${Date.now()}`,
-    sourceType: 'question',
-    sourceId: question.id,
-    cancer: question.cancer,
-    topic: question.topic || 'General',
-    front: `${question.id}｜${question.cancer}｜${question.topic}\n${question.stem}`,
-    back: [
-      `Answer: ${stat.correctAnswer || question.answer || '尚未輸入'}${answerText ? ` - ${answerText}` : ''}`,
-      trialText ? `Trials: ${trialText}` : '',
-      stat.explanation || question.explanation ? `Explanation: ${stat.explanation || question.explanation}` : '',
-      stat.wrongNotes ? `Weakness note: ${stat.wrongNotes}` : '',
-    ].filter(Boolean).join('\n\n'),
-    cloze: trialText ? `${trialText}: population / intervention / endpoint / exam trap?` : '',
-    trial: question.trials || [],
-    tags: question.tags || makeQuestionTags(question),
-    intervalDays: 1,
-    nextReviewDate: TODAY,
-    mastery: 0,
-    difficulty: stat.difficulty || question.tags?.examWeight || 3,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
 }
 
 function buildTrialCardFromName(trialName, sourceQuestion = null) {
@@ -1513,7 +1486,7 @@ function MetricCard({ label, value, sub }) {
 }
 
 
-function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswerUntilSubmit = false, practiceMode = false, practiceDraft = null, onPracticeChange = null, onEdit, onCreateFlashcard }) {
+function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswerUntilSubmit = false, practiceMode = false, practiceDraft = null, onPracticeChange = null, onEdit }) {
   const initialAnswer = stat.correctAnswer || question.answer || '';
   const [selected, setSelected] = useState(practiceMode ? '' : stat.userAnswer || '');
   const [correctAnswer, setCorrectAnswer] = useState(initialAnswer);
@@ -1684,11 +1657,6 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
     onUpdateStat(question.id, { ...stat, bookmarked: !stat.bookmarked });
   };
 
-  const createFlashcard = () => {
-    onCreateFlashcard?.(question, { ...stat, correctAnswer, explanation, wrongNotes });
-    setFeedback('已生成抽認卡。');
-  };
-
   return (
     <article className="question-card">
       <div className="question-top">
@@ -1707,7 +1675,6 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
             {question.notionUrl && (
               <button className="secondary" onClick={() => window.open(question.notionUrl, '_blank')}>Notion 詳解</button>
             )}
-            {onCreateFlashcard && <button className="secondary" onClick={createFlashcard}>生成抽認卡</button>}
             <button className={stat.bookmarked ? 'bookmark active' : 'bookmark'} onClick={toggleBookmark}>
               {stat.bookmarked ? '★ 已標記' : '☆ 標記'}
             </button>
@@ -2428,7 +2395,6 @@ function QuestionManagerPanel({
   onSaveCustomQuestion,
   onDeleteQuestion,
   onUpdateStat,
-  onCreateFlashcard,
 }) {
   const [mode, setMode] = useState('browse');
   const selectedQuestion = editingQuestionId ? getQuestionWithOverride(editingQuestionId, state) : null;
@@ -2470,6 +2436,7 @@ function QuestionManagerPanel({
       correctAnswer: patch.correctAnswer || null,
       explanation: patch.explanation,
       wrongNotes: patch.wrongNotes,
+      explanationImages: patch.explanationImages || [],
       manualEditedAt: new Date().toISOString(),
     });
   };
@@ -2556,7 +2523,6 @@ function QuestionManagerPanel({
               onEdit={() => setMode('edit')}
               onDelete={deleteSelected}
               onSaveExplanation={saveExplanation}
-              onCreateFlashcard={onCreateFlashcard}
             />
           )}
         </section>
@@ -2565,22 +2531,52 @@ function QuestionManagerPanel({
   );
 }
 
-function QuestionManagerDetail({ question, stat, onEdit, onDelete, onSaveExplanation, onCreateFlashcard }) {
+function QuestionManagerDetail({ question, stat, onEdit, onDelete, onSaveExplanation }) {
   const [correctAnswer, setCorrectAnswer] = useState(stat.correctAnswer || question.answer || '');
   const [explanation, setExplanation] = useState(stat.explanation || question.explanation || '');
   const [wrongNotes, setWrongNotes] = useState(stat.wrongNotes || '');
+  const [explanationImages, setExplanationImages] = useState(stat.explanationImages || []);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
     setCorrectAnswer(stat.correctAnswer || question.answer || '');
     setExplanation(stat.explanation || question.explanation || '');
     setWrongNotes(stat.wrongNotes || '');
+    setExplanationImages(Array.isArray(stat.explanationImages) ? stat.explanationImages : []);
     setMessage('');
-  }, [question.id, stat.correctAnswer, stat.explanation, stat.wrongNotes, question.answer, question.explanation]);
+  }, [question.id, stat.correctAnswer, stat.explanation, stat.wrongNotes, stat.explanationImages, question.answer, question.explanation]);
 
   const save = () => {
-    onSaveExplanation(question, { correctAnswer, explanation, wrongNotes });
+    onSaveExplanation(question, { correctAnswer, explanation, wrongNotes, explanationImages });
     setMessage('已儲存正解與詳解。');
+  };
+
+  const addImageFiles = async (files) => {
+    const imageFiles = [...files].filter((file) => file?.type?.startsWith('image/'));
+    if (!imageFiles.length) return;
+    const dataUrls = await Promise.all(imageFiles.map((file) => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    })));
+    setExplanationImages((prev) => [...prev, ...dataUrls]);
+    setMessage('圖片已加入，記得儲存。');
+  };
+
+  const handlePasteImage = (event) => {
+    const files = [...(event.clipboardData?.items || [])]
+      .filter((item) => item.type.startsWith('image/'))
+      .map((item) => item.getAsFile())
+      .filter(Boolean);
+    if (!files.length) return;
+    event.preventDefault();
+    addImageFiles(files);
+  };
+
+  const removeImage = (index) => {
+    setExplanationImages((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
+    setMessage('圖片已移除，記得儲存。');
   };
 
   return (
@@ -2621,20 +2617,46 @@ function QuestionManagerDetail({ question, stat, onEdit, onDelete, onSaveExplana
         </label>
       </div>
 
-      <div className="textareas">
+      <div className="textareas manager-note-grid">
         <label>
           詳解 / guideline / trial note
-          <textarea value={explanation} onChange={(e) => setExplanation(e.target.value)} placeholder="答案、考點、為什麼其他選項錯、相關 trial/guideline、記憶點。" />
+          <textarea value={explanation} onPaste={handlePasteImage} onChange={(e) => setExplanation(e.target.value)} placeholder="答案、考點、為什麼其他選項錯、相關 trial/guideline、記憶點。可直接貼上 JPG/PNG 圖片。" />
         </label>
         <label>
           錯誤原因 / 弱點標籤
-          <textarea value={wrongNotes} onChange={(e) => setWrongNotes(e.target.value)} placeholder="例如：endpoint 不熟、biomarker cutoff 忘記、drug toxicity 混淆。" />
+          <textarea value={wrongNotes} onPaste={handlePasteImage} onChange={(e) => setWrongNotes(e.target.value)} placeholder="例如：endpoint 不熟、biomarker cutoff 忘記、drug toxicity 混淆。可直接貼上 JPG/PNG 圖片。" />
         </label>
       </div>
 
+      <div className="image-attach-row">
+        <label className="file-button">
+          選擇 JPG/PNG
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+            onChange={(event) => {
+              addImageFiles(event.target.files || []);
+              event.target.value = '';
+            }}
+          />
+        </label>
+        <span className="muted">也可以直接在上方詳解或錯誤原因欄位貼上截圖。</span>
+      </div>
+
+      {explanationImages.length > 0 && (
+        <div className="note-image-grid">
+          {explanationImages.map((src, index) => (
+            <div className="note-image-card" key={`${src.slice(0, 48)}-${index}`}>
+              <img src={src} alt={`${question.id} note attachment ${index + 1}`} />
+              <button className="tiny" type="button" onClick={() => removeImage(index)}>移除圖片</button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="inline-actions">
         <button className="primary" onClick={save}>儲存正解/詳解</button>
-        <button className="secondary" onClick={() => onCreateFlashcard(question, { ...stat, correctAnswer, explanation, wrongNotes })}>建立 Flashcard</button>
         {message && <span className="save-message">{message}</span>}
       </div>
     </div>
@@ -3653,15 +3675,6 @@ export default function App() {
     });
   };
 
-  const createFlashcardFromQuestion = (question, stat) => {
-    const card = normalizeFlashcard(buildQuickCardFromQuestion(question, stat));
-    updateState((prev) => ({
-      ...prev,
-      flashcards: { ...normalizeFlashcards(prev.flashcards), [card.id]: card },
-      flashcardStats: { ...(prev.flashcardStats || {}), [card.id]: makeFlashcardStats(card) },
-    }));
-  };
-
   const createTrialCard = (trialName, sourceQuestion = null) => {
     if (!trialName.trim()) return;
     const card = normalizeFlashcard(buildTrialCardFromName(trialName.trim(), sourceQuestion));
@@ -4481,7 +4494,7 @@ export default function App() {
           <h2>Critical Error Queue</h2>
           <p className="muted">收錄 high confidence wrong、repeated wrong 與高錯誤率核心題；優先做 concept repair → similar question → 7-day retest。</p>
           {readiness.criticalErrors.length === 0 ? <p className="muted">目前沒有 critical errors。</p> : readiness.criticalErrors.slice(0, 40).map(({ q, stat }) => (
-            <QuestionCard key={q.id} question={q} stat={stat} onUpdateStat={updateStat} compact onCreateFlashcard={createFlashcardFromQuestion} />
+            <QuestionCard key={q.id} question={q} stat={stat} onUpdateStat={updateStat} compact />
           ))}
         </main>
       )}
@@ -4544,7 +4557,6 @@ export default function App() {
                   practiceMode
                   practiceDraft={todaySession?.practiceDrafts?.[q.id]}
                   onPracticeChange={(patch) => updatePracticeDraft(q.id, patch)}
-                  onCreateFlashcard={createFlashcardFromQuestion}
                 />
               ))}
             </div>
@@ -4559,13 +4571,13 @@ export default function App() {
           <div className="subsection">
             <h3>今日到期複習</h3>
             {dueReview.length === 0 ? <p className="muted">目前沒有到期題目。</p> : dueReview.slice(0, 30).map(({ q, stat }) => (
-              <QuestionCard key={q.id} question={q} stat={stat} onUpdateStat={updateStat} compact onCreateFlashcard={createFlashcardFromQuestion} />
+              <QuestionCard key={q.id} question={q} stat={stat} onUpdateStat={updateStat} compact />
             ))}
           </div>
           <div className="subsection">
             <h3>高錯誤率 / 標記題</h3>
             {weakQuestions.slice(0, 30).map(({ q, stat }) => (
-              <QuestionCard key={q.id} question={q} stat={stat} onUpdateStat={updateStat} compact onCreateFlashcard={createFlashcardFromQuestion} />
+              <QuestionCard key={q.id} question={q} stat={stat} onUpdateStat={updateStat} compact />
             ))}
           </div>
         </main>
@@ -4587,7 +4599,6 @@ export default function App() {
           onSaveCustomQuestion={saveCustomQuestion}
           onDeleteQuestion={deleteQuestion}
           onUpdateStat={updateStat}
-          onCreateFlashcard={createFlashcardFromQuestion}
         />
       )}
 

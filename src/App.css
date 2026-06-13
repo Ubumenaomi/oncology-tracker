@@ -276,6 +276,55 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.5; }
   background: #fff;
 }
 
+.manager-note-grid {
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.manager-note-grid label {
+  gap: 9px;
+  font-size: 16px;
+}
+
+.manager-note-grid textarea {
+  min-height: 220px;
+  padding: 14px 16px;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.image-attach-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 14px 0 12px;
+}
+
+.note-image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin: 12px 0 16px;
+}
+
+.note-image-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel-soft);
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.note-image-card img {
+  width: 100%;
+  max-height: 240px;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #fff;
+}
+
 .danger-zone {
   margin-top: 12px;
 }
