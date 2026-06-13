@@ -3909,6 +3909,53 @@ export default function App() {
     };
   }, [planProgress]);
 
+
+  const missionControl = useMemo(() => {
+    const nextPlanTask = studyPlan100.find((task) => !planProgress[task.id]) || studyPlan100[studyPlan100.length - 1];
+    const topWeakCancer = cancerSummary.find((row) => row.status === 'Red') || cancerSummary[0];
+    const topRedTopic = readiness.redTopics?.[0];
+    const dueCount = dueReview.length;
+    const mockNeeded = readiness.recentMockScores.length < 3 || readiness.recentMockAverage < 80;
+    const primaryFocus = topRedTopic
+      ? `${topRedTopic.cancer}｜${topRedTopic.topic}`
+      : topWeakCancer
+        ? `${topWeakCancer.cancer} 題庫覆蓋率 ${topWeakCancer.coverage}% / 正確率 ${topWeakCancer.accuracy}%`
+        : '維持今日任務 streak';
+
+    const actions = [
+      {
+        title: '今日主線任務',
+        detail: `完成 ${questTask.day}：${questTask.topic}，先做題再回想 trial / algorithm。`,
+        cta: 'Go Quest',
+        tab: 'quest',
+      },
+      {
+        title: '補破口',
+        detail: dueCount > 0
+          ? `先清 ${dueCount} 題到期複習與錯題，降低正式考失分風險。`
+          : `目前沒有到期複習；改補 ${primaryFocus}。`,
+        cta: dueCount > 0 ? 'Review Queue' : 'Analytics',
+        tab: dueCount > 0 ? 'review' : 'analytics',
+      },
+      {
+        title: mockNeeded ? '建立實戰分數' : '維持 ≥80 安全區',
+        detail: mockNeeded
+          ? '每 7–10 天做一次 mixed mock，讓預測分數不是只看單題練習。'
+          : '保留節奏：錯題 retest 轉換率 ≥90%，mock 波動 SD <8。',
+        cta: 'Mock Exam',
+        tab: 'mock',
+      },
+    ];
+
+    return {
+      goal: '通過腫瘤專科考試',
+      loop: '每日任務 → 題目作答 → 錯題修補 → Trial 卡片 → Boss / Mock 驗收',
+      planTarget: nextPlanTask ? `下一個讀書計畫：${nextPlanTask.day} ${nextPlanTask.topic}` : '100-Day Plan 已完成',
+      primaryFocus,
+      actions,
+    };
+  }, [planProgress, cancerSummary, readiness, dueReview.length, questTask]);
+
   const togglePlanTask = (id) => {
     updateState((prev) => {
       const wasDone = Boolean(prev.planProgress?.[id]);
@@ -4007,6 +4054,33 @@ export default function App() {
         <MetricCard label="Level / XP" value={`Lv ${state.game?.level || 1}`} sub={`${state.game?.xp || 0} XP · streak ${state.game?.streak || 0}`} />
         <MetricCard label="Flashcards" value={getFlashcardList(state).length} sub={`${dueFlashcards.length} due today`} />
         <MetricCard label="同步狀態" value={user ? 'Cloud' : 'Local'} sub={user ? user.email : '尚未登入'} />
+      </section>
+
+      <section className="mission-control panel">
+        <div className="section-head">
+          <div>
+            <div className="eyebrow dark">Mission Control</div>
+            <h2>{missionControl.goal}</h2>
+            <p className="muted">{missionControl.loop}</p>
+          </div>
+          <div className="mission-target">
+            <span>目前最該推進</span>
+            <strong>{missionControl.planTarget}</strong>
+          </div>
+        </div>
+        <div className="mission-focus">
+          <span className="pill trial">Score dragger</span>
+          <strong>{missionControl.primaryFocus}</strong>
+        </div>
+        <div className="mission-actions">
+          {missionControl.actions.map((action) => (
+            <button className="mission-action" type="button" key={action.title} onClick={() => setTab(action.tab)}>
+              <strong>{action.title}</strong>
+              <span>{action.detail}</span>
+              <em>{action.cta} →</em>
+            </button>
+          ))}
+        </div>
       </section>
 
       {aiPromptOpen && (
