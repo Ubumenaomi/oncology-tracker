@@ -1264,6 +1264,14 @@ button:disabled {
   opacity: 1;
 }
 
+.mission-top-cards {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(150px, auto);
+  gap: 12px;
+  align-items: stretch;
+  min-width: min(100%, 560px);
+}
+
 .mission-target {
   display: grid;
   gap: 4px;
@@ -1275,6 +1283,7 @@ button:disabled {
 }
 
 .mission-target span,
+.mission-dday span,
 .mission-action span {
   color: var(--muted);
   font-size: 13px;
@@ -1282,6 +1291,29 @@ button:disabled {
 
 .mission-target strong {
   color: #1e3a8a;
+}
+
+.mission-dday {
+  display: grid;
+  gap: 2px;
+  min-width: 150px;
+  border: 1px solid #bfdbfe;
+  border-radius: 18px;
+  padding: 14px 16px;
+  background: #ffffff;
+}
+
+.mission-dday strong {
+  color: #1d4ed8;
+  font-size: 30px;
+  line-height: 1;
+}
+
+.mission-dday em {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 750;
 }
 
 .mission-focus {
@@ -1321,6 +1353,7 @@ button:disabled {
 }
 
 @media (max-width: 900px) {
+  .mission-top-cards,
   .mission-actions {
     grid-template-columns: 1fr;
   }

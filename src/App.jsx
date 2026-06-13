@@ -53,6 +53,23 @@ const TODAY = (() => {
   return `${y}-${m}-${day}`;
 })();
 
+const EXAM_DATE = {
+  year: 2026,
+  monthIndex: 9,
+  day: 4,
+  display: '2026/10/4',
+  label: '腫瘤專科考試',
+};
+
+function getExamCountdown(now = new Date()) {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const examDay = new Date(EXAM_DATE.year, EXAM_DATE.monthIndex, EXAM_DATE.day);
+  const diffDays = Math.round((examDay - today) / 86400000);
+
+  if (diffDays === 0) return 'D-Day';
+  return diffDays > 0 ? `D-${diffDays}` : `D+${Math.abs(diffDays)}`;
+}
+
 
 const defaultState = {
   sessions: {},
@@ -4348,6 +4365,9 @@ export default function App() {
       goal: '通過腫瘤專科考試',
       loop: '每日任務 → 題目作答 → 錯題修補 → Trial 卡片 → Boss / Mock 驗收',
       planTarget: nextPlanTask ? `下一個讀書計畫：${nextPlanTask.day} ${nextPlanTask.topic}` : '100-Day Plan 已完成',
+      examLabel: EXAM_DATE.label,
+      examDate: EXAM_DATE.display,
+      examCountdown: getExamCountdown(),
       primaryFocus,
       actions,
     };
@@ -4459,9 +4479,16 @@ export default function App() {
             <h2>{missionControl.goal}</h2>
             <p className="muted">{missionControl.loop}</p>
           </div>
-          <div className="mission-target">
-            <span>目前最該推進</span>
-            <strong>{missionControl.planTarget}</strong>
+          <div className="mission-top-cards">
+            <div className="mission-target">
+              <span>目前最該推進</span>
+              <strong>{missionControl.planTarget}</strong>
+            </div>
+            <div className="mission-dday" aria-label={`${missionControl.examLabel} D-Day ${missionControl.examCountdown}`}>
+              <span>D-Day</span>
+              <strong>{missionControl.examCountdown}</strong>
+              <em>{missionControl.examLabel} · {missionControl.examDate}</em>
+            </div>
           </div>
         </div>
         <div className="mission-focus">
