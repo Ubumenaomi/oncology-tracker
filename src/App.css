@@ -1046,3 +1046,76 @@ button:disabled {
     flex-direction: column;
   }
 }
+
+.mission-control {
+  margin: 18px 0;
+  border-color: #bfdbfe;
+  background: linear-gradient(180deg, #ffffff 0%, #eff6ff 100%);
+}
+
+.eyebrow.dark {
+  color: #1d4ed8;
+  opacity: 1;
+}
+
+.mission-target {
+  display: grid;
+  gap: 4px;
+  min-width: min(100%, 320px);
+  border: 1px solid #bfdbfe;
+  border-radius: 18px;
+  padding: 14px 16px;
+  background: #ffffff;
+}
+
+.mission-target span,
+.mission-action span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.mission-target strong {
+  color: #1e3a8a;
+}
+
+.mission-focus {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.mission-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.mission-action {
+  display: grid;
+  gap: 8px;
+  text-align: left;
+  border: 1px solid #dbe3ef;
+  border-radius: 18px;
+  padding: 14px;
+  background: #ffffff;
+  color: var(--text);
+}
+
+.mission-action:hover {
+  border-color: #2563eb;
+  box-shadow: 0 12px 30px rgba(37, 99, 235, 0.12);
+}
+
+.mission-action em {
+  color: var(--primary);
+  font-style: normal;
+  font-weight: 800;
+}
+
+@media (max-width: 900px) {
+  .mission-actions {
+    grid-template-columns: 1fr;
+  }
+}
