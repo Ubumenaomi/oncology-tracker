@@ -1072,12 +1072,38 @@ function getTodayPlanTask(state) {
   return studyPlan100.find((task) => !state.planProgress?.[task.id]) || studyPlan100[studyPlan100.length - 1];
 }
 
-function getDailyQuestProgress(state, date = TODAY, task = getTodayPlanTask(state), practiceDone = false) {
+function getDailyQuestBucket(state, date = TODAY) {
   const saved = state.dailyQuestProgress?.[date] || {};
-  const hasLockedProgress = Boolean(saved.xpClaimed || saved.stageClearedAt);
-  const planTaskId = hasLockedProgress ? (saved.planTaskId || task?.id || 1) : (task?.id || saved.planTaskId || 1);
-  const sameTask = !saved.planTaskId || saved.planTaskId === planTaskId;
-  const activeSaved = hasLockedProgress || sameTask ? saved : {};
+  if (saved.tasks) return saved;
+  if (!saved.planTaskId) return { activeTaskId: null, tasks: {} };
+  return {
+    activeTaskId: saved.planTaskId,
+    tasks: {
+      [saved.planTaskId]: saved,
+    },
+  };
+}
+
+function getSavedDailyQuestTask(state, date, taskId) {
+  const bucket = getDailyQuestBucket(state, date);
+  return bucket.tasks?.[taskId] || {};
+}
+
+function writeDailyQuestTask(state, date, taskId, progress) {
+  const bucket = getDailyQuestBucket(state, date);
+  return {
+    ...bucket,
+    activeTaskId: taskId,
+    tasks: {
+      ...(bucket.tasks || {}),
+      [taskId]: progress,
+    },
+  };
+}
+
+function getDailyQuestProgress(state, date = TODAY, task = getTodayPlanTask(state), practiceDone = false) {
+  const planTaskId = task?.id || 1;
+  const activeSaved = getSavedDailyQuestTask(state, date, planTaskId);
   const memoryDone = Boolean(activeSaved.memoryDone);
   const bossDone = Boolean(activeSaved.bossDone);
   const practiceStar = Boolean(activeSaved.practiceDone || practiceDone);
@@ -3411,7 +3437,7 @@ export default function App() {
         },
         dailyQuestProgress: {
           ...(prev.dailyQuestProgress || {}),
-          [TODAY]: dailyQuestProgress,
+          [TODAY]: writeDailyQuestTask(prev, TODAY, currentTask.id, dailyQuestProgress),
         },
       };
     });
@@ -3663,7 +3689,7 @@ export default function App() {
           ...prev,
           dailyQuestProgress: {
             ...(prev.dailyQuestProgress || {}),
-            [TODAY]: next,
+            [TODAY]: writeDailyQuestTask(prev, TODAY, questTask.id, next),
           },
         };
       }
@@ -3701,7 +3727,7 @@ export default function App() {
         },
         dailyQuestProgress: {
           ...(prev.dailyQuestProgress || {}),
-          [TODAY]: next,
+          [TODAY]: writeDailyQuestTask(prev, TODAY, questTask.id, next),
         },
       };
     });
@@ -3735,7 +3761,7 @@ export default function App() {
         },
         dailyQuestProgress: {
           ...(prev.dailyQuestProgress || {}),
-          [TODAY]: next,
+          [TODAY]: writeDailyQuestTask(prev, TODAY, questTask.id, next),
         },
       };
     });
@@ -3769,7 +3795,7 @@ export default function App() {
         },
         dailyQuestProgress: {
           ...(prev.dailyQuestProgress || {}),
-          [TODAY]: {
+          [TODAY]: writeDailyQuestTask(prev, TODAY, questTask.id, {
             ...currentProgress,
             practiceDone: true,
             memoryDone: true,
@@ -3777,7 +3803,7 @@ export default function App() {
             stars: 3,
             xpClaimed: true,
             stageClearedAt: new Date().toISOString(),
-          },
+          }),
         },
       };
     });
@@ -4248,6 +4274,19 @@ export default function App() {
             <MetricCard label="Game level" value={`Lv ${state.game?.level || 1}`} sub={`${state.game?.xp || 0} XP`} />
             <MetricCard label="Boss defeated" value={(state.game?.defeatedBosses || []).length} sub={`${(state.game?.unlockedBosses || []).length} unlocked`} />
             <MetricCard label="Trial cards" value={getFlashcardList(state).filter((card) => card.sourceType === 'trial').length} sub="Trial Boss target 50" />
+          </section>
+
+          <section className="plan-progress-panel" aria-label="100-Day Plan completion progress">
+            <div className="plan-cancer-head">
+              <strong>100-Day Plan 總進度</strong>
+              <span>{planSummary.completed}/{planSummary.total}（{planSummary.percent}%）</span>
+            </div>
+            <div className="progress-bar large"><span style={{ width: `${planSummary.percent}%` }} /></div>
+            <div className="plan-cancer-head">
+              <strong>Golden trial 進度</strong>
+              <span>{planSummary.goldenCompleted}/{planSummary.goldenTotal}（{planSummary.goldenPercent}%）</span>
+            </div>
+            <div className="progress-bar"><span style={{ width: `${planSummary.goldenPercent}%` }} /></div>
           </section>
 
           <div className="subsection">
