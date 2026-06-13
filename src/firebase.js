@@ -42,4 +42,3 @@ export {
   onSnapshot,
   serverTimestamp,
 };
-console.log("API key = ", import.meta.env.VITE_FIREBASE_API_KEY);
