@@ -66,6 +66,8 @@ const defaultState = {
   dailyQuestProgress: {},
   bossProgress: {},
   questionOverrides: {},
+  customQuestions: {},
+  deletedQuestionIds: {},
   mockExams: [],
   flashcards: {},
   flashcardStats: {},
@@ -409,6 +411,14 @@ function mergeCloudState(localState, cloudState) {
       ...(cloudState.questionOverrides || {}),
       ...(localState.questionOverrides || {}),
     },
+    customQuestions: {
+      ...(cloudState.customQuestions || {}),
+      ...(localState.customQuestions || {}),
+    },
+    deletedQuestionIds: {
+      ...(cloudState.deletedQuestionIds || {}),
+      ...(localState.deletedQuestionIds || {}),
+    },
     mockExams: [
       ...(cloudState.mockExams || []),
       ...(localState.mockExams || []),
@@ -607,6 +617,9 @@ function normalizeState(state) {
     },
     dailyQuestProgress: state?.dailyQuestProgress || {},
     bossProgress: state?.bossProgress || {},
+    questionOverrides: state?.questionOverrides || {},
+    customQuestions: state?.customQuestions || {},
+    deletedQuestionIds: state?.deletedQuestionIds || {},
     flashcards: normalizeFlashcards(state?.flashcards),
     flashcardStats: normalizeFlashcardStats(state?.flashcardStats, state?.flashcards),
     game: { ...game, xp, level: xpLevel(xp), streak: player.streak, badges: player.badges },
@@ -671,8 +684,38 @@ function makeQuestionTags(question) {
   };
 }
 
-function findQuestionById(id) {
-  return questionBank.find((q) => q.id === id);
+function normalizeQuestion(question = {}) {
+  return {
+    ...question,
+    id: question.id || `custom-${Date.now()}`,
+    year: Number.isFinite(Number(question.year)) ? Number(question.year) : (question.year || 'Custom'),
+    number: question.number ? Number(question.number) : null,
+    stem: String(question.stem || ''),
+    options: {
+      A: question.options?.A || '',
+      B: question.options?.B || '',
+      C: question.options?.C || '',
+      D: question.options?.D || '',
+      E: question.options?.E || '',
+    },
+    answer: question.answer || null,
+    cancer: question.cancer || 'Custom',
+    topic: question.topic || 'Manual',
+    trials: normalizeTextList(question.trials),
+    explanation: question.explanation || '',
+    notionUrl: question.notionUrl || '',
+    sourceType: question.sourceType || (String(question.id || '').startsWith('custom-') ? 'custom' : 'bank'),
+  };
+}
+
+function getQuestionPool(state = {}) {
+  const deleted = state?.deletedQuestionIds || {};
+  const customQuestions = Object.values(state?.customQuestions || {}).map((q) => normalizeQuestion({ ...q, sourceType: 'custom' }));
+  return [...questionBank, ...customQuestions].filter((q) => !deleted[q.id]);
+}
+
+function findQuestionById(id, state = {}) {
+  return getQuestionPool(state).find((q) => q.id === id) || null;
 }
 
 function applyQuestionOverride(question, overrides = {}) {
@@ -693,7 +736,7 @@ function applyQuestionOverride(question, overrides = {}) {
 
 
 const getQuestionWithOverride = (id, state) => {
-  const original = findQuestionById(id);
+  const original = findQuestionById(id, state);
   if (!original) return null;
   const question = applyQuestionOverride(original, state?.questionOverrides || {});
   return {
@@ -850,7 +893,7 @@ function questionMatchesTask(question, task, minScore = 120) {
 function generateDailyQuestionIds(state, task = getTodayPlanTask(state)) {
   const { dailyCount, preferredYears, preferredCancers } = state.settings;
 
-  const pool = questionBank
+  const pool = getQuestionPool(state)
     .map((q) => getQuestionWithOverride(q.id, state))
     .filter(Boolean)
     .filter((q) => {
@@ -1224,7 +1267,7 @@ function getQuestMemoryCards(state, task) {
 }
 
 function getWeaknessQuestion(state, task) {
-  const rows = questionBank
+  const rows = getQuestionPool(state)
     .map((q) => ({ q: getQuestionWithOverride(q.id, state), stat: getStat(state, q.id) }))
     .filter(({ q }) => q)
     .map((row) => ({ ...row, taskScore: scoreQuestionForTask(row.q, task) }))
@@ -1235,7 +1278,7 @@ function getWeaknessQuestion(state, task) {
 
   if (rows[0]) return rows[0].q;
 
-  return questionBank
+  return getQuestionPool(state)
     .map((q) => getQuestionWithOverride(q.id, state))
     .filter(Boolean)
     .map((q) => ({ q, taskScore: scoreQuestionForTask(q, task) }))
@@ -1272,7 +1315,7 @@ function buildBossChallenges(task, state) {
 
 function getCancerSummary(state) {
   return cancerCategories.map((cancer) => {
-    const ids = questionBank
+    const ids = getQuestionPool(state)
       .map((q) => getQuestionWithOverride(q.id, state))
       .filter((q) => q?.cancer === cancer)
       .map((q) => q.id);
@@ -1335,7 +1378,7 @@ function getCoreTopicNames() {
 
 function getTopicMasteryRows(state) {
   const topicMap = new Map();
-  questionBank
+  getQuestionPool(state)
     .map((q) => getQuestionWithOverride(q.id, state))
     .filter(Boolean)
     .forEach((q) => {
@@ -1363,7 +1406,7 @@ function getTopicMasteryRows(state) {
 }
 
 function getCriticalErrorItems(state) {
-  return questionBank
+  return getQuestionPool(state)
     .map((q) => ({ q: getQuestionWithOverride(q.id, state), stat: getStat(state, q.id) }))
     .filter(({ q, stat }) => q && ((stat.highConfidenceWrong || 0) > 0 || (stat.repeatedWrong || 0) >= 2 || (stat.wrong || 0) >= 2))
     .sort((a, b) => (b.stat.highConfidenceWrong || 0) - (a.stat.highConfidenceWrong || 0) || (b.stat.repeatedWrong || 0) - (a.stat.repeatedWrong || 0) || wrongRate(b.stat) - wrongRate(a.stat));
@@ -1450,7 +1493,7 @@ function getReadinessMetrics(state) {
 }
 
 function buildAiPrompt(state) {
-  const weak = questionBank
+  const weak = getQuestionPool(state)
     .map((q) => ({ q: getQuestionWithOverride(q.id, state), stat: getStat(state, q.id) }))
     .filter(({ q, stat }) => q && (stat.wrong > 0 || stat.bookmarked))
     .sort((a, b) => wrongRate(b.stat) - wrongRate(a.stat) || b.stat.wrong - a.stat.wrong)
@@ -2063,6 +2106,8 @@ function SyncPanel({
   );
 }
 
+// Legacy standalone panel kept for data-migration safety; replaced by QuestionManagerPanel.
+// eslint-disable-next-line no-unused-vars
 function ManualExplanationPanel({ state, onUpdateStat }) {
   const [year, setYear] = useState('113');
   const [number, setNumber] = useState('');
@@ -2233,6 +2278,8 @@ function ManualExplanationPanel({ state, onUpdateStat }) {
   );
 }
 
+// Legacy standalone panel kept for data-migration safety; replaced by QuestionManagerPanel.
+// eslint-disable-next-line no-unused-vars
 function QuestionEditPanel({ state, onSaveOverride }) {
   const [year, setYear] = useState('113');
   const [number, setNumber] = useState('');
@@ -2363,6 +2410,234 @@ function QuestionEditPanel({ state, onSaveOverride }) {
         </div>
       )}
     </main>
+  );
+}
+
+function QuestionManagerPanel({
+  state,
+  questions,
+  search,
+  bankYear,
+  bankCancer,
+  editingQuestionId,
+  onSearch,
+  onYearChange,
+  onCancerChange,
+  onEdit,
+  onSaveOverride,
+  onSaveCustomQuestion,
+  onDeleteQuestion,
+  onUpdateStat,
+  onCreateFlashcard,
+}) {
+  const [mode, setMode] = useState('browse');
+  const selectedQuestion = editingQuestionId ? getQuestionWithOverride(editingQuestionId, state) : null;
+
+  const startNewQuestion = () => {
+    const id = `custom-${Date.now()}`;
+    const draft = normalizeQuestion({
+      id,
+      year: 'Custom',
+      number: null,
+      stem: '',
+      options: { A: '', B: '', C: '', D: '', E: '' },
+      answer: '',
+      cancer: bankCancer !== 'All' ? bankCancer : 'Custom',
+      topic: 'Manual',
+      trials: [],
+      explanation: '',
+      sourceType: 'custom',
+      createdAt: new Date().toISOString(),
+    });
+    onSaveCustomQuestion(draft);
+    onEdit(id);
+    setMode('edit');
+  };
+
+  const deleteSelected = () => {
+    if (!selectedQuestion) return;
+    const label = selectedQuestion.sourceType === 'custom' ? '刪除這題自訂題目' : '從題庫列表隱藏這題';
+    if (!window.confirm(`${label}？作答紀錄會保留。`)) return;
+    onDeleteQuestion(selectedQuestion.id);
+    onEdit(null);
+    setMode('browse');
+  };
+
+  const saveExplanation = (question, patch) => {
+    const stat = getStat(state, question.id);
+    onUpdateStat(question.id, {
+      ...stat,
+      correctAnswer: patch.correctAnswer || null,
+      explanation: patch.explanation,
+      wrongNotes: patch.wrongNotes,
+      manualEditedAt: new Date().toISOString(),
+    });
+  };
+
+  return (
+    <main className="panel question-manager-panel">
+      <div className="section-head">
+        <div>
+          <h2>Question Manager</h2>
+          <p className="muted">同一頁完成搜尋題庫、手動新增題目、補詳解、修改欄位與刪除/隱藏題目。</p>
+        </div>
+        <div className="inline-actions">
+          <button className="primary" onClick={startNewQuestion}>新增題目</button>
+          <button className="secondary" onClick={() => setMode(mode === 'browse' ? 'edit' : 'browse')} disabled={!selectedQuestion}>
+            {mode === 'browse' ? '編輯選取題' : '回到瀏覽'}
+          </button>
+        </div>
+      </div>
+
+      <div className="filters">
+        <input name="question_manager_search" value={search} onChange={(e) => onSearch(e.target.value)} placeholder="搜尋題幹、trial、癌別、藥名、題號..." />
+        <select name="question_manager_year" value={bankYear} onChange={(e) => onYearChange(e.target.value)}>
+          <option>All</option>
+          <option>112</option>
+          <option>113</option>
+          <option>114</option>
+          <option>Custom</option>
+        </select>
+        <select name="question_manager_cancer" value={bankCancer} onChange={(e) => onCancerChange(e.target.value)}>
+          <option>All</option>
+          {cancerCategories.map((c) => <option key={c}>{c}</option>)}
+          <option>Custom</option>
+        </select>
+      </div>
+
+      <div className="question-manager-layout">
+        <section className="question-manager-list" aria-label="Question list">
+          <div className="list-summary">
+            <strong>{questions.length}</strong>
+            <span className="muted">符合條件，顯示前 80 題</span>
+          </div>
+          {questions.slice(0, 80).map((q) => (
+            <button
+              type="button"
+              key={q.id}
+              className={editingQuestionId === q.id ? 'manager-question-row active' : 'manager-question-row'}
+              onClick={() => { onEdit(q.id); setMode('browse'); }}
+            >
+              <span className="qid">{q.id}</span>
+              <strong>{q.stem || '尚未輸入題幹'}</strong>
+              <span>{q.cancer} · {q.topic}</span>
+            </button>
+          ))}
+        </section>
+
+        <section className="question-manager-detail" aria-label="Question detail">
+          {!selectedQuestion ? (
+            <div className="empty-state">
+              <h3>選一題或新增題目</h3>
+              <p>左側可搜尋題庫；右側會顯示題目、詳解與編輯器。</p>
+            </div>
+          ) : mode === 'edit' ? (
+            <div>
+              <QuestionEditor
+                question={selectedQuestion}
+                override={state.questionOverrides?.[selectedQuestion.id]}
+                onSave={(id, override) => {
+                  if (selectedQuestion.sourceType === 'custom') {
+                    onSaveCustomQuestion(normalizeQuestion({ ...selectedQuestion, ...override, id, sourceType: 'custom', updatedAt: new Date().toISOString() }));
+                  } else {
+                    onSaveOverride(id, override);
+                  }
+                }}
+                onCancel={() => setMode('browse')}
+              />
+              <div className="inline-actions danger-zone">
+                <button className="danger" onClick={deleteSelected}>{selectedQuestion.sourceType === 'custom' ? '刪除題目' : '隱藏題目'}</button>
+              </div>
+            </div>
+          ) : (
+            <QuestionManagerDetail
+              question={selectedQuestion}
+              stat={getStat(state, selectedQuestion.id)}
+              onEdit={() => setMode('edit')}
+              onDelete={deleteSelected}
+              onSaveExplanation={saveExplanation}
+              onCreateFlashcard={onCreateFlashcard}
+            />
+          )}
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function QuestionManagerDetail({ question, stat, onEdit, onDelete, onSaveExplanation, onCreateFlashcard }) {
+  const [correctAnswer, setCorrectAnswer] = useState(stat.correctAnswer || question.answer || '');
+  const [explanation, setExplanation] = useState(stat.explanation || question.explanation || '');
+  const [wrongNotes, setWrongNotes] = useState(stat.wrongNotes || '');
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    setCorrectAnswer(stat.correctAnswer || question.answer || '');
+    setExplanation(stat.explanation || question.explanation || '');
+    setWrongNotes(stat.wrongNotes || '');
+    setMessage('');
+  }, [question.id, stat.correctAnswer, stat.explanation, stat.wrongNotes, question.answer, question.explanation]);
+
+  const save = () => {
+    onSaveExplanation(question, { correctAnswer, explanation, wrongNotes });
+    setMessage('已儲存正解與詳解。');
+  };
+
+  return (
+    <div className="manager-detail-card">
+      <div className="question-top">
+        <div>
+          <span className="qid">{question.id}</span>
+          <span className="pill">{question.cancer}</span>
+          <span className="pill soft">{question.topic}</span>
+          {question.sourceType === 'custom' && <span className="priority high">Custom</span>}
+        </div>
+        <div className="inline-actions mini">
+          <button className="secondary" onClick={onEdit}>修改題目</button>
+          <button className="danger" onClick={onDelete}>{question.sourceType === 'custom' ? '刪除' : '隱藏'}</button>
+        </div>
+      </div>
+      <p className="stem">{question.stem || '尚未輸入題幹。'}</p>
+      <div className="options compact-options">
+        {Object.entries(question.options || {}).map(([key, value]) => (
+          <div key={key} className="option readonly-option">
+            <span className="option-key">{key}</span>
+            <span>{value}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="manual-grid">
+        <label>
+          正解
+          <select value={correctAnswer} onChange={(e) => setCorrectAnswer(e.target.value)}>
+            <option value="">尚未輸入</option>
+            {['A', 'B', 'C', 'D', 'E'].map((x) => <option key={x} value={x}>{x}</option>)}
+          </select>
+        </label>
+        <label>
+          Trials
+          <input value={(question.trials || []).join(', ')} readOnly />
+        </label>
+      </div>
+
+      <div className="textareas">
+        <label>
+          詳解 / guideline / trial note
+          <textarea value={explanation} onChange={(e) => setExplanation(e.target.value)} placeholder="答案、考點、為什麼其他選項錯、相關 trial/guideline、記憶點。" />
+        </label>
+        <label>
+          錯誤原因 / 弱點標籤
+          <textarea value={wrongNotes} onChange={(e) => setWrongNotes(e.target.value)} placeholder="例如：endpoint 不熟、biomarker cutoff 忘記、drug toxicity 混淆。" />
+        </label>
+      </div>
+
+      <div className="inline-actions">
+        <button className="primary" onClick={save}>儲存正解/詳解</button>
+        <button className="secondary" onClick={() => onCreateFlashcard(question, { ...stat, correctAnswer, explanation, wrongNotes })}>建立 Flashcard</button>
+        {message && <span className="save-message">{message}</span>}
+      </div>
+    </div>
   );
 }
 
@@ -2552,7 +2827,7 @@ function FlashcardsPanel({
   };
 
   const buildAiCardPromptFromWeakQuestions = () => {
-    const promptSourceQuestions = questionBank
+    const promptSourceQuestions = getQuestionPool(state)
       .map((q) => getQuestionWithOverride(q.id, state))
       .filter(Boolean)
       .map((q) => ({ q, stat: getStat(state, q.id) }))
@@ -2654,7 +2929,7 @@ ${sourceText || '目前沒有符合條件的錯題或 due questions。'}
   };
 
   const buildTrialCardPromptFromWeakQuestions = () => {
-    const trialSourceQuestions = questionBank
+    const trialSourceQuestions = getQuestionPool(state)
       .map((q) => getQuestionWithOverride(q.id, state))
       .filter(Boolean)
       .map((q) => ({ q, stat: getStat(state, q.id) }))
@@ -3064,7 +3339,7 @@ function MockExamPanel({ state, onFinishMock }) {
   const [showResults, setShowResults] = useState(false);
 
   const startMock = () => {
-    const pool = shuffleStable(questionBank
+    const pool = shuffleStable(getQuestionPool(state)
       .map((q) => getQuestionWithOverride(q.id, state))
       .filter(Boolean)
       .filter((q) => examYear === 'All' || Number(q.year) === Number(examYear))
@@ -3538,6 +3813,49 @@ export default function App() {
     });
   };
 
+  const saveCustomQuestion = (question) => {
+    const normalized = normalizeQuestion({
+      ...question,
+      id: question.id || `custom-${Date.now()}`,
+      sourceType: 'custom',
+      updatedAt: new Date().toISOString(),
+    });
+    updateState((prev) => ({
+      ...prev,
+      customQuestions: {
+        ...(prev.customQuestions || {}),
+        [normalized.id]: normalized,
+      },
+      deletedQuestionIds: {
+        ...(prev.deletedQuestionIds || {}),
+        [normalized.id]: false,
+      },
+    }));
+  };
+
+  const deleteQuestion = (id) => {
+    updateState((prev) => {
+      const nextCustom = { ...(prev.customQuestions || {}) };
+      const nextOverrides = { ...(prev.questionOverrides || {}) };
+      const nextDeleted = { ...(prev.deletedQuestionIds || {}) };
+
+      if (nextCustom[id]) {
+        delete nextCustom[id];
+        delete nextDeleted[id];
+      } else {
+        nextDeleted[id] = true;
+      }
+      delete nextOverrides[id];
+
+      return {
+        ...prev,
+        customQuestions: nextCustom,
+        questionOverrides: nextOverrides,
+        deletedQuestionIds: nextDeleted,
+      };
+    });
+  };
+
   const loginWithEmail = async (email, password) => {
     setSyncError('');
     setSyncStatus('登入中...');
@@ -3826,12 +4144,12 @@ export default function App() {
     createTodaySession({ force: true });
   };
 
-  const dueReview = useMemo(() => questionBank
+  const dueReview = useMemo(() => getQuestionPool(state)
     .map((q) => ({ q: getQuestionWithOverride(q.id, state), stat: getStat(state, q.id) }))
     .filter(({ q, stat }) => q && stat.nextReviewDate && stat.nextReviewDate <= TODAY)
     .sort((a, b) => wrongRate(b.stat) - wrongRate(a.stat)), [state]);
 
-  const weakQuestions = useMemo(() => questionBank
+  const weakQuestions = useMemo(() => getQuestionPool(state)
     .map((q) => ({ q: getQuestionWithOverride(q.id, state), stat: getStat(state, q.id) }))
     .filter(({ q, stat }) => q && (stat.wrong > 0 || stat.bookmarked))
     .sort((a, b) => wrongRate(b.stat) - wrongRate(a.stat) || b.stat.wrong - a.stat.wrong), [state]);
@@ -3999,7 +4317,7 @@ export default function App() {
   };
 
 
-  const bankQuestions = useMemo(() => questionBank
+  const bankQuestions = useMemo(() => getQuestionPool(state)
     .map((q) => getQuestionWithOverride(q.id, state))
     .filter(Boolean)
     .filter((q) => {
@@ -4008,8 +4326,7 @@ export default function App() {
       const cancerOk = bankCancer === 'All' || q.cancer === bankCancer;
       const yearOk = bankYear === 'All' || String(q.year) === String(bankYear);
       return searchOk && cancerOk && yearOk;
-    })
-    .slice(0, 80), [search, bankCancer, bankYear, state]);
+    }), [search, bankCancer, bankYear, state]);
 
   const updateSettings = (patch) => {
     updateState((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } }));
@@ -4058,7 +4375,7 @@ export default function App() {
       </header>
 
       <section className="metrics-grid">
-        <MetricCard label="題庫總數" value={questionBank.length} sub="112–114 年" />
+        <MetricCard label="題庫總數" value={getQuestionPool(state).length} sub="112–114 年" />
         <MetricCard label="已練題目" value={summary.reviewed} sub={`${summary.attempts} total attempts`} />
         <MetricCard label="正確率" value={`${summary.accuracy}%`} sub={`${summary.correct} correct / ${summary.wrong} wrong`} />
         <MetricCard label="今日待複習" value={dueReview.length} sub="依 next review date" />
@@ -4104,7 +4421,7 @@ export default function App() {
       )}
 
       <nav className="tabs">
-        {[['quest', 'Quest'], ['readiness', 'Board Readiness'], ['mock', 'Mock Exam'], ['critical', 'Critical Errors'], ['flashcards', 'Flashcards'], ['flashcard-review', 'Card Review'], ['today', 'Daily Practice'], ['review', 'Review Queue'], ['bank', 'Question Bank'], ['manual', 'Manual Add'], ['question-edit', 'Question Edit'], ['analytics', 'Analytics'], ['plan', '100-Day Plan'], ['sync', 'Cloud Sync'], ['settings', 'Settings']].map(([key, label]) => (
+        {[['quest', 'Quest'], ['readiness', 'Board Readiness'], ['mock', 'Mock Exam'], ['critical', 'Critical Errors'], ['flashcards', 'Flashcards'], ['flashcard-review', 'Card Review'], ['today', 'Daily Practice'], ['review', 'Review Queue'], ['questions', 'Question Manager'], ['analytics', 'Analytics'], ['plan', '100-Day Plan'], ['sync', 'Cloud Sync'], ['settings', 'Settings']].map(([key, label]) => (
           <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>
         ))}
       </nav>
@@ -4254,60 +4571,24 @@ export default function App() {
         </main>
       )}
 
-      {tab === 'bank' && (
-        <main className="panel">
-          <div className="section-head">
-            <div>
-              <h2>Question Bank</h2>
-              <p className="muted">可搜尋 trial、癌別、年份、題幹文字；每題可補上答案與詳解。</p>
-            </div>
-          </div>
-          <div className="filters">
-            <input name="bank_search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜尋：KEYNOTE-671、EGFR、breast、PARP..." />
-            <select name="bank_year" value={bankYear} onChange={(e) => setBankYear(e.target.value)}>
-              <option>All</option>
-              <option>112</option>
-              <option>113</option>
-              <option>114</option>
-            </select>
-            <select name="bank_cancer" value={bankCancer} onChange={(e) => setBankCancer(e.target.value)}>
-              <option>All</option>
-              {cancerCategories.map((c) => <option key={c}>{c}</option>)}
-            </select>
-          </div>
-          <p className="muted">顯示前 80 題，共符合 {bankQuestions.length} 題。</p>
-          <div className="question-list">
-            {bankQuestions.map((q) => (
-              <div key={q.id} className="bank-question-wrapper">
-                <QuestionCard
-                  question={q}
-                  stat={getStat(state, q.id)}
-                  onUpdateStat={updateStat}
-                  compact
-                  onEdit={(id) => setEditingQuestionId(id)}
-                  onCreateFlashcard={createFlashcardFromQuestion}
-                />
-                {editingQuestionId === q.id && (
-                  <QuestionEditor
-                    question={q}
-                    override={state.questionOverrides?.[q.id]}
-                    onSave={saveQuestionOverride}
-                    onCancel={() => setEditingQuestionId(null)}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-        </main>
-      )}
-
-
-      {tab === 'manual' && (
-        <ManualExplanationPanel state={state} onUpdateStat={updateStat} />
-      )}
-
-      {tab === 'question-edit' && (
-        <QuestionEditPanel state={state} onSaveOverride={saveQuestionOverride} />
+      {tab === 'questions' && (
+        <QuestionManagerPanel
+          state={state}
+          questions={bankQuestions}
+          search={search}
+          bankYear={bankYear}
+          bankCancer={bankCancer}
+          editingQuestionId={editingQuestionId}
+          onSearch={setSearch}
+          onYearChange={setBankYear}
+          onCancerChange={setBankCancer}
+          onEdit={setEditingQuestionId}
+          onSaveOverride={saveQuestionOverride}
+          onSaveCustomQuestion={saveCustomQuestion}
+          onDeleteQuestion={deleteQuestion}
+          onUpdateStat={updateStat}
+          onCreateFlashcard={createFlashcardFromQuestion}
+        />
       )}
 
       {tab === 'analytics' && (
