@@ -76,6 +76,72 @@ select, input, textarea { border: 1px solid #cbd5e1; border-radius: 12px; paddin
 .textareas { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .textareas label { display: grid; gap: 6px; color: var(--muted); font-weight: 750; font-size: 13px; }
 textarea { min-height: 92px; resize: vertical; line-height: 1.5; }
+.practice-note-grid label {
+  font-size: 16px;
+  gap: 9px;
+}
+
+.practice-note-grid textarea {
+  min-height: 150px;
+  padding: 14px 16px;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.note-reader-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: 28px;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.note-reader-panel {
+  width: min(1180px, 100%);
+  max-height: calc(100vh - 56px);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28);
+  padding: 20px;
+}
+
+.note-reader-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.note-reader-layout {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 16px;
+}
+
+.note-reader-layout label {
+  display: grid;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.note-reader-layout textarea {
+  min-height: min(62vh, 620px);
+  padding: 18px 20px;
+  font-size: 18px;
+  line-height: 1.75;
+}
+
+.note-reader-actions {
+  margin-top: 16px;
+}
 .prompt-box { width: 100%; min-height: 260px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
 .stats-line { margin-top: 10px; color: var(--muted); font-size: 13px; }
 
@@ -97,7 +163,10 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.5; }
   .app-shell { padding: 12px; }
   .app-header, .section-head { flex-direction: column; }
   .metrics-grid { grid-template-columns: repeat(2, 1fr); }
-  .filters, .textareas, .plan-grid, .settings-grid { grid-template-columns: 1fr; }
+  .filters, .textareas, .plan-grid, .settings-grid, .note-reader-layout { grid-template-columns: 1fr; }
+  .note-reader-backdrop { padding: 12px; }
+  .note-reader-panel { max-height: calc(100vh - 24px); }
+  .note-reader-layout textarea { min-height: 42vh; }
   .table-row { grid-template-columns: 1.2fr 0.6fr 0.8fr 0.7fr 0.8fr; font-size: 13px; }
 }
 

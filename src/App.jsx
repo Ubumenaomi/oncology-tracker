@@ -1498,6 +1498,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
   const [revealed, setRevealed] = useState(
     practiceMode ? false : (!hideAnswerUntilSubmit || Boolean(stat.lastAttemptAt))
   );
+  const [notesExpanded, setNotesExpanded] = useState(false);
   const [feedback, setFeedback] = useState('');
 
   useEffect(() => {
@@ -1523,6 +1524,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
       );
     }
 
+    setNotesExpanded(false);
     setFeedback('');
   }, [question.id]);
 
@@ -1806,18 +1808,70 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                   </button>
                 </div>
                 <button className="secondary" onClick={saveNote}>儲存詳解/筆記</button>
+                {practiceMode && (
+                  <button className="secondary" onClick={() => setNotesExpanded(true)}>放大閱讀/編輯</button>
+                )}
               </div>
 
-              <div className="textareas">
+              <div className={practiceMode ? 'textareas practice-note-grid' : 'textareas'}>
                 <label>
                   詳解 / guideline / trial note
-                  <textarea value={explanation} onChange={(e) => setExplanation(e.target.value)} placeholder="例如：KEYNOTE-671 為 perioperative pembrolizumab + platinum-doublet chemotherapy，primary endpoint 為 EFS 與 OS..." />
+                  <textarea
+                    value={explanation}
+                    onFocus={() => practiceMode && setNotesExpanded(true)}
+                    onChange={(e) => setExplanation(e.target.value)}
+                    placeholder="例如：KEYNOTE-671 為 perioperative pembrolizumab + platinum-doublet chemotherapy，primary endpoint 為 EFS 與 OS..."
+                  />
                 </label>
                 <label>
                   錯誤原因 / 弱點標籤
-                  <textarea value={wrongNotes} onChange={(e) => setWrongNotes(e.target.value)} placeholder="例如：忘記 eligibility、HR、primary endpoint、biomarker cutoff、toxicity..." />
+                  <textarea
+                    value={wrongNotes}
+                    onFocus={() => practiceMode && setNotesExpanded(true)}
+                    onChange={(e) => setWrongNotes(e.target.value)}
+                    placeholder="例如：忘記 eligibility、HR、primary endpoint、biomarker cutoff、toxicity..."
+                  />
                 </label>
               </div>
+
+              {practiceMode && notesExpanded && (
+                <div className="note-reader-backdrop" role="dialog" aria-modal="true" aria-label={`${question.id} 詳解與錯誤原因放大閱讀`}>
+                  <div className="note-reader-panel">
+                    <div className="note-reader-head">
+                      <div>
+                        <span className="qid">{question.id}</span>
+                        <span className="pill">{question.cancer}</span>
+                        <span className="pill soft">{question.topic}</span>
+                      </div>
+                      <button className="secondary" onClick={() => setNotesExpanded(false)}>關閉</button>
+                    </div>
+                    <div className="note-reader-layout">
+                      <label>
+                        詳解 / guideline / trial note
+                        <textarea
+                          value={explanation}
+                          onChange={(e) => setExplanation(e.target.value)}
+                          autoFocus
+                          placeholder="答案、考點、為什麼其他選項錯、相關 trial/guideline、記憶點。"
+                        />
+                      </label>
+                      <label>
+                        錯誤原因 / 弱點標籤
+                        <textarea
+                          value={wrongNotes}
+                          onChange={(e) => setWrongNotes(e.target.value)}
+                          placeholder="例如：忘記 eligibility、HR、primary endpoint、biomarker cutoff、toxicity..."
+                        />
+                      </label>
+                    </div>
+                    <div className="inline-actions note-reader-actions">
+                      <button className="primary" onClick={saveNote}>儲存詳解/筆記</button>
+                      <button className="secondary" onClick={() => setNotesExpanded(false)}>回到題目</button>
+                      {feedback && <span className="save-message">{feedback}</span>}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {question.explanationFigures?.length > 0 && (
                 <div className="explanation-figures">
