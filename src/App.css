@@ -266,6 +266,18 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.5; }
   margin: 16px 0 24px;
 }
 
+.plan-progress-panel {
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--panel-2);
+  padding: 16px;
+  margin: 0 0 24px;
+}
+
+.plan-progress-panel .progress-bar + .plan-cancer-head {
+  margin-top: 16px;
+}
+
 .plan-cancer-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
@@ -292,6 +304,10 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.5; }
   border-radius: 999px;
   background: var(--border);
   overflow: hidden;
+}
+
+.progress-bar.large {
+  height: 16px;
 }
 
 .progress-bar span {
