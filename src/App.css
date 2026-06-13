@@ -193,6 +193,13 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.5; }
 
 .readonly-option {
   cursor: default;
+  grid-template-columns: 28px minmax(0, 1fr);
+}
+
+.readonly-option span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 
 .save-message {
