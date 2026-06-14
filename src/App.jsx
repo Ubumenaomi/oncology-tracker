@@ -27,6 +27,55 @@ const ERROR_TYPE_OPTIONS = [
   'Overconfidence',
 ];
 
+const FLASHCARD_TYPE_OPTIONS = [
+  'Trial Card',
+  'Algorithm Card',
+  'Cloze Card',
+  'Trap Card',
+];
+
+const FLASHCARD_TYPE_ALIASES = {
+  trial: 'Trial Card',
+  'trial card': 'Trial Card',
+  algorithm: 'Algorithm Card',
+  'algorithm card': 'Algorithm Card',
+  cloze: 'Cloze Card',
+  'cloze card': 'Cloze Card',
+  trap: 'Trap Card',
+  'trap card': 'Trap Card',
+  'exam trap': 'Trap Card',
+  'topic recall': 'Algorithm Card',
+  'golden trial': 'Trial Card',
+  'focus tags': 'Algorithm Card',
+  'algorithm recall': 'Algorithm Card',
+  toxicity: 'Trap Card',
+  biomarker: 'Cloze Card',
+  basic: 'Trap Card',
+  imported: 'Trap Card',
+};
+
+const FLASHCARD_SCHEMA_PROMPT = `每張卡必須包含：
+- front
+- back
+- type: 只能是 "Trial Card", "Algorithm Card", "Cloze Card", "Trap Card"
+- cancer
+- topic
+- sourceQuestionId
+- trial: array
+- tags: array
+- examValue: 1-5
+- errorType: 從 Knowledge gap, Misread question, Trial confusion, Biomarker cutoff, Treatment sequence, Toxicity, Guideline outdated, Overconfidence 選一個
+
+製卡規則：
+1. 不要把整個題目題幹直接變成 front。
+2. 每張卡只測一個可轉移的 decision rule 或核心概念。
+3. Trial Card 必須包含 population / intervention / comparator / endpoint / exam trap。
+4. Algorithm Card 必須包含 treatment sequencing 與 contraindication / exception。
+5. Cloze Card 必須針對 cutoff、duration、endpoint、dose、eligibility。
+6. Trap Card 必須指出常見錯誤敘述為何錯。
+7. 醫學名詞與藥名保留英文，其餘用繁體中文。
+8. back 要 concise，但要足夠讓我考前複習。`;
+
 const FLASHCARD_RATINGS = {
   Again: { interval: 1, masteryDelta: -1 },
   Hard: { interval: 3, masteryDelta: 0 },
@@ -491,13 +540,31 @@ function normalizeTextList(value = []) {
   return [String(value).trim()].filter(Boolean);
 }
 
+function normalizeFlashcardType(type, sourceType = '') {
+  const normalized = String(type || sourceType || '').trim().toLowerCase();
+  return FLASHCARD_TYPE_ALIASES[normalized] || (normalized.includes('trial') ? 'Trial Card' : 'Trap Card');
+}
+
+function normalizeExamValue(value) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return 3;
+  return Math.max(1, Math.min(5, Math.round(numericValue)));
+}
+
+function normalizeFlashcardErrorType(errorType) {
+  return ERROR_TYPE_OPTIONS.includes(errorType) ? errorType : 'Knowledge gap';
+}
+
 function normalizeFlashcard(card) {
   return {
     ...card,
     front: String(card.front || ''),
     back: String(card.back || ''),
+    type: normalizeFlashcardType(card.type, card.sourceType),
     tags: [...new Set(normalizeTextList(card.tags))],
     trial: [...new Set(normalizeTextList(card.trial))],
+    examValue: normalizeExamValue(card.examValue),
+    errorType: normalizeFlashcardErrorType(card.errorType),
   };
 }
 
@@ -1068,7 +1135,7 @@ function examMatchesBoss(exam, boss) {
 
 function getBossRows(state, readiness = getReadinessMetrics(state)) {
   const progress = getModuleProgress(state.planProgress || {});
-  const trialCards = getFlashcardList(state).filter((card) => card.sourceType === 'trial').length;
+  const trialCards = getFlashcardList(state).filter((card) => card.sourceType === 'trial' || card.type === 'Trial Card').length;
   const completedYears = new Set((state.mockExams || [])
     .filter((exam) => exam.completedAt && exam.year)
     .map((exam) => Number(exam.year)));
@@ -1112,13 +1179,17 @@ function buildTrialCardFromName(trialName, sourceQuestion = null) {
     id: `trial-card-${trialName.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-${Date.now()}`,
     sourceType: 'trial',
     sourceId: sourceQuestion?.id || null,
+    sourceQuestionId: sourceQuestion?.id || null,
     cancer,
     topic: sourceQuestion?.topic || 'Pivotal trial',
     front: `${trialName} 的 population / intervention / comparator / endpoint / exam trap？`,
     back: 'Population:\nIntervention:\nComparator:\nPrimary endpoint:\nKey result:\nToxicity / exam trap:',
     cloze: `${trialName} primary endpoint = {{c1::}}; key eligible population = {{c2::}}`,
+    type: 'Trial Card',
     trial: [trialName],
     tags: sourceQuestion?.tags || { domain: cancer, subtopic: 'Pivotal trial', trial: [trialName], cardEligible: true, examWeight: 4 },
+    examValue: 5,
+    errorType: 'Trial confusion',
     intervalDays: 1,
     nextReviewDate: TODAY,
     mastery: 0,
@@ -1212,7 +1283,7 @@ function buildTopicRecallCards(task) {
     {
       id: `recall-${task?.id || 'x'}-topic`,
       sourceType: 'topic-recall',
-      type: 'Topic Recall',
+      type: 'Algorithm Card',
       cancer: task?.cancer || 'Today',
       topic: task?.topic || 'Today topic',
       front: `${task?.topic || 'Today topic'} 的核心考點是什麼？`,
@@ -1221,7 +1292,7 @@ function buildTopicRecallCards(task) {
     {
       id: `recall-${task?.id || 'x'}-trial`,
       sourceType: 'topic-recall',
-      type: 'Golden Trial',
+      type: 'Trial Card',
       cancer: task?.cancer || 'Today',
       topic: task?.topic || 'Golden trial',
       front: `${firstTrial} 的 population / endpoint / implication？`,
@@ -1230,7 +1301,7 @@ function buildTopicRecallCards(task) {
     {
       id: `recall-${task?.id || 'x'}-focus`,
       sourceType: 'topic-recall',
-      type: 'Focus Tags',
+      type: 'Algorithm Card',
       cancer: task?.cancer || 'Today',
       topic: task?.topic || 'Focus',
       front: `今天 ${task?.module || task?.cancer || 'topic'} 要主動回想哪些 focus tags？`,
@@ -1239,7 +1310,7 @@ function buildTopicRecallCards(task) {
     {
       id: `recall-${task?.id || 'x'}-algorithm`,
       sourceType: 'topic-recall',
-      type: 'Algorithm Recall',
+      type: 'Algorithm Card',
       cancer: task?.cancer || 'Today',
       topic: task?.topic || 'Algorithm',
       front: `${task?.topic || 'Today topic'} 的 treatment sequencing / algorithm 怎麼走？`,
@@ -1248,7 +1319,7 @@ function buildTopicRecallCards(task) {
     {
       id: `recall-${task?.id || 'x'}-trap`,
       sourceType: 'topic-recall',
-      type: 'Exam Trap',
+      type: 'Trap Card',
       cancer: task?.cancer || 'Today',
       topic: task?.topic || 'Exam trap',
       front: `${secondTrial} 或今日主題最容易被考成什麼陷阱？`,
@@ -2937,7 +3008,7 @@ function FlashcardsPanel({
   const [cardPromptMessage, setCardPromptMessage] = useState('');
   const [editingCardId, setEditingCardId] = useState(null);
   const allFlashcards = getFlashcardList(state);
-  const trialCards = allFlashcards.filter((card) => card.sourceType === 'trial');
+  const trialCards = allFlashcards.filter((card) => card.sourceType === 'trial' || card.type === 'Trial Card');
   const weakCards = allFlashcards.filter((card) => (card.mastery || 0) <= 2);
 
   const submitTrialCard = () => {
@@ -3029,30 +3100,13 @@ ${stat.wrongNotes || ''}
       .join('\n\n---\n\n');
 
     const prompt = `
-你是一位 hematology-oncology board exam coach。請根據以下錯題與 due questions 資料，幫我產生高品質 Anki-style flashcards。
+你是一位 hematology-oncology board exam coach。請根據以下錯題與 due questions 資料，產生高分導向 flashcards。
 
 請只輸出 JSON array，不要加 markdown，不要加說明文字。
 
-每張卡格式如下：
-{
-  "front": "...",
-  "back": "...",
-  "type": "Basic" | "Trial" | "Cloze" | "Exam Trap" | "Toxicity" | "Biomarker",
-  "cancer": "...",
-  "topic": "...",
-  "sourceQuestionId": "...",
-  "tags": ["...", "..."]
-}
+${FLASHCARD_SCHEMA_PROMPT}
 
-製卡規則：
-1. 不要把整個題目貼到 front。
-2. 每張卡只測一個核心知識點。
-3. 優先產生 trial endpoint、patient population、biomarker cutoff、toxicity、contraindication、exam trap。
-4. Trial card 必須包含：population、regimen、endpoint、key result、board trap。
-5. Cloze card 適合數字、cutoff、duration、HR、PFS/OS。
-6. 每題產生 2–4 張卡。
-7. 醫學名詞與藥名保留英文，其餘用繁體中文。
-8. back 要 concise，但要足夠讓我考前複習。
+請優先抽出可轉移的 decision rule，不要把「題目放正面、選項放背面」。每題產生 2–4 張卡，優先涵蓋 pivotal trial、treatment sequencing、cutoff/duration/endpoint、常見錯選項。
 
 以下是錯題與 due questions 來源資料：
 
@@ -3117,29 +3171,13 @@ ${sourceText}
       .join('\n---\n');
 
     const prompt = `
-你是一位 hematology-oncology board exam coach。請根據以下 trial list 與錯題來源，產生高品質 Trial Cards。
+你是一位 hematology-oncology board exam coach。請根據以下 trial list 與錯題來源，產生高分導向 flashcards。
 
 請只輸出 JSON array，不要加 markdown，不要加說明文字。
 
-每張卡格式如下：
-{
-  "front": "...",
-  "back": "...",
-  "type": "Trial",
-  "cancer": "...",
-  "topic": "...",
-  "sourceQuestionId": "...",
-  "tags": ["trial", "..."]
-}
+${FLASHCARD_SCHEMA_PROMPT}
 
-每個 trial 至少產生 1–2 張卡。Trial card 的 back 必須包含：
-- Disease setting / population
-- Regimen / comparator
-- Primary endpoint
-- Key result
-- Board exam trap
-
-醫學名詞與藥名保留英文，其餘用繁體中文。
+每個 pivotal trial 至少產生 1–2 張卡。優先使用 Trial Card；若來源題目包含治療順序、數字 cutoff、或錯選項陷阱，可另外產生 Algorithm Card、Cloze Card、Trap Card。
 
 Trial sources:
 
@@ -3193,11 +3231,11 @@ ${trialText || '目前沒有符合條件的 trial 來源。'}
 
       <div className="subsection import-card-panel">
         <h3>Import Flashcards</h3>
-        <p className="muted">貼上 ChatGPT 產生的 JSON array；每張卡至少需要 front/back。</p>
+        <p className="muted">貼上 ChatGPT 產生的 JSON array；每張卡至少需要 front/back，建議使用 Trial / Algorithm / Cloze / Trap Card schema。</p>
         <textarea
           value={importJson}
           onChange={(e) => setImportJson(e.target.value)}
-          placeholder={'[\n  {\n    "front": "T-DM1 和 T-DXd 的 linker / bystander effect 差異？",\n    "back": "T-DM1：non-cleavable linker；T-DXd：cleavable linker，bystander effect 明顯。",\n    "type": "Exam Trap",\n    "cancer": "Breast",\n    "topic": "ADC",\n    "sourceQuestionId": "114-Q081",\n    "tags": ["ADC", "T-DM1", "T-DXd"]\n  }\n]'}
+          placeholder={'[\n  {\n    "front": "PACIFIC trial 的 P/I/C/O 與主要考試陷阱是什麼？",\n    "back": "Population: unresectable stage III NSCLC，完成 definitive concurrent platinum-based CCRT 後未 progression。Intervention: durvalumab consolidation。Comparator: placebo。Outcome: improved PFS and OS。Trap: 不是 CCRT 同時加 durvalumab，而是 CCRT 後 consolidation。",\n    "type": "Trial Card",\n    "cancer": "Lung",\n    "topic": "Unresectable stage III NSCLC",\n    "sourceQuestionId": "Day-3",\n    "trial": ["PACIFIC"],\n    "tags": ["PACIFIC", "durvalumab", "CCRT", "stage III NSCLC", "OS", "PFS"],\n    "examValue": 5,\n    "errorType": "Trial confusion"\n  }\n]'}
         />
         <div className="inline-actions">
           <button className="primary" onClick={submitImport}>Import Cards</button>
@@ -3275,6 +3313,8 @@ function FlashcardCard({
       topic: draft.topic,
       trial: splitEditableList(draft.trial),
       tags: splitEditableList(draft.tags),
+      examValue: normalizeExamValue(draft.examValue),
+      errorType: normalizeFlashcardErrorType(draft.errorType),
     });
     onCancelEdit();
   };
@@ -3289,10 +3329,12 @@ function FlashcardCard({
     <article className="flashcard-card">
       <div className="question-top">
         <div>
+          <span className="pill">{card.type || 'Flashcard'}</span>
           <span className="pill">{card.cancer}</span>
           <span className="pill soft">{card.topic}</span>
           {card.trial?.map((trial) => <span className="pill trial" key={trial}>{trial}</span>)}
           {card.tags?.map((tag) => <span className="pill tag" key={tag}>{tag}</span>)}
+          {card.examValue >= 4 && <span className="priority high">EV{card.examValue}</span>}
         </div>
         <span className="priority">M{card.mastery || 0}</span>
       </div>
@@ -3301,10 +3343,12 @@ function FlashcardCard({
           <label>Front<textarea value={draft.front} onChange={(e) => setDraft((prev) => ({ ...prev, front: e.target.value }))} /></label>
           <label>Back<textarea value={draft.back} onChange={(e) => setDraft((prev) => ({ ...prev, back: e.target.value }))} /></label>
           <div className="flashcard-editor-grid">
-            <label>Type<input value={draft.type} onChange={(e) => setDraft((prev) => ({ ...prev, type: e.target.value }))} /></label>
+            <label>Type<select value={draft.type} onChange={(e) => setDraft((prev) => ({ ...prev, type: e.target.value }))}>{FLASHCARD_TYPE_OPTIONS.map((type) => <option value={type} key={type}>{type}</option>)}</select></label>
             <label>Cancer<input value={draft.cancer} onChange={(e) => setDraft((prev) => ({ ...prev, cancer: e.target.value }))} /></label>
             <label>Topic<input value={draft.topic} onChange={(e) => setDraft((prev) => ({ ...prev, topic: e.target.value }))} /></label>
             <label>Trial names<input value={draft.trial} onChange={(e) => setDraft((prev) => ({ ...prev, trial: e.target.value }))} placeholder="PACIFIC, KEYNOTE-671" /></label>
+            <label>Exam value<input type="number" min="1" max="5" value={draft.examValue} onChange={(e) => setDraft((prev) => ({ ...prev, examValue: e.target.value }))} /></label>
+            <label>Error type<select value={draft.errorType} onChange={(e) => setDraft((prev) => ({ ...prev, errorType: e.target.value }))}>{ERROR_TYPE_OPTIONS.map((errorType) => <option value={errorType} key={errorType}>{errorType}</option>)}</select></label>
           </div>
           <label>Tags<input value={draft.tags} onChange={(e) => setDraft((prev) => ({ ...prev, tags: e.target.value }))} placeholder="trial, endpoint, NSCLC" /></label>
           <div className="inline-actions">
@@ -3337,11 +3381,13 @@ function makeFlashcardEditDraft(card) {
   return {
     front: card.front || '',
     back: card.back || '',
-    type: card.type || '',
+    type: normalizeFlashcardType(card.type, card.sourceType),
     cancer: card.cancer || '',
     topic: card.topic || '',
     trial: normalizeTextList(card.trial).join(', '),
     tags: normalizeTextList(card.tags).join(', '),
+    examValue: normalizeExamValue(card.examValue),
+    errorType: normalizeFlashcardErrorType(card.errorType),
   };
 }
 
@@ -3381,6 +3427,8 @@ function FlashcardReviewPanel({ dueFlashcards, allFlashcards, onReviewCard, onUp
       topic: draft.topic,
       trial: splitEditableList(draft.trial),
       tags: splitEditableList(draft.tags),
+      examValue: normalizeExamValue(draft.examValue),
+      errorType: normalizeFlashcardErrorType(draft.errorType),
     });
     setEditing(false);
   };
@@ -3422,6 +3470,7 @@ function FlashcardReviewPanel({ dueFlashcards, allFlashcards, onReviewCard, onUp
               <span className="pill soft">{card.topic}</span>
               {card.trial?.map((trial) => <span className="pill trial" key={trial}>{trial}</span>)}
               {card.tags?.map((tag) => <span className="pill tag" key={tag}>{tag}</span>)}
+              {card.examValue >= 4 && <span className="priority high">EV{card.examValue}</span>}
             </div>
             <span className="priority">{activeIndex + 1}/{queue.length} · M{card.mastery || 0}</span>
           </div>
@@ -3430,10 +3479,12 @@ function FlashcardReviewPanel({ dueFlashcards, allFlashcards, onReviewCard, onUp
               <label>Front<textarea value={draft.front} onChange={(e) => setDraft((prev) => ({ ...prev, front: e.target.value }))} /></label>
               <label>Back<textarea value={draft.back} onChange={(e) => setDraft((prev) => ({ ...prev, back: e.target.value }))} /></label>
               <div className="flashcard-editor-grid">
-                <label>Type<input value={draft.type} onChange={(e) => setDraft((prev) => ({ ...prev, type: e.target.value }))} /></label>
+                <label>Type<select value={draft.type} onChange={(e) => setDraft((prev) => ({ ...prev, type: e.target.value }))}>{FLASHCARD_TYPE_OPTIONS.map((type) => <option value={type} key={type}>{type}</option>)}</select></label>
                 <label>Cancer<input value={draft.cancer} onChange={(e) => setDraft((prev) => ({ ...prev, cancer: e.target.value }))} /></label>
                 <label>Topic<input value={draft.topic} onChange={(e) => setDraft((prev) => ({ ...prev, topic: e.target.value }))} /></label>
                 <label>Trial names<input value={draft.trial} onChange={(e) => setDraft((prev) => ({ ...prev, trial: e.target.value }))} placeholder="PACIFIC, KEYNOTE-671" /></label>
+                <label>Exam value<input type="number" min="1" max="5" value={draft.examValue} onChange={(e) => setDraft((prev) => ({ ...prev, examValue: e.target.value }))} /></label>
+                <label>Error type<select value={draft.errorType} onChange={(e) => setDraft((prev) => ({ ...prev, errorType: e.target.value }))}>{ERROR_TYPE_OPTIONS.map((errorType) => <option value={errorType} key={errorType}>{errorType}</option>)}</select></label>
               </div>
               <label>Tags<input value={draft.tags} onChange={(e) => setDraft((prev) => ({ ...prev, tags: e.target.value }))} placeholder="trial, endpoint, NSCLC" /></label>
               <div className="inline-actions review-actions">
@@ -3891,9 +3942,10 @@ export default function App() {
         if (!item?.front || !item?.back) {
           throw new Error(`第 ${index + 1} 張卡缺少 front/back。`);
         }
+        const type = normalizeFlashcardType(item.type, item.sourceType);
         return {
           id: `fc-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`,
-          sourceType: item.sourceType || (String(item.type || '').toLowerCase().includes('trial') ? 'trial' : 'manual'),
+          sourceType: item.sourceType || (type === 'Trial Card' ? 'trial' : 'manual'),
           sourceId: item.sourceQuestionId || item.sourceId || null,
           sourceQuestionId: item.sourceQuestionId || item.sourceId || null,
           cancer: item.cancer || 'Imported',
@@ -3903,11 +3955,13 @@ export default function App() {
           cloze: item.cloze || '',
           trial: normalizeTextList(item.trial),
           tags: normalizeTextList(item.tags),
+          examValue: normalizeExamValue(item.examValue),
+          errorType: normalizeFlashcardErrorType(item.errorType),
           intervalDays: 1,
           nextReviewDate: TODAY,
           mastery: 0,
           difficulty: item.difficulty || 3,
-          type: item.type || 'Imported',
+          type,
           createdAt: now,
           updatedAt: now,
         };
@@ -4774,7 +4828,7 @@ export default function App() {
             <MetricCard label="今日建議" value={`Day ${Math.min(planSummary.completed + 1, 100)}`} sub="照順序推進，錯題用 Review Queue 補強" />
             <MetricCard label="Game level" value={`Lv ${state.game?.level || 1}`} sub={`${state.game?.xp || 0} XP`} />
             <MetricCard label="Boss defeated" value={(state.game?.defeatedBosses || []).length} sub={`${(state.game?.unlockedBosses || []).length} unlocked`} />
-            <MetricCard label="Trial cards" value={getFlashcardList(state).filter((card) => card.sourceType === 'trial').length} sub="Trial Boss target 50" />
+            <MetricCard label="Trial cards" value={getFlashcardList(state).filter((card) => card.sourceType === 'trial' || card.type === 'Trial Card').length} sub="Trial Boss target 50" />
           </section>
 
           <section className="plan-progress-panel" aria-label="100-Day Plan completion progress">
