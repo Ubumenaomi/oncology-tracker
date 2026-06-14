@@ -88,6 +88,7 @@ const defaultState = {
   mockExams: [],
   flashcards: {},
   flashcardStats: {},
+  deletedFlashcardIds: {},
   game: {
     xp: 0,
     level: 1,
@@ -394,6 +395,10 @@ function saveState(state) {
 
 function mergeCloudState(localState, cloudState) {
   if (!cloudState) return normalizeState({ ...defaultState, ...localState });
+  const deletedFlashcardIds = {
+    ...(cloudState.deletedFlashcardIds || {}),
+    ...(localState.deletedFlashcardIds || {}),
+  };
 
   return normalizeState({
     ...defaultState,
@@ -440,7 +445,8 @@ function mergeCloudState(localState, cloudState) {
       ...(cloudState.mockExams || []),
       ...(localState.mockExams || []),
     ].filter((exam, index, exams) => exam?.id && exams.findIndex((x) => x.id === exam.id) === index),
-    flashcards: mergeFlashcardMaps(cloudState.flashcards, localState.flashcards),
+    deletedFlashcardIds,
+    flashcards: mergeFlashcardMaps(cloudState.flashcards, localState.flashcards, deletedFlashcardIds),
     flashcardStats: {
       ...(cloudState.flashcardStats || {}),
       ...(localState.flashcardStats || {}),
@@ -529,11 +535,15 @@ function normalizeFlashcardStats(stats = {}, flashcards = {}) {
   return normalized;
 }
 
-function mergeFlashcardMaps(cloudFlashcards = {}, localFlashcards = {}) {
-  return {
+function removeDeletedFlashcardRecords(records = {}, deletedFlashcardIds = {}) {
+  return Object.fromEntries(Object.entries(records || {}).filter(([id]) => !deletedFlashcardIds[id]));
+}
+
+function mergeFlashcardMaps(cloudFlashcards = {}, localFlashcards = {}, deletedFlashcardIds = {}) {
+  return removeDeletedFlashcardRecords({
     ...normalizeFlashcards(cloudFlashcards),
     ...normalizeFlashcards(localFlashcards),
-  };
+  }, deletedFlashcardIds);
 }
 
 function getFlashcardList(stateOrFlashcards = {}, statsOverride = null) {
@@ -625,6 +635,8 @@ function normalizeState(state) {
     streak: Math.max(game.streak || 0, state?.player?.streak || 0),
     badges: [...new Set([...(game.badges || []), ...(state?.player?.badges || [])])],
   };
+  const deletedFlashcardIds = state?.deletedFlashcardIds || {};
+  const flashcards = removeDeletedFlashcardRecords(normalizeFlashcards(state?.flashcards), deletedFlashcardIds);
   return {
     ...defaultState,
     ...state,
@@ -637,8 +649,9 @@ function normalizeState(state) {
     questionOverrides: state?.questionOverrides || {},
     customQuestions: state?.customQuestions || {},
     deletedQuestionIds: state?.deletedQuestionIds || {},
-    flashcards: normalizeFlashcards(state?.flashcards),
-    flashcardStats: normalizeFlashcardStats(state?.flashcardStats, state?.flashcards),
+    deletedFlashcardIds,
+    flashcards,
+    flashcardStats: normalizeFlashcardStats(removeDeletedFlashcardRecords(state?.flashcardStats, deletedFlashcardIds), flashcards),
     game: { ...game, xp, level: xpLevel(xp), streak: player.streak, badges: player.badges },
     player,
   };
@@ -3875,6 +3888,10 @@ export default function App() {
         ...prev,
         flashcards: nextCards,
         flashcardStats: nextStats,
+        deletedFlashcardIds: {
+          ...(prev.deletedFlashcardIds || {}),
+          [cardId]: new Date().toISOString(),
+        },
       };
     });
   };
