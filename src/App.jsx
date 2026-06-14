@@ -84,7 +84,6 @@ const FLASHCARD_RATINGS = {
 };
 
 const XP_RULES = {
-  dailyComplete: 30,
   stageClear: 100,
   planTask: 50,
   wrongAgainRecovery: 80,
@@ -93,6 +92,43 @@ const XP_RULES = {
   fullMock75: 300,
   wrongRetest90: 300,
 };
+
+const PRACTICE_MODES = {
+  minimum: {
+    label: '保底',
+    shortLabel: '保底 15 題',
+    total: 15,
+    newCount: 7,
+    topicCount: 3,
+    dueCount: 3,
+    weaknessCount: 2,
+    xp: 40,
+  },
+  standard: {
+    label: '標準',
+    shortLabel: '標準 30 題',
+    total: 30,
+    newCount: 15,
+    topicCount: 6,
+    dueCount: 5,
+    weaknessCount: 4,
+    xp: 90,
+  },
+  sprint: {
+    label: '衝刺',
+    shortLabel: '衝刺 40 題',
+    total: 40,
+    newCount: 18,
+    topicCount: 8,
+    dueCount: 8,
+    weaknessCount: 6,
+    xp: 140,
+  },
+};
+
+function getPracticeModeConfig(mode) {
+  return PRACTICE_MODES[mode] || PRACTICE_MODES.standard;
+}
 
 const TODAY = (() => {
   const d = new Date();
@@ -124,7 +160,8 @@ const defaultState = {
   sessions: {},
   stats: {},
   settings: {
-    dailyCount: 12,
+    dailyCount: 30,
+    practiceMode: 'standard',
     preferredYears: [112, 113, 114],
     preferredCancers: [],
   },
@@ -710,6 +747,7 @@ function normalizeState(state) {
     settings: {
       ...defaultState.settings,
       ...(state?.settings || {}),
+      practiceMode: PRACTICE_MODES[state?.settings?.practiceMode] ? state.settings.practiceMode : 'standard',
     },
     dailyQuestProgress: state?.dailyQuestProgress || {},
     bossProgress: state?.bossProgress || {},
@@ -1022,7 +1060,8 @@ function sortBossWeaknessRows(a, b) {
 }
 
 function generateDailyQuestionIds(state, task = getTodayPlanTask(state)) {
-  const { dailyCount, preferredYears, preferredCancers } = state.settings;
+  const { preferredYears, preferredCancers } = state.settings;
+  const modeConfig = getPracticeModeConfig(state.settings?.practiceMode);
 
   const pool = getQuestionPool(state)
     .map((q) => getQuestionWithOverride(q.id, state))
@@ -1039,8 +1078,16 @@ function generateDailyQuestionIds(state, task = getTodayPlanTask(state)) {
     .filter((item) => questionMatchesTask(item.q, task))
     .sort((a, b) => b.taskScore - a.taskScore);
 
-  const due = withStats.filter(({ stat }) => stat.nextReviewDate && stat.nextReviewDate <= TODAY);
-  const highWrong = withStats.filter(({ stat }) => stat.wrong > 0 && wrongRate(stat) >= 50);
+  const due = withStats
+    .filter(({ stat }) => stat.nextReviewDate && stat.nextReviewDate <= TODAY)
+    .sort((a, b) => wrongRate(b.stat) - wrongRate(a.stat) || String(a.stat.nextReviewDate || '').localeCompare(String(b.stat.nextReviewDate || '')));
+  const weaknessTrap = withStats
+    .map((item) => ({ ...item, taskScore: scoreQuestionForTask(item.q, task) }))
+    .filter(({ stat }) => stat.wrong > 0 || stat.bookmarked || (stat.highConfidenceWrong || 0) > 0 || (stat.repeatedWrong || 0) > 0)
+    .sort((a, b) => (b.stat.highConfidenceWrong || 0) - (a.stat.highConfidenceWrong || 0)
+      || (b.stat.repeatedWrong || 0) - (a.stat.repeatedWrong || 0)
+      || wrongRate(b.stat) - wrongRate(a.stat)
+      || b.taskScore - a.taskScore);
   const newQuestions = withStats.filter(({ stat }) => (stat.attempts || 0) === 0);
   const bookmarked = withStats.filter(({ stat }) => stat.bookmarked);
   const regular = withStats.filter(({ stat }) => (stat.attempts || 0) > 0 && !(stat.nextReviewDate && stat.nextReviewDate <= TODAY) && !(stat.wrong > 0 && wrongRate(stat) >= 50));
@@ -1069,51 +1116,37 @@ function generateDailyQuestionIds(state, task = getTodayPlanTask(state)) {
 
   const used = new Set();
   const result = [];
-  const topicalCount = Math.max(3, Math.ceil(dailyCount * 0.45));
-  result.push(...pickOrdered(topical, topicalCount, used));
 
-  const readiness = getReadinessMetrics(state);
-  let dueRatio = 0.4;
-  let wrongRatio = 0.3;
-  let newRatio = 0.2;
-  let bookmarkRatio = 0.1;
+  result.push(...pickUnique(newQuestions, modeConfig.newCount, used));
+  result.push(...pickOrdered(topical, modeConfig.topicCount, used));
+  result.push(...pickOrdered(due, modeConfig.dueCount, used));
+  result.push(...pickOrdered(weaknessTrap, modeConfig.weaknessCount, used));
 
-  if (readiness.predictedScore < 70) {
-    dueRatio = 0.2;
-    wrongRatio = 0.3;
-    newRatio = 0.5;
-    bookmarkRatio = 0;
-  } else if (readiness.predictedScore >= 70 && readiness.predictedScore < 80) {
-    dueRatio = 0.35;
-    wrongRatio = 0.3;
-    newRatio = 0.25;
-    bookmarkRatio = 0.1;
-  } else if (readiness.predictedScore >= 80) {
-    dueRatio = 0.3;
-    wrongRatio = 0.4;
-    newRatio = 0.2;
-    bookmarkRatio = 0.1;
+  while (result.length < modeConfig.total) {
+    const before = result.length;
+    result.push(...pickUnique(newQuestions, 1, used));
+    if (result.length >= modeConfig.total) break;
+    result.push(...pickOrdered(topical, 1, used));
+    if (result.length === before) break;
   }
 
-  const dueCount = Math.ceil(dailyCount * dueRatio);
-  const wrongCount = Math.ceil(dailyCount * wrongRatio);
-  const newCount = Math.ceil(dailyCount * newRatio);
-  const bookmarkCount = Math.max(0, dailyCount - dueCount - wrongCount - newCount, Math.floor(dailyCount * bookmarkRatio));
-
-  result.push(...pickUnique(due.filter(({ q }) => questionMatchesTask(q, task)), Math.ceil(dueCount / 2), used));
-  result.push(...pickUnique(highWrong.filter(({ q }) => questionMatchesTask(q, task)), Math.ceil(wrongCount / 2), used));
-  result.push(...pickUnique(newQuestions.filter(({ q }) => questionMatchesTask(q, task)), Math.ceil(newCount / 2), used));
-  result.push(...pickUnique(due, dueCount, used));
-  result.push(...pickUnique(highWrong, wrongCount, used));
-  result.push(...pickUnique(newQuestions, newCount, used));
-  result.push(...pickUnique(bookmarked, bookmarkCount, used));
-
-  if (result.length < dailyCount) {
-    const remaining = dailyCount - result.length;
-    result.push(...pickUnique(regular, remaining, used));
+  if (result.length < modeConfig.total) {
+    result.push(...pickOrdered(due, modeConfig.total - result.length, used));
+  }
+  if (result.length < modeConfig.total) {
+    result.push(...pickOrdered(weaknessTrap, modeConfig.total - result.length, used));
+  }
+  if (result.length < modeConfig.total) {
+    result.push(...pickUnique(bookmarked, modeConfig.total - result.length, used));
+  }
+  if (result.length < modeConfig.total) {
+    result.push(...pickUnique(regular, modeConfig.total - result.length, used));
+  }
+  if (result.length < modeConfig.total) {
+    result.push(...pickUnique(withStats, modeConfig.total - result.length, used));
   }
 
-  return result.slice(0, dailyCount);
+  return result.slice(0, modeConfig.total);
 }
 
 const BOSS_DEFINITIONS = [
@@ -1624,6 +1657,26 @@ function MetricCard({ label, value, sub }) {
       <div className="metric-label">{label}</div>
       <div className="metric-value">{value}</div>
       {sub && <div className="metric-sub">{sub}</div>}
+    </div>
+  );
+}
+
+function PracticeModeSelector({ value, onChange, compact = false }) {
+  return (
+    <div className={compact ? 'practice-mode compact' : 'practice-mode'}>
+      <span>今日練習模式</span>
+      <div className="practice-mode-options" role="group" aria-label="今日練習模式">
+        {Object.entries(PRACTICE_MODES).map(([key, mode]) => (
+          <button
+            key={key}
+            type="button"
+            className={value === key ? 'active' : ''}
+            onClick={() => onChange(key)}
+          >
+            {mode.shortLabel}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -4125,6 +4178,10 @@ export default function App() {
   const todayCompleted = todaySessionMatchesQuest && todayIds.length > 0 && todayIds.every((id) => todaySession?.practiceDrafts?.[id]?.rated);
   const questProgress = getDailyQuestProgress(state, TODAY, baseQuestTask, todayCompleted);
   const questTask = studyPlan100.find((task) => task.id === questProgress.planTaskId) || baseQuestTask;
+  const selectedPracticeMode = state.settings?.practiceMode || 'standard';
+  const selectedPracticeConfig = getPracticeModeConfig(selectedPracticeMode);
+  const todayPracticeMode = todaySession?.practiceMode || selectedPracticeMode;
+  const todayPracticeConfig = getPracticeModeConfig(todayPracticeMode);
   const questRecallCards = useMemo(() => getQuestMemoryCards(state, questTask), [state, questTask]);
   const questBossChallenges = useMemo(() => buildBossChallenges(questTask, state), [questTask, state]);
 
@@ -4165,6 +4222,7 @@ export default function App() {
 
   const createTodaySession = ({ force = false } = {}) => {
     const ids = generateDailyQuestionIds(state, questTask);
+    const modeConfig = getPracticeModeConfig(state.settings?.practiceMode);
     updateState((prev) => {
       const existing = prev.sessions?.[TODAY];
       const existingMatchesQuest = Number(existing?.planTaskId) === Number(questTask.id);
@@ -4177,6 +4235,15 @@ export default function App() {
             date: TODAY,
             planTaskId: questTask.id,
             planTopic: questTask.topic,
+            practiceMode: state.settings?.practiceMode || 'standard',
+            practiceModeLabel: modeConfig.shortLabel,
+            practiceRecipe: {
+              total: modeConfig.total,
+              newCount: modeConfig.newCount,
+              topicCount: modeConfig.topicCount,
+              dueCount: modeConfig.dueCount,
+              weaknessCount: modeConfig.weaknessCount,
+            },
             questionIds: ids,
             createdAt: new Date().toISOString(),
             completed: false,
@@ -4197,7 +4264,7 @@ export default function App() {
         [TODAY]: { ...(prev.sessions?.[TODAY] || {}), planTaskId: questTask.id, planTopic: questTask.topic, completed: true },
       },
       game: {
-        ...awardXp(prev.game || defaultState.game, XP_RULES.dailyComplete, 'Daily 10-15 questions completed', { date: TODAY }),
+        ...awardXp(prev.game || defaultState.game, getPracticeModeConfig(prev.sessions?.[TODAY]?.practiceMode).xp, `${getPracticeModeConfig(prev.sessions?.[TODAY]?.practiceMode).shortLabel} Daily Practice completed`, { date: TODAY, practiceMode: prev.sessions?.[TODAY]?.practiceMode || 'standard' }),
         streak: (prev.game?.streak || 0) + 1,
         dailyClaims: { ...(prev.game?.dailyClaims || {}), [TODAY]: true },
       },
@@ -4532,6 +4599,11 @@ export default function App() {
     updateState((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } }));
   };
 
+  const setPracticeMode = (practiceMode) => {
+    const modeConfig = getPracticeModeConfig(practiceMode);
+    updateSettings({ practiceMode, dailyCount: modeConfig.total });
+  };
+
   const exportBackup = () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -4569,7 +4641,8 @@ export default function App() {
           <p>112–114 腫專考古題、mixed mock、confidence calibration、critical error queue、≥80 分預測。</p>
         </div>
         <div className="header-actions">
-          <button className="primary" onClick={() => createTodaySession()}>產生今日 10–15 題</button>
+          <PracticeModeSelector value={selectedPracticeMode} onChange={setPracticeMode} compact />
+          <button className="primary" onClick={() => createTodaySession()}>產生今日 Daily Practice</button>
           <button className="secondary" onClick={() => setAiPromptOpen(!aiPromptOpen)}>AI Review Prompt</button>
         </div>
       </header>
@@ -4723,9 +4796,14 @@ export default function App() {
           <div className="section-head">
             <div>
               <h2>今日練習：{TODAY}</h2>
-              <p className="muted">每日建議 10–15 題。系統會優先抽 100-Day Plan 今日主題，再補到期複習題、高錯誤率題與新題。</p>
+              <p className="muted">
+                {todayQuestions.length
+                  ? `${todayPracticeConfig.shortLabel}：New ${todayPracticeConfig.newCount} / Topic ${todayPracticeConfig.topicCount} / Due ${todayPracticeConfig.dueCount} / Weakness ${todayPracticeConfig.weaknessCount}`
+                  : `${selectedPracticeConfig.shortLabel}：New ${selectedPracticeConfig.newCount} / Topic ${selectedPracticeConfig.topicCount} / Due ${selectedPracticeConfig.dueCount} / Weakness ${selectedPracticeConfig.weaknessCount}`}
+              </p>
             </div>
             <div className="inline-actions">
+              <PracticeModeSelector value={selectedPracticeMode} onChange={setPracticeMode} />
               <button className="secondary" onClick={regenerateTodaySession}>重新抽題</button>
               <button className="good" disabled={!todayCompleted || state.game?.dailyClaims?.[TODAY]} onClick={claimDailyCompletion}>
                 {state.game?.dailyClaims?.[TODAY] ? '今日 XP 已領取' : '領取每日 XP'}
@@ -4736,8 +4814,8 @@ export default function App() {
           {!todayQuestions.length ? (
             <div className="empty-state">
               <h3>今天尚未產生題目</h3>
-              <p>按下「產生今日 10–15 題」開始。若你已有大量錯題，系統會自動提高錯題複習比例。</p>
-              <button className="primary" onClick={() => createTodaySession()}>產生今日題目</button>
+              <p>選擇今日練習模式後，按同一個按鈕產生固定比例的 New / Topic / Due / Weakness 題組。</p>
+              <button className="primary" onClick={() => createTodaySession()}>產生今日 Daily Practice</button>
             </div>
           ) : (
             <div className="question-list">
@@ -4943,8 +5021,9 @@ export default function App() {
           <h2>Settings / Backup</h2>
           <div className="settings-grid">
             <label>
-              每日題數
-              <input name="dailyCount" type="number" min="10" max="15" value={state.settings.dailyCount} onChange={(e) => updateSettings({ dailyCount: Math.max(10, Math.min(15, Number(e.target.value))) })} />
+              Practice Mode
+              <PracticeModeSelector value={selectedPracticeMode} onChange={setPracticeMode} />
+              <span className="muted">目前模式會產生 {selectedPracticeConfig.total} 題，完成後獎勵 {selectedPracticeConfig.xp} XP。</span>
             </label>
             <label>
               年份篩選
