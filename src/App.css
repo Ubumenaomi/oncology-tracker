@@ -39,6 +39,59 @@ h3 { margin: 0 0 8px; }
 .file-button input { display: none; }
 .link-button { border: 0; background: transparent; color: var(--primary); font-weight: 700; padding: 0; margin-right: 8px; }
 
+.practice-mode {
+  display: grid;
+  gap: 6px;
+  align-items: center;
+}
+
+.practice-mode > span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.app-header .practice-mode > span {
+  color: #dbeafe;
+}
+
+.practice-mode-options {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #cbd5e1;
+  border-radius: 16px;
+  background: #f8fafc;
+}
+
+.app-header .practice-mode-options {
+  border-color: rgba(219, 234, 254, 0.35);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.practice-mode-options button {
+  border: 0;
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.app-header .practice-mode-options button {
+  color: #dbeafe;
+}
+
+.practice-mode-options button.active {
+  background: var(--primary);
+  color: #ffffff;
+}
+
+.practice-mode.compact {
+  min-width: 310px;
+}
+
 .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 18px 0; }
 .metric-card { background: var(--panel); border: 1px solid var(--line); border-radius: 22px; padding: 18px; box-shadow: var(--shadow); }
 .metric-label { color: var(--muted); font-size: 13px; }
@@ -174,6 +227,9 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.5; }
   .metrics-grid { grid-template-columns: 1fr; }
   .question-top { flex-direction: column; align-items: flex-start; }
   .answer-row > * { width: 100%; }
+  .practice-mode.compact { min-width: 0; width: 100%; }
+  .practice-mode-options { flex-wrap: wrap; }
+  .practice-mode-options button { flex: 1 1 88px; }
   .primary, .secondary, .good, .bad, .danger, .file-button { width: 100%; }
 }
 
