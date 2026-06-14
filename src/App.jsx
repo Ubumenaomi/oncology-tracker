@@ -27,6 +27,49 @@ const ERROR_TYPE_OPTIONS = [
   'Overconfidence',
 ];
 
+const ERROR_TYPE_REMEDIATION = {
+  'Knowledge gap': {
+    task: 'Guideline / core table review',
+    cardType: 'Core Table Card',
+    action: '回 guideline 與核心表格，把缺口整理成一張核心整理卡。',
+  },
+  'Trial confusion': {
+    task: 'Trial Card',
+    cardType: 'Trial Card',
+    action: '建立或複習 Trial Card：population、intervention、endpoint、OS/PFS 與適用情境。',
+  },
+  'Biomarker cutoff': {
+    task: 'Cloze Card',
+    cardType: 'Cloze Card',
+    action: '把 cutoff、threshold、duration 或數字做成填空卡。',
+  },
+  'Treatment sequence': {
+    task: 'Algorithm Card',
+    cardType: 'Algorithm Card',
+    action: '把一線/二線/維持/術前術後順序整理成流程卡。',
+  },
+  'Misread question': {
+    task: 'Question-reading reminder',
+    cardType: 'Exam Trap Card',
+    action: '補一條審題提醒：否定詞、例外條件、疾病期別、line of therapy。',
+  },
+  Toxicity: {
+    task: 'Toxicity comparison',
+    cardType: 'Toxicity Card',
+    action: '整理 AE、contraindication、dose hold/discontinue 的比較表。',
+  },
+  'Guideline outdated': {
+    task: 'Latest guideline check',
+    cardType: 'Guideline Update Card',
+    action: '標記需更新 NCCN / ESMO / ASCO，補上新舊標準差異。',
+  },
+  Overconfidence: {
+    task: 'High-confidence wrong audit',
+    cardType: 'Exam Trap Card',
+    action: '回看為什麼很有把握卻錯，寫成陷阱提醒與重測題。',
+  },
+};
+
 const FLASHCARD_RATINGS = {
   Again: { interval: 1, masteryDelta: -1 },
   Hard: { interval: 3, masteryDelta: 0 },
@@ -861,6 +904,13 @@ function wrongRate(stat) {
   return Math.round((stat.wrong / stat.attempts) * 100);
 }
 
+function getRemediationForErrorType(errorType) {
+  return ERROR_TYPE_REMEDIATION[errorType] || {
+    task: 'Targeted correction task',
+    cardType: 'Exam Trap Card',
+    action: '把錯因整理成一張可重測的補救卡。',
+  };
+}
 
 function nextIntervalByRating(rating, stat) {
   const current = stat.intervalDays || 1;
@@ -1577,7 +1627,11 @@ function buildAiPrompt(state) {
     .sort((a, b) => wrongRate(b.stat) - wrongRate(a.stat) || b.stat.wrong - a.stat.wrong)
     .slice(0, 15);
 
-  return `你是一位 hematology-oncology board exam coach。請根據以下腫瘤內科專科醫師考題練習紀錄，幫我做 AI review。\n\n要求輸出：\n1. 弱點總結\n2. 高錯誤率癌別與 trial\n3. 每個弱點的補救讀書任務\n4. 10 題 fellow-level MCQ 題目\n5. 3 題 oral board style question\n6. 明天應該優先複習的題目與主題\n\n我的錯題/標記題：\n${weak.map(({ q, stat }) => `- ${q.id} | ${q.cancer} | ${q.topic} | wrong rate ${wrongRate(stat)}% | attempts ${stat.attempts} | trials: ${(q.trials || []).join(', ') || 'none'} | note: ${stat.wrongNotes || 'none'} | stem: ${q.stem}`).join('\n')}`;
+  return `你是一位 hematology-oncology board exam coach。請根據以下腫瘤內科專科醫師考題練習紀錄，幫我做 AI review。\n\n要求輸出：\n1. 弱點總結\n2. 高錯誤率癌別與 trial\n3. 每個弱點的補救讀書任務，需依 error type 指派 Trial Card / Cloze Card / Algorithm Card / Toxicity comparison / guideline update 等\n4. 10 題 fellow-level MCQ 題目\n5. 3 題 oral board style question\n6. 明天應該優先複習的題目與主題\n\n我的錯題/標記題：\n${weak.map(({ q, stat }) => {
+    const errorType = stat.lastErrorType || stat.errorTypes?.[stat.errorTypes.length - 1] || 'none';
+    const remediation = stat.lastRemediationTask?.task || (errorType !== 'none' ? getRemediationForErrorType(errorType).task : 'none');
+    return `- ${q.id} | ${q.cancer} | ${q.topic} | wrong rate ${wrongRate(stat)}% | attempts ${stat.attempts} | error type: ${errorType} | repair: ${remediation} | trials: ${(q.trials || []).join(', ') || 'none'} | note: ${stat.wrongNotes || 'none'} | stem: ${q.stem}`;
+  }).join('\n')}`;
 }
 
 function MetricCard({ label, value, sub }) {
@@ -1685,6 +1739,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
 
   const answerIsSingleChoice = /^[A-E]$/.test(String(correctAnswer || '').trim().toUpperCase());
   const isCorrectSelection = selected && answerIsSingleChoice && selected === String(correctAnswer).trim().toUpperCase();
+  const selectedErrorRemediation = errorType ? getRemediationForErrorType(errorType) : null;
 
   const recordRating = (rating) => {
     if (practiceMode && practiceDraft?.rated) {
@@ -1698,6 +1753,11 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
     const isCorrect = answerIsSingleChoice && selected === String(correctAnswer).trim().toUpperCase();
     const newCorrect = previous.correct + (isCorrect ? 1 : 0);
     const newWrong = previous.wrong + (isCorrect ? 0 : 1);
+
+    if (!isCorrect && !errorType) {
+      setFeedback('答錯題必須先選擇 Error type，才能送出評分並排入補救任務。');
+      return;
+    }
 
     const ratingScoreMap = { Again: 4, Hard: 3, Good: 2, Easy: 1 };
     const score = ratingScoreMap[rating] || 3;
@@ -1713,6 +1773,15 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
     const interval = nextIntervalByRating(rating, previous);
     const normalizedConfidence = Number(confidence) || 3;
     const wasPreviouslyWrong = (previous.wrong || 0) > 0;
+    const remediation = isCorrect ? null : getRemediationForErrorType(errorType);
+    const remediationEvent = remediation ? {
+      date: TODAY,
+      questionId: question.id,
+      errorType,
+      task: remediation.task,
+      cardType: remediation.cardType,
+      action: remediation.action,
+    } : null;
     const answerEvent = {
       date: TODAY,
       mode: practiceMode ? 'daily' : 'review',
@@ -1722,6 +1791,8 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
       confidence: normalizedConfidence,
       rating,
       errorType: isCorrect ? '' : errorType,
+      remediationTask: remediation?.task || '',
+      remediationCardType: remediation?.cardType || '',
     };
 
     onUpdateStat(question.id, {
@@ -1749,9 +1820,11 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
       wrongRetestAttempts: (previous.wrongRetestAttempts || 0) + (wasPreviouslyWrong ? 1 : 0),
       wrongRetestCorrect: (previous.wrongRetestCorrect || 0) + (wasPreviouslyWrong && isCorrect ? 1 : 0),
       errorTypes: isCorrect || !errorType ? (previous.errorTypes || []) : [...(previous.errorTypes || []), errorType].slice(-20),
+      lastRemediationTask: remediationEvent || previous.lastRemediationTask || null,
+      remediationTasks: remediationEvent ? [remediationEvent, ...(previous.remediationTasks || [])].slice(0, 20) : (previous.remediationTasks || []),
     });
 
-    setFeedback(`紀錄：${rating}，下次複習 ${interval} 天後`);
+    setFeedback(`紀錄：${rating}，下次複習 ${interval} 天後${remediation ? `。補救任務：${remediation.task}` : ''}`);
 
     // Mark practiceDraft as rated so UI/logic won't double-record
     if (practiceMode && onPracticeChange) {
@@ -1892,6 +1965,12 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                     </select>
                   </label>
                 )}
+                {!isCorrectSelection && selectedErrorRemediation && (
+                  <div className="remediation-preview">
+                    <strong>{selectedErrorRemediation.task}</strong>
+                    <span>{selectedErrorRemediation.action}</span>
+                  </div>
+                )}
                 <label>
                   Mastery
                   <select value={stat.mastery || 0} onChange={(e) => onUpdateStat(question.id, { ...stat, mastery: Number(e.target.value) })}>
@@ -2018,6 +2097,8 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
 
       <div className="stats-line">
         attempts {stat.attempts} · correct {stat.correct} · wrong {stat.wrong} · wrong rate {wrongRate(stat)}% · high-confidence wrong {stat.highConfidenceWrong || 0} · next review {stat.nextReviewDate || 'not scheduled'}
+        {stat.lastErrorType && <> · last error {stat.lastErrorType}</>}
+        {stat.lastRemediationTask?.task && <> · repair {stat.lastRemediationTask.task}</>}
       </div>
     </article>
   );
@@ -3075,6 +3156,8 @@ Wrong: ${stat.wrong}
 Wrong rate: ${wrongRate(stat)}%
 Mastery: ${stat.mastery}
 Bookmarked: ${stat.bookmarked ? 'yes' : 'no'}
+Last error type: ${stat.lastErrorType || stat.errorTypes?.[stat.errorTypes.length - 1] || 'none'}
+Recommended remediation: ${stat.lastRemediationTask?.task || (stat.lastErrorType ? getRemediationForErrorType(stat.lastErrorType).task : 'none')}
 
 Stem:
 ${q.stem || ''}
@@ -4364,6 +4447,18 @@ export default function App() {
     .filter(({ q, stat }) => q && (stat.wrong > 0 || stat.bookmarked))
     .sort((a, b) => wrongRate(b.stat) - wrongRate(a.stat) || b.stat.wrong - a.stat.wrong), [state]);
 
+  const remediationQueue = useMemo(() => weakQuestions
+    .map(({ q, stat }) => {
+      const errorType = stat.lastErrorType || stat.errorTypes?.[stat.errorTypes.length - 1] || '';
+      const remediation = stat.lastRemediationTask || (errorType ? {
+        errorType,
+        ...getRemediationForErrorType(errorType),
+      } : null);
+      return remediation ? { q, stat, remediation } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => wrongRate(b.stat) - wrongRate(a.stat) || b.stat.wrong - a.stat.wrong), [weakQuestions]);
+
   const summary = useMemo(() => {
     const stats = Object.values(state.stats);
     const attempts = stats.reduce((s, x) => s + (x.attempts || 0), 0);
@@ -4785,7 +4880,20 @@ export default function App() {
       {tab === 'review' && (
         <main className="panel">
           <h2>Review Queue</h2>
-          <p className="muted">優先順序：今日到期 → 錯誤率 ≥50% → 已標記題目 → 未練新題。</p>
+          <p className="muted">優先順序：錯因補救任務 → 今日到期 → 錯誤率 ≥50% → 已標記題目 → 未練新題。</p>
+          <div className="subsection">
+            <h3>錯因補救任務</h3>
+            {remediationQueue.length === 0 ? <p className="muted">答錯並選擇 Error type 後，這裡會自動排入 Trial Card、Cloze Card、Algorithm Card 等補救任務。</p> : remediationQueue.slice(0, 20).map(({ q, stat, remediation }) => (
+              <div className="remediation-row" key={`${q.id}-${remediation.errorType || remediation.task}`}>
+                <div>
+                  <strong>{q.id}</strong> · {q.cancer} · {q.topic} · wrong rate {wrongRate(stat)}%
+                  <p>{remediation.errorType || stat.lastErrorType} → {remediation.task}</p>
+                  <span>{remediation.action}</span>
+                </div>
+                <span className="pill tag">{remediation.cardType}</span>
+              </div>
+            ))}
+          </div>
           <div className="subsection">
             <h3>今日到期複習</h3>
             {dueReview.length === 0 ? <p className="muted">目前沒有到期題目。</p> : dueReview.slice(0, 30).map(({ q, stat }) => (
