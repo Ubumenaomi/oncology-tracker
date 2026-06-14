@@ -908,6 +908,39 @@ function questionMatchesTask(question, task, minScore = 120) {
   return hasTaskSpecificHit && scoreQuestionForTask(question, task) >= minScore;
 }
 
+function getBossWeaknessTier(question, task) {
+  if (!question || !task) return 0;
+  const questionText = getQuestionContentText(question);
+  const taskTopicText = [
+    task.topic,
+    task.details,
+    ...(task.goldenTrials || []),
+  ].filter(Boolean).join(' ').toLowerCase();
+  const topicWords = taskTopicText
+    .split(/[^a-z0-9]+/i)
+    .filter((word) => word.length >= 3 && !['and', 'the', 'with', 'for', 'from'].includes(word));
+  const topicWordHits = topicWords.filter((word) => questionText.includes(word)).length;
+  const trialHits = (task.goldenTrials || []).filter((trial) => questionText.includes(String(trial).toLowerCase())).length;
+  const focusHits = (task.focusTags || []).filter((tag) => questionText.includes(String(tag).toLowerCase())).length;
+  const topicHit = Boolean(
+    question.topic
+    && getTaskSearchText(task).includes(String(question.topic).toLowerCase())
+  );
+
+  if (trialHits > 0 || topicHit || topicWordHits >= 2) return 1;
+  if (focusHits > 0) return 2;
+  if (question.cancer === task.cancer) return 3;
+  return 0;
+}
+
+function sortBossWeaknessRows(a, b) {
+  return a.bossTier - b.bossTier
+    || (b.stat.highConfidenceWrong || 0) - (a.stat.highConfidenceWrong || 0)
+    || (b.stat.repeatedWrong || 0) - (a.stat.repeatedWrong || 0)
+    || wrongRate(b.stat) - wrongRate(a.stat)
+    || b.taskScore - a.taskScore;
+}
+
 function generateDailyQuestionIds(state, task = getTodayPlanTask(state)) {
   const { dailyCount, preferredYears, preferredCancers } = state.settings;
 
@@ -1260,20 +1293,29 @@ function getWeaknessQuestion(state, task) {
   const rows = getQuestionPool(state)
     .map((q) => ({ q: getQuestionWithOverride(q.id, state), stat: getStat(state, q.id) }))
     .filter(({ q }) => q)
-    .map((row) => ({ ...row, taskScore: scoreQuestionForTask(row.q, task) }))
-    .filter(({ q, stat }) => (
-      questionMatchesTask(q, task)
+    .map((row) => ({
+      ...row,
+      taskScore: scoreQuestionForTask(row.q, task),
+      bossTier: getBossWeaknessTier(row.q, task),
+    }))
+    .filter(({ stat, bossTier }) => (
+      bossTier > 0
     ) && ((stat.wrong || 0) > 0 || (stat.highConfidenceWrong || 0) > 0 || (stat.repeatedWrong || 0) > 0))
-    .sort((a, b) => (b.stat.highConfidenceWrong || 0) - (a.stat.highConfidenceWrong || 0) || wrongRate(b.stat) - wrongRate(a.stat) || b.taskScore - a.taskScore);
+    .sort(sortBossWeaknessRows);
 
   if (rows[0]) return rows[0].q;
 
   return getQuestionPool(state)
     .map((q) => getQuestionWithOverride(q.id, state))
     .filter(Boolean)
-    .map((q) => ({ q, taskScore: scoreQuestionForTask(q, task) }))
-    .filter(({ q }) => questionMatchesTask(q, task))
-    .sort((a, b) => b.taskScore - a.taskScore)[0]?.q || null;
+    .map((q) => ({
+      q,
+      stat: getStat(state, q.id),
+      taskScore: scoreQuestionForTask(q, task),
+      bossTier: getBossWeaknessTier(q, task),
+    }))
+    .filter(({ bossTier }) => bossTier > 0)
+    .sort(sortBossWeaknessRows)[0]?.q || null;
 }
 
 function buildBossChallenges(task, state) {
