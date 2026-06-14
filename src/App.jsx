@@ -169,6 +169,8 @@ const PRACTICE_MODES = {
   },
 };
 
+const PRACTICE_PAGE_SIZE = 10;
+
 function getPracticeModeConfig(mode) {
   return PRACTICE_MODES[mode] || PRACTICE_MODES.standard;
 }
@@ -1109,13 +1111,15 @@ function sortBossWeaknessRows(a, b) {
     || b.taskScore - a.taskScore;
 }
 
-function generateDailyQuestionIds(state, task = getTodayPlanTask(state)) {
+function generateDailyQuestionIds(state, task = getTodayPlanTask(state), excludedIds = []) {
   const { preferredYears, preferredCancers } = state.settings;
   const modeConfig = getPracticeModeConfig(state.settings?.practiceMode);
+  const excluded = new Set(excludedIds);
 
   const pool = getQuestionPool(state)
     .map((q) => getQuestionWithOverride(q.id, state))
     .filter(Boolean)
+    .filter((q) => !excluded.has(q.id))
     .filter((q) => {
       const yearOk = !preferredYears || preferredYears.length === 0 || preferredYears.includes(Number(q.year));
       const cancerOk = !preferredCancers || preferredCancers.length === 0 || preferredCancers.includes(q.cancer);
@@ -3000,6 +3004,8 @@ function QuestPanel({
   recallCards,
   bossChallenges,
   onCreatePractice,
+  practiceMode,
+  onPracticeModeChange,
   onMarkRecall,
   onSetBossResult,
   onClaimStageClear,
@@ -3075,6 +3081,9 @@ function QuestPanel({
             <strong>{star.done ? '⭐' : '☆'} {star.title}</strong>
             <p>{star.text}</p>
             {star.action && <button className="secondary" onClick={star.action}>{star.actionText}</button>}
+            {star.key === 'practice' && (
+              <PracticeModeSelector value={practiceMode} onChange={onPracticeModeChange} />
+            )}
           </div>
         ))}
       </section>
@@ -3877,6 +3886,7 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState('尚未登入，資料目前只存在這台裝置。');
   const [syncError, setSyncError] = useState('');
   const [isApplyingCloudState, setIsApplyingCloudState] = useState(false);
+  const [practicePage, setPracticePage] = useState(0);
 
   useEffect(() => {
     saveState(state);
@@ -4265,6 +4275,9 @@ export default function App() {
   const selectedPracticeConfig = getPracticeModeConfig(selectedPracticeMode);
   const todayPracticeMode = todaySession?.practiceMode || selectedPracticeMode;
   const todayPracticeConfig = getPracticeModeConfig(todayPracticeMode);
+  const currentPracticePage = Math.min(practicePage, Math.max(0, Math.ceil(todayQuestions.length / PRACTICE_PAGE_SIZE) - 1));
+  const visibleTodayQuestions = todayQuestions.slice(currentPracticePage * PRACTICE_PAGE_SIZE, (currentPracticePage + 1) * PRACTICE_PAGE_SIZE);
+  const totalPracticePages = Math.ceil(todayPracticeConfig.total / PRACTICE_PAGE_SIZE);
   const questRecallCards = useMemo(() => getQuestMemoryCards(state, questTask), [state, questTask]);
   const questBossChallenges = useMemo(() => buildBossChallenges(questTask, state), [questTask, state]);
 
@@ -4304,17 +4317,23 @@ export default function App() {
   }, []);
 
   const createTodaySession = ({ force = false } = {}) => {
-    const ids = generateDailyQuestionIds(state, questTask);
     const modeConfig = getPracticeModeConfig(state.settings?.practiceMode);
     updateState((prev) => {
       const existing = prev.sessions?.[TODAY];
       const existingMatchesQuest = Number(existing?.planTaskId) === Number(questTask.id);
-      if (!force && existing?.questionIds?.length && existingMatchesQuest) return prev;
+      const existingQuestionIds = existingMatchesQuest ? (existing?.questionIds || []) : [];
+      const generatedIds = generateDailyQuestionIds(prev, questTask, force ? [] : existingQuestionIds);
+      const targetCount = force ? modeConfig.total : Math.min(modeConfig.total, Math.max(PRACTICE_PAGE_SIZE, existingQuestionIds.length));
+      const questionIds = force
+        ? generatedIds
+        : [...existingQuestionIds, ...generatedIds].filter((id, index, ids) => ids.indexOf(id) === index).slice(0, targetCount);
+      if (!force && existingQuestionIds.length >= targetCount && existingMatchesQuest) return prev;
       return {
         ...prev,
         sessions: {
           ...prev.sessions,
           [TODAY]: {
+            ...(force ? {} : existing),
             date: TODAY,
             planTaskId: questTask.id,
             planTopic: questTask.topic,
@@ -4327,15 +4346,54 @@ export default function App() {
               dueCount: modeConfig.dueCount,
               weaknessCount: modeConfig.weaknessCount,
             },
-            questionIds: ids,
-            createdAt: new Date().toISOString(),
+            questionIds,
+            createdAt: force || !existing?.createdAt ? new Date().toISOString() : existing.createdAt,
+            updatedAt: new Date().toISOString(),
             completed: false,
-            practiceDrafts: {},
+            practiceDrafts: force ? {} : (existing?.practiceDrafts || {}),
           },
         },
       };
     });
+    setPracticePage(0);
     setTab('today');
+  };
+
+  const loadNextPracticePage = () => {
+    const nextPage = currentPracticePage + 1;
+    const requiredCount = Math.min(todayPracticeConfig.total, (nextPage + 1) * PRACTICE_PAGE_SIZE);
+    if (todayQuestions.length >= requiredCount) {
+      setPracticePage(nextPage);
+      return;
+    }
+    if (todayQuestions.length >= todayPracticeConfig.total) return;
+
+    updateState((prev) => {
+      const existing = prev.sessions?.[TODAY];
+      const existingMatchesQuest = Number(existing?.planTaskId) === Number(questTask.id);
+      if (!existingMatchesQuest) return prev;
+      const existingQuestionIds = existing?.questionIds || [];
+      const targetCount = Math.min(todayPracticeConfig.total, (nextPage + 1) * PRACTICE_PAGE_SIZE);
+      const generatedIds = generateDailyQuestionIds(prev, questTask, existingQuestionIds);
+      const questionIds = [...existingQuestionIds, ...generatedIds]
+        .filter((id, index, ids) => ids.indexOf(id) === index)
+        .slice(0, targetCount);
+      if (questionIds.length <= existingQuestionIds.length) return prev;
+
+      return {
+        ...prev,
+        sessions: {
+          ...(prev.sessions || {}),
+          [TODAY]: {
+            ...existing,
+            questionIds,
+            completed: false,
+            updatedAt: new Date().toISOString(),
+          },
+        },
+      };
+    });
+    setPracticePage(nextPage);
   };
 
   const claimDailyCompletion = () => {
@@ -4696,7 +4754,36 @@ export default function App() {
 
   const setPracticeMode = (practiceMode) => {
     const modeConfig = getPracticeModeConfig(practiceMode);
-    updateSettings({ practiceMode, dailyCount: modeConfig.total });
+    updateState((prev) => {
+      const existing = prev.sessions?.[TODAY];
+      const existingMatchesQuest = Number(existing?.planTaskId) === Number(questTask.id);
+      return {
+        ...prev,
+        settings: {
+          ...prev.settings,
+          practiceMode,
+          dailyCount: modeConfig.total,
+        },
+        sessions: {
+          ...(prev.sessions || {}),
+          ...(existingMatchesQuest ? {
+            [TODAY]: {
+              ...existing,
+              practiceMode,
+              practiceModeLabel: modeConfig.shortLabel,
+              practiceRecipe: {
+                total: modeConfig.total,
+                newCount: modeConfig.newCount,
+                topicCount: modeConfig.topicCount,
+                dueCount: modeConfig.dueCount,
+                weaknessCount: modeConfig.weaknessCount,
+              },
+              updatedAt: new Date().toISOString(),
+            },
+          } : {}),
+        },
+      };
+    });
   };
 
   const exportBackup = () => {
@@ -4736,7 +4823,6 @@ export default function App() {
           <p>112–114 腫專考古題、mixed mock、confidence calibration、critical error queue、≥80 分預測。</p>
         </div>
         <div className="header-actions">
-          <PracticeModeSelector value={selectedPracticeMode} onChange={setPracticeMode} compact />
           <button className="primary" onClick={() => createTodaySession()}>產生今日 Daily Practice</button>
           <button className="secondary" onClick={() => setAiPromptOpen(!aiPromptOpen)}>AI Review Prompt</button>
         </div>
@@ -4808,6 +4894,8 @@ export default function App() {
           recallCards={questRecallCards}
           bossChallenges={questBossChallenges}
           onCreatePractice={createTodaySession}
+          practiceMode={selectedPracticeMode}
+          onPracticeModeChange={setPracticeMode}
           onMarkRecall={markQuestRecall}
           onSetBossResult={setQuestBossResult}
           onClaimStageClear={claimStageClear}
@@ -4898,7 +4986,6 @@ export default function App() {
               </p>
             </div>
             <div className="inline-actions">
-              <PracticeModeSelector value={selectedPracticeMode} onChange={setPracticeMode} />
               <button className="secondary" onClick={regenerateTodaySession}>重新抽題</button>
               <button className="good" disabled={!todayCompleted || state.game?.dailyClaims?.[TODAY]} onClick={claimDailyCompletion}>
                 {state.game?.dailyClaims?.[TODAY] ? '今日 XP 已領取' : '領取每日 XP'}
@@ -4913,20 +5000,32 @@ export default function App() {
               <button className="primary" onClick={() => createTodaySession()}>產生今日 Daily Practice</button>
             </div>
           ) : (
-            <div className="question-list">
-              {todayQuestions.map((q) => (
-                <QuestionCard
-                  key={`${todaySession?.createdAt || TODAY}-${q.id}`}
-                  question={q}
-                  stat={getStat(state, q.id)}
-                  onUpdateStat={updateStat}
-                  hideAnswerUntilSubmit
-                  practiceMode
-                  practiceDraft={todaySession?.practiceDrafts?.[q.id]}
-                  onPracticeChange={(patch) => updatePracticeDraft(q.id, patch)}
-                />
-              ))}
-            </div>
+            <>
+              <div className="practice-page-toolbar">
+                <strong>第 {currentPracticePage + 1} 頁 / 共 {totalPracticePages} 頁</strong>
+                <span>目前已載入 {todayQuestions.length}/{todayPracticeConfig.total} 題，每頁 10 題。</span>
+              </div>
+              <div className="question-list">
+                {visibleTodayQuestions.map((q) => (
+                  <QuestionCard
+                    key={`${todaySession?.createdAt || TODAY}-${q.id}`}
+                    question={q}
+                    stat={getStat(state, q.id)}
+                    onUpdateStat={updateStat}
+                    hideAnswerUntilSubmit
+                    practiceMode
+                    practiceDraft={todaySession?.practiceDrafts?.[q.id]}
+                    onPracticeChange={(patch) => updatePracticeDraft(q.id, patch)}
+                  />
+                ))}
+              </div>
+              <div className="practice-page-actions">
+                <button className="secondary" disabled={currentPracticePage === 0} onClick={() => setPracticePage(Math.max(0, currentPracticePage - 1))}>上一頁</button>
+                <button className="primary" disabled={currentPracticePage + 1 >= totalPracticePages} onClick={loadNextPracticePage}>
+                  {todayQuestions.length < Math.min(todayPracticeConfig.total, (currentPracticePage + 2) * PRACTICE_PAGE_SIZE) ? '下一頁並補題' : '下一頁'}
+                </button>
+              </div>
+            </>
           )}
         </main>
       )}

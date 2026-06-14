@@ -109,6 +109,29 @@ h3 { margin: 0 0 8px; }
 .empty-state { background: var(--panel-soft); border: 1px dashed #cbd5e1; border-radius: 22px; padding: 28px; text-align: center; }
 
 .question-list { display: grid; gap: 14px; }
+.practice-page-toolbar,
+.practice-page-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 14px 0;
+}
+
+.practice-page-toolbar {
+  color: var(--muted);
+  font-weight: 750;
+}
+
+.practice-page-toolbar strong {
+  color: var(--text);
+}
+
+.practice-page-actions {
+  justify-content: flex-end;
+}
+
 .question-card { border: 1px solid var(--line); background: #fff; border-radius: 22px; padding: 16px; }
 .question-top { display: flex; justify-content: space-between; gap: 10px; align-items: center; margin-bottom: 10px; }
 .qid { font-weight: 850; margin-right: 8px; }
@@ -878,6 +901,10 @@ button.tiny,
   margin: 0;
   color: var(--muted);
   line-height: 1.5;
+}
+
+.quest-star .practice-mode {
+  margin-top: 2px;
 }
 
 .quest-star.done,
