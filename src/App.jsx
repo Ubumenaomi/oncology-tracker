@@ -141,30 +141,33 @@ const PRACTICE_MODES = {
     label: '保底',
     shortLabel: '保底 15 題',
     total: 15,
-    newCount: 7,
+    newCount: 4,
     topicCount: 3,
     dueCount: 3,
     weaknessCount: 2,
+    highYieldCount: 3,
     xp: 40,
   },
   standard: {
     label: '標準',
     shortLabel: '標準 30 題',
     total: 30,
-    newCount: 15,
+    newCount: 9,
     topicCount: 6,
     dueCount: 5,
     weaknessCount: 4,
+    highYieldCount: 6,
     xp: 90,
   },
   sprint: {
     label: '衝刺',
     shortLabel: '衝刺 40 題',
     total: 40,
-    newCount: 18,
+    newCount: 12,
     topicCount: 8,
     dueCount: 8,
     weaknessCount: 6,
+    highYieldCount: 6,
     xp: 140,
   },
 };
@@ -174,6 +177,126 @@ const PRACTICE_PAGE_SIZE = 10;
 function getPracticeModeConfig(mode) {
   return PRACTICE_MODES[mode] || PRACTICE_MODES.standard;
 }
+
+const HIGH_YIELD_TOPICS = [
+  {
+    id: 'lung-perioperative-io',
+    label: 'Lung perioperative IO',
+    cancer: 'Lung',
+    type: '每年高頻＋近年更新',
+    examFrequency: 5,
+    recentUpdate: 5,
+    aliases: ['perioperative', 'neoadjuvant', 'adjuvant', 'pembrolizumab', 'nivolumab', 'atezolizumab', 'checkmate 816', 'keynote-671', 'impower010'],
+  },
+  {
+    id: 'breast-adc',
+    label: 'Breast ADC',
+    cancer: 'Breast',
+    type: '每年高頻＋近年更新',
+    examFrequency: 5,
+    recentUpdate: 5,
+    aliases: ['adc', 't-dxd', 'trastuzumab deruxtecan', 'sacituzumab', 'her2-low', 'destiny-breast', 'trop2'],
+  },
+  {
+    id: 'gu-ev-pembro',
+    label: 'GU EV/pembro',
+    cancer: 'GU',
+    type: '每年高頻＋近年更新',
+    examFrequency: 5,
+    recentUpdate: 5,
+    aliases: ['enfortumab', 'ev', 'pembrolizumab', 'urothelial', 'ev-302', 'javelin', 'fgfr'],
+  },
+  {
+    id: 'gyn-io',
+    label: 'GYN IO',
+    cancer: 'GYN',
+    type: '每年高頻＋近年更新',
+    examFrequency: 5,
+    recentUpdate: 5,
+    aliases: ['endometrial', 'cervical', 'dmmr', 'pmmr', 'dostarlimab', 'pembrolizumab', 'keynote-a18', 'keynote-775', 'ruby'],
+  },
+  {
+    id: 'crc-algorithm',
+    label: 'CRC algorithm',
+    cancer: 'GI',
+    type: '常考 algorithm',
+    examFrequency: 4,
+    recentUpdate: 3,
+    aliases: ['crc', 'colon', 'rectal', 'ras', 'braf', 'msi', 'her2', 'anti-egfr', 'folfox', 'folfiri', 'tnt'],
+  },
+  {
+    id: 'hcc-algorithm',
+    label: 'HCC algorithm',
+    cancer: 'GI',
+    type: '常考 algorithm',
+    examFrequency: 4,
+    recentUpdate: 4,
+    aliases: ['hcc', 'atezo', 'bevacizumab', 'stride', 'himalaya', 'imbrave', 'durvalumab', 'tremelimumab'],
+  },
+  {
+    id: 'mcrpc-algorithm',
+    label: 'mCRPC',
+    cancer: 'GU',
+    type: '常考 algorithm',
+    examFrequency: 4,
+    recentUpdate: 4,
+    aliases: ['mcrpc', 'prostate', 'parpi', 'lu-177', 'psma', 'cabazitaxel', 'abiraterone', 'enzalutamide'],
+  },
+  {
+    id: 'rcc-algorithm',
+    label: 'RCC algorithm',
+    cancer: 'GU',
+    type: '常考 algorithm',
+    examFrequency: 4,
+    recentUpdate: 4,
+    aliases: ['rcc', 'renal', 'keynote-564', 'io/tki', 'checkmate-9er', 'clear', 'cabozantinib', 'lenvatinib'],
+  },
+  {
+    id: 'ici-toxicity',
+    label: 'ICI toxicity',
+    cancer: 'Supportive/Stats',
+    type: '支持性治療 / toxicity',
+    examFrequency: 3,
+    recentUpdate: 3,
+    aliases: ['ici', 'irae', 'pneumonitis', 'colitis', 'hepatitis', 'endocrine', 'myocarditis', 'toxicity'],
+  },
+  {
+    id: 'adc-ild',
+    label: 'ADC ILD',
+    cancer: 'Supportive/Stats',
+    type: '支持性治療 / toxicity',
+    examFrequency: 3,
+    recentUpdate: 5,
+    aliases: ['adc', 'ild', 'pneumonitis', 't-dxd', 'trastuzumab deruxtecan', 'enfortumab', 'sacituzumab'],
+  },
+  {
+    id: 'febrile-neutropenia',
+    label: 'Febrile neutropenia',
+    cancer: 'Supportive/Stats',
+    type: '支持性治療 / toxicity',
+    examFrequency: 3,
+    recentUpdate: 2,
+    aliases: ['febrile neutropenia', 'neutropenic fever', 'anc', 'mascc', 'g-csf', 'infection'],
+  },
+  {
+    id: 'rare-sarcoma-cup-hereditary',
+    label: 'Sarcoma / CUP / MEN / VHL',
+    cancer: 'Other',
+    type: '低頻但會考',
+    examFrequency: 2,
+    recentUpdate: 2,
+    aliases: ['sarcoma', 'cup', 'men', 'vhl', 'gist', 'net', 'thyroid', 'ihc', 'rare'],
+  },
+  {
+    id: 'epidemiology-background',
+    label: 'Epidemiology background',
+    cancer: 'Other',
+    type: '純背景知識',
+    examFrequency: 1,
+    recentUpdate: 1,
+    aliases: ['epidemiology', 'incidence', 'mortality', 'risk factor', 'screening'],
+  },
+];
 
 const TODAY = (() => {
   const d = new Date();
@@ -438,6 +561,18 @@ const weaknessPlanTasks = Array.from({ length: 15 }, (_, index) => ({
   priority: 'High',
 }));
 
+function getTaskHighYieldWeight({ cancer, topic, details, focusTags = [], goldenTrials = [] }) {
+  const text = [cancer, topic, details, ...focusTags, ...goldenTrials].join(' ').toLowerCase();
+  const matched = HIGH_YIELD_TOPICS.filter((item) => (
+    item.cancer === cancer
+    || item.aliases.some((alias) => text.includes(String(alias).toLowerCase()))
+  ));
+  if (matched.length) return Math.max(...matched.map((item) => item.examFrequency));
+  if (String(topic || '').toLowerCase().includes('toxicity') || focusTags.includes('toxicity')) return 3;
+  if (['Other', 'Rare/Skin/Sarcoma/CUP/Other'].includes(cancer) || focusTags.includes('rare')) return 2;
+  return 3;
+}
+
 function buildStudyPlan100() {
   const tasks = [];
   const moduleOrder = ['Lung', 'Breast', 'GI', 'GU', 'GYN', 'Head & Neck', 'Heme', 'Rare/Skin/Sarcoma/CUP/Other', 'Supportive/Emergency/Stats'];
@@ -458,6 +593,7 @@ function buildStudyPlan100() {
         details,
         goldenTrials,
         focusTags,
+        highYieldWeight: getTaskHighYieldWeight({ cancer: module.cancer, topic, details, focusTags, goldenTrials }),
         requiredQuestionIds: [],
         bossUnlockContribution: module.bossUnlockContribution,
         priority: focusTags.includes('boss') || focusTags.includes('weakness repair') ? 'High' : 'High',
@@ -478,6 +614,7 @@ function buildStudyPlan100() {
       details,
       goldenTrials,
       focusTags,
+      highYieldWeight: getTaskHighYieldWeight({ cancer, topic, details, focusTags, goldenTrials }),
       requiredQuestionIds: [],
       bossUnlockContribution,
       priority: 'High',
@@ -500,6 +637,7 @@ function buildStudyPlan100() {
       details,
       goldenTrials,
       focusTags,
+      highYieldWeight: getTaskHighYieldWeight({ cancer: 'Final Review', topic, details, focusTags, goldenTrials }),
       requiredQuestionIds: [],
       bossUnlockContribution: 'Final Board Boss',
       priority: 'High',
@@ -1036,6 +1174,65 @@ function getQuestionPromptText(question) {
   ].filter(Boolean).join(' ').toLowerCase();
 }
 
+function questionMatchesHighYieldTopic(question, highYieldTopic) {
+  if (!question || !highYieldTopic) return false;
+  const questionText = getQuestionContentText(question);
+  const aliases = highYieldTopic.aliases || [];
+  const cancerMatch = question.cancer === highYieldTopic.cancer
+    || (highYieldTopic.cancer === 'Supportive/Stats' && ['Supportive/Stats', 'Other'].includes(question.cancer));
+  const aliasHit = aliases.some((alias) => questionText.includes(String(alias).toLowerCase()));
+  return aliasHit || (cancerMatch && aliases.some((alias) => String(question.topic || '').toLowerCase().includes(String(alias).toLowerCase())));
+}
+
+function getQuestionHighYieldTopics(question) {
+  return HIGH_YIELD_TOPICS.filter((topic) => questionMatchesHighYieldTopic(question, topic));
+}
+
+function getHighYieldTopicQuestionStats(state, highYieldTopic) {
+  const rows = getQuestionPool(state)
+    .map((q) => getQuestionWithOverride(q.id, state))
+    .filter((q) => q && questionMatchesHighYieldTopic(q, highYieldTopic))
+    .map((q) => ({ q, stat: getStat(state, q.id) }));
+  const attempts = rows.reduce((sum, row) => sum + (row.stat.attempts || 0), 0);
+  const wrong = rows.reduce((sum, row) => sum + (row.stat.wrong || 0), 0);
+  const lastDates = rows
+    .map((row) => row.stat.lastAttemptAt)
+    .filter(Boolean)
+    .sort();
+  return {
+    total: rows.length,
+    attempts,
+    wrongRateFactor: attempts ? Math.max(1, wrong / attempts) : 1,
+    daysSinceReview: lastDates.length ? Math.max(1, daysBetween(lastDates[lastDates.length - 1], TODAY)) : 30,
+  };
+}
+
+function scoreHighYieldTopic(state, highYieldTopic) {
+  const stats = getHighYieldTopicQuestionStats(state, highYieldTopic);
+  const recencyFactor = Math.min(3, Math.log2(stats.daysSinceReview + 1));
+  return Math.round(
+    highYieldTopic.examFrequency
+    * highYieldTopic.recentUpdate
+    * stats.wrongRateFactor
+    * recencyFactor
+    * 10
+  ) / 10;
+}
+
+function getRankedHighYieldTopics(state, task = null) {
+  return HIGH_YIELD_TOPICS
+    .map((topic) => {
+      const mainlineBonus = task && (topic.cancer === task.cancer || getTaskSearchText(task).includes(topic.label.toLowerCase())) ? 1.25 : 1;
+      const score = Math.round(scoreHighYieldTopic(state, topic) * mainlineBonus * 10) / 10;
+      return { ...topic, priorityScore: score };
+    })
+    .sort((a, b) => b.priorityScore - a.priorityScore || b.examFrequency - a.examFrequency || b.recentUpdate - a.recentUpdate);
+}
+
+function formatPracticeRecipe(config) {
+  return `New ${config.newCount} / Topic ${config.topicCount} / Due ${config.dueCount} / Weakness ${config.weaknessCount} / High-yield ${config.highYieldCount || 0}`;
+}
+
 function getCancerAliases(cancer) {
   const aliases = {
     Breast: ['breast', '乳癌'],
@@ -1115,6 +1312,7 @@ function generateDailyQuestionIds(state, task = getTodayPlanTask(state), exclude
   const { preferredYears, preferredCancers } = state.settings;
   const modeConfig = getPracticeModeConfig(state.settings?.practiceMode);
   const excluded = new Set(excludedIds);
+  const highYieldTopicIds = new Set(getRankedHighYieldTopics(state, task).slice(0, 5).map((topic) => topic.id));
 
   const pool = getQuestionPool(state)
     .map((q) => getQuestionWithOverride(q.id, state))
@@ -1142,6 +1340,22 @@ function generateDailyQuestionIds(state, task = getTodayPlanTask(state), exclude
       || (b.stat.repeatedWrong || 0) - (a.stat.repeatedWrong || 0)
       || wrongRate(b.stat) - wrongRate(a.stat)
       || b.taskScore - a.taskScore);
+  const highYield = withStats
+    .map((item) => {
+      const matchedTopics = getQuestionHighYieldTopics(item.q).filter((topic) => highYieldTopicIds.has(topic.id));
+      const topicScore = matchedTopics.reduce((max, topic) => Math.max(max, scoreHighYieldTopic(state, topic)), 0);
+      const personalScore = 1
+        + wrongRate(item.stat) / 100
+        + ((item.stat.highConfidenceWrong || 0) * 0.5)
+        + Math.min(1, daysBetween(item.stat.lastAttemptAt, TODAY) / 30);
+      return {
+        ...item,
+        highYieldScore: Math.round(topicScore * personalScore * 10) / 10,
+        matchedTopics,
+      };
+    })
+    .filter((item) => item.matchedTopics.length > 0)
+    .sort((a, b) => b.highYieldScore - a.highYieldScore || wrongRate(b.stat) - wrongRate(a.stat));
   const newQuestions = withStats.filter(({ stat }) => (stat.attempts || 0) === 0);
   const bookmarked = withStats.filter(({ stat }) => stat.bookmarked);
   const regular = withStats.filter(({ stat }) => (stat.attempts || 0) > 0 && !(stat.nextReviewDate && stat.nextReviewDate <= TODAY) && !(stat.wrong > 0 && wrongRate(stat) >= 50));
@@ -1175,12 +1389,15 @@ function generateDailyQuestionIds(state, task = getTodayPlanTask(state), exclude
   result.push(...pickOrdered(topical, modeConfig.topicCount, used));
   result.push(...pickOrdered(due, modeConfig.dueCount, used));
   result.push(...pickOrdered(weaknessTrap, modeConfig.weaknessCount, used));
+  result.push(...pickOrdered(highYield, modeConfig.highYieldCount || 0, used));
 
   while (result.length < modeConfig.total) {
     const before = result.length;
     result.push(...pickUnique(newQuestions, 1, used));
     if (result.length >= modeConfig.total) break;
     result.push(...pickOrdered(topical, 1, used));
+    if (result.length >= modeConfig.total) break;
+    result.push(...pickOrdered(highYield, 1, used));
     if (result.length === before) break;
   }
 
@@ -1189,6 +1406,9 @@ function generateDailyQuestionIds(state, task = getTodayPlanTask(state), exclude
   }
   if (result.length < modeConfig.total) {
     result.push(...pickOrdered(weaknessTrap, modeConfig.total - result.length, used));
+  }
+  if (result.length < modeConfig.total) {
+    result.push(...pickOrdered(highYield, modeConfig.total - result.length, used));
   }
   if (result.length < modeConfig.total) {
     result.push(...pickUnique(bookmarked, modeConfig.total - result.length, used));
@@ -3003,6 +3223,7 @@ function QuestPanel({
   progress,
   recallCards,
   bossChallenges,
+  highYieldTopics,
   onCreatePractice,
   practiceMode,
   onPracticeModeChange,
@@ -3055,6 +3276,7 @@ function QuestPanel({
           <div className="trial-tags">
             {(task.goldenTrials || []).map((trial) => <span key={trial}>{trial}</span>)}
             {(task.focusTags || []).map((tag) => <span key={tag}>{tag}</span>)}
+            <span>Weight {task.highYieldWeight || 3}</span>
           </div>
         </div>
         <div className={allStars ? 'stage-clear-card cleared' : 'stage-clear-card'}>
@@ -3086,6 +3308,21 @@ function QuestPanel({
             )}
           </div>
         ))}
+      </section>
+
+      <section className="adaptive-practice-card">
+        <div>
+          <h3>今日高頻插隊</h3>
+          <p className="muted">主線仍是 {task.day}；Daily Practice 會額外補強高頻、近年更新、錯題率與久未複習的主題。</p>
+        </div>
+        <div className="high-yield-list">
+          {highYieldTopics.slice(0, 4).map((topic) => (
+            <span key={topic.id} className="high-yield-chip">
+              {topic.label}
+              <strong>{topic.priorityScore}</strong>
+            </span>
+          ))}
+        </div>
       </section>
 
       {allStars && (
@@ -4280,6 +4517,7 @@ export default function App() {
   const totalPracticePages = Math.ceil(todayPracticeConfig.total / PRACTICE_PAGE_SIZE);
   const questRecallCards = useMemo(() => getQuestMemoryCards(state, questTask), [state, questTask]);
   const questBossChallenges = useMemo(() => buildBossChallenges(questTask, state), [questTask, state]);
+  const highYieldTopics = useMemo(() => getRankedHighYieldTopics(state, questTask), [state, questTask]);
 
   const updatePracticeDraft = useCallback((questionId, patch) => {
     updateState((prev) => {
@@ -4345,7 +4583,9 @@ export default function App() {
               topicCount: modeConfig.topicCount,
               dueCount: modeConfig.dueCount,
               weaknessCount: modeConfig.weaknessCount,
+              highYieldCount: modeConfig.highYieldCount || 0,
             },
+            highYieldInserts: getRankedHighYieldTopics(prev, questTask).slice(0, 5).map(({ id, label, type, priorityScore }) => ({ id, label, type, priorityScore })),
             questionIds,
             createdAt: force || !existing?.createdAt ? new Date().toISOString() : existing.createdAt,
             updatedAt: new Date().toISOString(),
@@ -4893,6 +5133,7 @@ export default function App() {
           progress={questProgress}
           recallCards={questRecallCards}
           bossChallenges={questBossChallenges}
+          highYieldTopics={highYieldTopics}
           onCreatePractice={createTodaySession}
           practiceMode={selectedPracticeMode}
           onPracticeModeChange={setPracticeMode}
@@ -4981,8 +5222,8 @@ export default function App() {
               <h2>今日練習：{TODAY}</h2>
               <p className="muted">
                 {todayQuestions.length
-                  ? `${todayPracticeConfig.shortLabel}：New ${todayPracticeConfig.newCount} / Topic ${todayPracticeConfig.topicCount} / Due ${todayPracticeConfig.dueCount} / Weakness ${todayPracticeConfig.weaknessCount}`
-                  : `${selectedPracticeConfig.shortLabel}：New ${selectedPracticeConfig.newCount} / Topic ${selectedPracticeConfig.topicCount} / Due ${selectedPracticeConfig.dueCount} / Weakness ${selectedPracticeConfig.weaknessCount}`}
+                  ? `${todayPracticeConfig.shortLabel}：${formatPracticeRecipe(todayPracticeConfig)}`
+                  : `${selectedPracticeConfig.shortLabel}：${formatPracticeRecipe(selectedPracticeConfig)}`}
               </p>
             </div>
             <div className="inline-actions">
@@ -4996,11 +5237,33 @@ export default function App() {
           {!todayQuestions.length ? (
             <div className="empty-state">
               <h3>今天尚未產生題目</h3>
-              <p>選擇今日練習模式後，按同一個按鈕產生固定比例的 New / Topic / Due / Weakness 題組。</p>
+              <p>選擇今日練習模式後，按同一個按鈕產生 New / Topic / Due / Weakness / High-yield 題組。</p>
+              <div className="high-yield-list preview">
+                {highYieldTopics.slice(0, 4).map((topic) => (
+                  <span key={topic.id} className="high-yield-chip">
+                    {topic.label}
+                    <strong>{topic.priorityScore}</strong>
+                  </span>
+                ))}
+              </div>
               <button className="primary" onClick={() => createTodaySession()}>產生今日 Daily Practice</button>
             </div>
           ) : (
             <>
+              <div className="adaptive-practice-card compact">
+                <div>
+                  <h3>今日題目組成</h3>
+                  <p className="muted">{formatPracticeRecipe(todayPracticeConfig)}。主線：{questTask.day}｜{questTask.topic}</p>
+                </div>
+                <div className="high-yield-list">
+                  {(todaySession?.highYieldInserts || highYieldTopics).slice(0, 4).map((topic) => (
+                    <span key={topic.id} className="high-yield-chip">
+                      {topic.label}
+                      <strong>{topic.priorityScore}</strong>
+                    </span>
+                  ))}
+                </div>
+              </div>
               <div className="practice-page-toolbar">
                 <strong>第 {currentPracticePage + 1} 頁 / 共 {totalPracticePages} 頁</strong>
                 <span>目前已載入 {todayQuestions.length}/{todayPracticeConfig.total} 題，每頁 10 題。</span>
@@ -5193,6 +5456,7 @@ export default function App() {
                         <span className="pill soft">{task.module}</span>
                         <span className="pill">{task.cancer}</span>
                         <span className={task.priority === 'High' ? 'priority high' : 'priority'}>{task.priority}</span>
+                        <span className="high-yield-weight">Weight {task.highYieldWeight || 3}</span>
                       </div>
                       <p className="phase-line">{task.phase}</p>
                       <p>{task.details}</p>
