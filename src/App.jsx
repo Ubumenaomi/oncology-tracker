@@ -334,6 +334,7 @@ const defaultState = {
     preferredCancers: [],
   },
   planProgress: {},
+  planItemProgress: {},
   dailyQuestProgress: {},
   bossProgress: {},
   questionOverrides: {},
@@ -741,6 +742,7 @@ function mergeCloudState(localState, cloudState) {
       ...(cloudState.planProgress || {}),
       ...(localState.planProgress || {}),
     },
+    planItemProgress: mergePlanItemProgress(cloudState.planItemProgress, localState.planItemProgress),
     dailyQuestProgress: {
       ...(cloudState.dailyQuestProgress || {}),
       ...(localState.dailyQuestProgress || {}),
@@ -877,6 +879,31 @@ function removeDeletedFlashcardRecords(records = {}, deletedFlashcardIds = {}) {
   return Object.fromEntries(Object.entries(records || {}).filter(([id]) => !deletedFlashcardIds[id]));
 }
 
+function normalizePlanItemProgress(progress = {}) {
+  if (!progress || typeof progress !== 'object' || Array.isArray(progress)) return {};
+  return Object.fromEntries(Object.entries(progress).map(([taskId, item]) => {
+    const criteria = item?.criteria && typeof item.criteria === 'object' && !Array.isArray(item.criteria) ? item.criteria : {};
+    const knowledge = item?.knowledge && typeof item.knowledge === 'object' && !Array.isArray(item.knowledge) ? item.knowledge : {};
+    return [taskId, {
+      criteria: Object.fromEntries(Object.entries(criteria).filter(([, value]) => Boolean(value))),
+      knowledge: Object.fromEntries(Object.entries(knowledge).filter(([, value]) => Boolean(value))),
+      updatedAt: item?.updatedAt || null,
+    }];
+  }));
+}
+
+function mergePlanItemProgress(cloudProgress = {}, localProgress = {}) {
+  const cloud = normalizePlanItemProgress(cloudProgress);
+  const local = normalizePlanItemProgress(localProgress);
+  const merged = { ...cloud };
+  Object.entries(local).forEach(([taskId, item]) => {
+    const cloudUpdatedAt = merged[taskId]?.updatedAt || '';
+    const localUpdatedAt = item.updatedAt || '';
+    merged[taskId] = !cloudUpdatedAt || localUpdatedAt >= cloudUpdatedAt ? item : merged[taskId];
+  });
+  return merged;
+}
+
 function mergeFlashcardMaps(cloudFlashcards = {}, localFlashcards = {}, deletedFlashcardIds = {}) {
   return removeDeletedFlashcardRecords({
     ...normalizeFlashcards(cloudFlashcards),
@@ -983,6 +1010,7 @@ function normalizeState(state) {
       ...(state?.settings || {}),
       practiceMode: PRACTICE_MODES[state?.settings?.practiceMode] ? state.settings.practiceMode : 'standard',
     },
+    planItemProgress: normalizePlanItemProgress(state?.planItemProgress),
     dailyQuestProgress: state?.dailyQuestProgress || {},
     bossProgress: state?.bossProgress || {},
     questionOverrides: state?.questionOverrides || {},
@@ -1653,6 +1681,36 @@ function getDailyWrongErrorTypeStatus(state, questionIds = [], date = TODAY) {
     wrongRatedCount: wrongRated.length,
     classifiedCount: wrongRated.filter((row) => row.errorType).length,
     complete: wrongRated.every((row) => row.errorType),
+  };
+}
+
+function getTaskCriteriaItems(task) {
+  return task?.completionCriteria || dailyCompletionCriteria;
+}
+
+function getTaskKnowledgeItems(task) {
+  return [...new Set([...(task?.goldenTrials || []), ...(task?.focusTags || [])])];
+}
+
+function getPlanItemProgressForTask(state, taskId) {
+  return normalizePlanItemProgress(state?.planItemProgress)[taskId] || { criteria: {}, knowledge: {}, updatedAt: null };
+}
+
+function isTaskItemGroupComplete(items, progressGroup = {}) {
+  return items.length === 0 || items.every((item) => Boolean(progressGroup[item]));
+}
+
+function isTaskFullyConfirmed(task, itemProgress) {
+  return isTaskItemGroupComplete(getTaskCriteriaItems(task), itemProgress?.criteria)
+    && isTaskItemGroupComplete(getTaskKnowledgeItems(task), itemProgress?.knowledge);
+}
+
+function buildFullPlanItemProgress(task, checked) {
+  const now = new Date().toISOString();
+  return {
+    criteria: checked ? Object.fromEntries(getTaskCriteriaItems(task).map((item) => [item, true])) : {},
+    knowledge: checked ? Object.fromEntries(getTaskKnowledgeItems(task).map((item) => [item, true])) : {},
+    updatedAt: now,
   };
 }
 
@@ -5065,16 +5123,61 @@ export default function App() {
     };
   }, [planProgress, cancerSummary, readiness, dueReview.length, questTask]);
 
-  const togglePlanTask = (id) => {
+  const togglePlanTask = (id, checkedOverride = null) => {
+    const task = studyPlan100.find((item) => Number(item.id) === Number(id));
+    if (!task) return;
     updateState((prev) => {
       const wasDone = Boolean(prev.planProgress?.[id]);
+      const checked = checkedOverride == null ? !wasDone : Boolean(checkedOverride);
       const nextState = {
         ...prev,
-        game: wasDone ? prev.game : awardXp(prev.game || defaultState.game, XP_RULES.planTask, '100-Day task completed', { taskId: id }),
+        game: checked && !wasDone ? awardXp(prev.game || defaultState.game, XP_RULES.planTask, '100-Day task completed', { taskId: id }) : prev.game,
         planProgress: {
           ...(prev.planProgress || {}),
-          [id]: !wasDone,
+          [id]: checked,
         },
+        planItemProgress: {
+          ...(prev.planItemProgress || {}),
+          [id]: buildFullPlanItemProgress(task, checked),
+        },
+      };
+      return syncBossGameState(nextState);
+    });
+  };
+
+  const togglePlanItem = (task, group, item) => {
+    updateState((prev) => {
+      const taskId = task.id;
+      const current = getPlanItemProgressForTask(prev, taskId);
+      const nextGroup = {
+        ...(current[group] || {}),
+        [item]: !current[group]?.[item],
+      };
+      if (!nextGroup[item]) delete nextGroup[item];
+      const nextItemProgress = {
+        ...current,
+        [group]: nextGroup,
+        updatedAt: new Date().toISOString(),
+      };
+      const nextPlanItemProgress = {
+        ...(prev.planItemProgress || {}),
+        [taskId]: nextItemProgress,
+      };
+      const fullyConfirmed = isTaskFullyConfirmed(task, nextItemProgress);
+      const questCleared = Object.values(prev.dailyQuestProgress || {}).some((bucket) => {
+        const saved = bucket?.tasks?.[taskId] || (Number(bucket?.planTaskId) === Number(taskId) ? bucket : null);
+        return Boolean(saved?.xpClaimed || saved?.stageClearedAt);
+      });
+      const wasDone = Boolean(prev.planProgress?.[taskId]);
+      const nextPlanProgress = {
+        ...(prev.planProgress || {}),
+        [taskId]: fullyConfirmed || (wasDone && questCleared),
+      };
+      const nextState = {
+        ...prev,
+        game: fullyConfirmed && !wasDone ? awardXp(prev.game || defaultState.game, XP_RULES.planTask, '100-Day task completed', { taskId }) : prev.game,
+        planProgress: nextPlanProgress,
+        planItemProgress: nextPlanItemProgress,
       };
       return syncBossGameState(nextState);
     });
@@ -5083,16 +5186,18 @@ export default function App() {
   const setPlanCancerCompleted = (cancer, completed) => {
     updateState((prev) => {
       const next = { ...(prev.planProgress || {}) };
+      const nextItemProgress = { ...(prev.planItemProgress || {}) };
       studyPlan100.filter((task) => task.cancer === cancer).forEach((task) => {
         next[task.id] = completed;
+        nextItemProgress[task.id] = buildFullPlanItemProgress(task, completed);
       });
-      return syncBossGameState({ ...prev, planProgress: next });
+      return syncBossGameState({ ...prev, planProgress: next, planItemProgress: nextItemProgress });
     });
   };
 
   const resetPlanProgress = () => {
     if (!window.confirm('確定要清除 100-Day Plan 的所有 checklist 完成狀態？')) return;
-    updateState((prev) => ({ ...prev, planProgress: {} }));
+    updateState((prev) => ({ ...prev, planProgress: {}, planItemProgress: {} }));
   };
 
 
@@ -5566,9 +5671,20 @@ export default function App() {
             <div className="plan-task-list">
               {studyPlan100.map((task) => {
                 const done = Boolean(planProgress[task.id]);
+                const itemProgress = getPlanItemProgressForTask(state, task.id);
+                const criteriaItems = getTaskCriteriaItems(task);
+                const knowledgeItems = getTaskKnowledgeItems(task);
+                const confirmedCount = criteriaItems.filter((item) => itemProgress.criteria?.[item]).length
+                  + knowledgeItems.filter((item) => itemProgress.knowledge?.[item]).length;
+                const totalConfirmations = criteriaItems.length + knowledgeItems.length;
                 return (
-                  <label key={task.id} className={done ? 'plan-task done' : 'plan-task'}>
-                    <input type="checkbox" checked={done} onChange={() => togglePlanTask(task.id)} />
+                  <article key={task.id} className={done ? 'plan-task done' : 'plan-task'}>
+                    <input
+                      type="checkbox"
+                      checked={done}
+                      aria-label={`${task.day} complete`}
+                      onChange={(event) => togglePlanTask(task.id, event.target.checked)}
+                    />
                     <div className="plan-task-main">
                       <div className="plan-task-title">
                         <span className="day-chip">{task.day}</span>
@@ -5577,18 +5693,44 @@ export default function App() {
                         <span className="pill">{task.cancer}</span>
                         <span className={task.priority === 'High' ? 'priority high' : 'priority'}>{task.priority}</span>
                         <span className="high-yield-weight">Weight {task.highYieldWeight || 3}</span>
+                        <span className={confirmedCount === totalConfirmations ? 'confirmation-progress done' : 'confirmation-progress'}>{confirmedCount}/{totalConfirmations} confirmed</span>
                       </div>
                       <p className="phase-line">{task.phase}</p>
                       <p>{task.details}</p>
                       <div className="trial-tags">
-                        {(task.goldenTrials || []).map((trial) => <span key={trial}>{trial}</span>)}
-                        {(task.focusTags || []).map((tag) => <span key={tag}>{tag}</span>)}
+                        {knowledgeItems.map((item) => (
+                          <button
+                            key={item}
+                            type="button"
+                            className={itemProgress.knowledge?.[item] ? 'chip-check knowledge done' : 'chip-check knowledge'}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              togglePlanItem(task, 'knowledge', item);
+                            }}
+                          >
+                            <span>{itemProgress.knowledge?.[item] ? '✓' : '○'}</span>
+                            {item}
+                          </button>
+                        ))}
                       </div>
                       <div className="criteria-tags">
-                        {(task.completionCriteria || dailyCompletionCriteria).map((criterion) => <span key={criterion}>{criterion}</span>)}
+                        {criteriaItems.map((criterion) => (
+                          <button
+                            key={criterion}
+                            type="button"
+                            className={itemProgress.criteria?.[criterion] ? 'chip-check criteria done' : 'chip-check criteria'}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              togglePlanItem(task, 'criteria', criterion);
+                            }}
+                          >
+                            <span>{itemProgress.criteria?.[criterion] ? '✓' : '○'}</span>
+                            {criterion}
+                          </button>
+                        ))}
                       </div>
                     </div>
-                  </label>
+                  </article>
                 );
               })}
             </div>
