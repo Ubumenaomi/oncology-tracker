@@ -14,6 +14,10 @@ const manualChunks = (id) => {
     return 'vendor-icons'
   }
 
+  if (id.includes('/src/data/questions/year111')) {
+    return 'questions-111'
+  }
+
   if (id.includes('/src/data/questions/year112')) {
     return 'questions-112'
   }
