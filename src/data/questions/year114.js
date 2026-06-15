@@ -16,7 +16,7 @@ export const questions114 = [
     "topic": "Metastatic",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "此題應該主要是要考KEYNOTE-048: pembrolizumab alone vs. pembro-platinum/5-FU vs. EXTREME regimen (cetuximab-platinum/5-FU)\n\n作者認為，pembro加上化療跟pembro monotherapy比起來，可以加強response rate，故在症狀需要快速緩解、PD-L1 low or unknown，或high disease burden的病人，可加上化療。文章中並未提供time to response的資料。\n\n(A) Cetuximab 在platinum-refractory的HNSCC可與anti-PD-1 (nivolumab or pembrolizumab)併用。與pembrolizumab併用於platinum refractory病人 (但未接受過anti-PD-1 or anti-EGFR)，ORR可達45%；若與nivolumab併用，在treatment naive病人ORR約37%，refractory病人約22%。但就各大guideline以及腫瘤學而言，若要快速達到response，合併化療會是比較好的選擇。\n其他藥物 (B) sorafenib (C) lenvatinib (E) erlotinib 目前皆無與 immune checkpoint inhibitor併用於轉移或復發頭頸癌之indication，故選 (D)\n[Ref.]\nKEYNOTE-048: 1. Burtness B et al. Lancet 2019. 2. Harrington K et al. J Clin Oncol 2022.\nPembrolizumab + cetuximab: Sacco AG et al. Lancet Oncol. 2021.\nNivolumab + cetuximab: Chung CH et al. Clin Cancer Res. 2022.",
     "tags": []
   },
   {
@@ -36,7 +36,7 @@ export const questions114 = [
     "topic": "Metastatic",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "Durvalumab目前有combine CRRT in locally advanced NPC的trial進行中，但無metastatic治療的indication，故選 (D)\n[註] 全部都是中國的trials；目前只有toripalimab有FDA approval in NPC，其他都沒有\n[Ref.]\nJUPITER-02 (Toripalimab + GP): Mai HQ et al. JAMA. 2023.\nCAPTAIN-1st (Camrelizumab + GP): Yang Y et al. Lancet Oncol. 2021.\nRATIONALE-309 (Tislelizumab + GP): Yang Y et al. Cancer Cell. 2023.\nMo et al. (Camrelizumab + Apatinib): Mo Y et al. Front Immunol. 2024",
     "tags": []
   },
   {
@@ -56,7 +56,7 @@ export const questions114 = [
     "topic": "Adjuvant",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "(A) 針對局部晚期頭頸癌，使用 cetuximab + cisplatin 合併放射治療相較於接受cetuximab 合併 放射治療，有較佳的overall survival。錯誤\nRTOG 0522：cetuximab + Q3W cis + RT (Arm B) vs. Q3W cis + RT (Arm A)；primary endpont PFS。KM curve就可看出沒有PFS benefit；另外也比cis-CCRT毒。\n[Ref.] 1. Ang KK et al. J Clin Oncol. 2014. 2. Caudell JJ et al. Int J Radiat Oncol Biol Phys. 2023\n\n(B) 局部晚期頭頸癌之高風險病患，術後化學放射治療使用weekly cisplatin 40mg/m2與標準的 每三週一次cisplatin 100mg/m2，有相當之療效，但副作用較低。正確\n雖說如此，目前NCCN以及ASCO的建議，都還是把cisplatin 100 mg/m2 Q3W放在cisplatin 40 mg/m2 QW之前。表列重要的兩個trials。\n[Ref.] 1. Kiyota N et al. J Clin Oncol. 2022. 2. Noronha V et al. J Clin Oncol. 2018.\n\n(C) 局部晚期頭頸癌給予 definitive chemoradiotherapy時，使用weekly cisplatin 30mg/m2與標準的每三週一次cisplatin 100mg/m2，有相當之療效，但副作用較低。錯誤\n如果是definitive CCRT，ConCERT trial證實definitive weekly 40 mg/m2 cisplatin效果不亞於tri-weekly 100 mg/m2 cisplatin，但毒性更低。不過如 (B) 詳解中提到，weekly 30 mg/m2的效果則比不上 triweekly 100 mg/m2，故本選項錯誤。另外補充，cisplatin在CCRT的accumulative dose應≥ 200 mg/m2。\n[Ref.] 1. Goyal S et al. J Clin Oncol. 2022. 2. Strojan P et al. Head Neck. 2016.\n\n(D) 根據Keynote-689臨床試驗結果，可以證明局部晚期頭頸癌化學放射治療時同步給予每三 週一次的pembrolizumab兩療程，即可有效增加治療效果。錯誤\nKN-689是neoadjuvant phase先給兩個療程的pembrolizumab，術後adjuvant phase再跟cisplatin-CCRT一起給pemrolizumab三個療程，最後接maintenance pembrolizumab 12個療程。故此選項錯誤。順便更新efficacy result：primary endpoint EFS 59.7 vs. 26.9 mo; HR 0.66 (0.49-0.88), p=0.0022。\n[Ref.] Uppaluri R et al. N Engl J Med. 2025\n\n(E) 局部晚期頭頸癌，使用cetuximab取代化療與放射治療合併使用，效果不亞於cisplatin為基礎之化學放射治療。錯誤\n目前證據僅限於p16+ oropharyngeal SCC，但cetuximab-CCRT的survival和locoregional failure均劣於cisplatin-CCRT，故NCCN/ASCO等均不建議以cetuximab取代化療與RT併用。下頁表格詳列重要的clinical trials against cetuximab-CCRT。\n[Ref.]\n1. RTOG 1016: Gillison ML et al. Lancet. 2019.\n2. De-ESCALATe HPV: Mehanna H et al. Lancet. 2019.\n3. TROG 12.01: Rischin D et al. Int J Radiat Oncol Biol Phys. 2021.\n4. ARTSCAN III: Gebre-Medhin M et al. Int J Radiat Oncol Biol Phys. 2025\n\n(E) 局部晚期頭頸癌，使用cetuximab取代化療與放射治療合併使用，效果不亞於cisplatin為基礎之化學放射治療。錯誤",
     "tags": []
   },
   {
@@ -76,7 +76,7 @@ export const questions114 = [
     "topic": "Adjuvant",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "The adverse pathologic features in SCCHN:\n[Major high-risk features] → CCRT (對p16+ or p16-皆是)\nExtranodal extension (ENE) (A)\nPositive surgical margins\n[Other adverse features] → RT alone (以p16-; p16+只有些微差異)\nClose margins (<5mm)\npT3 or pT4 primary; pN2 or pN3\nNodal disease in levels IV or V (尤其是oral cavity cancer) (D)\nPerineural invasion (B)\nLymphatic or vascular invasion (C)\n[Ref.] NCCN Guidelines Version 1.2026: Cancer of the Oral Cavity\n\n最後是 (E) the Worse pattern of invasion (WPOI), 由Brandwein-Gensler et al.提出，主要用於oral cavity SCC，描述腫瘤侵犯邊緣 (invasive front) 的生長方式，共有5級。其中WPOI 4 和 WPOI 5被視為minor high-risk features，可考慮adjuvant RT；而題幹是WPOI-3,4,5，故選 (E)。另外，在College of American Pathologists Guideline中，WPOI並沒有被列為術後病理報告內的必備項目。\n[Ref.] Togni L et al. J Clin Med. 2026",
     "tags": []
   },
   {
@@ -96,7 +96,7 @@ export const questions114 = [
     "topic": "Biomarker",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "KRAS mutation則只占大約不到3%，更有人提出沒有KRAS mutation 是在區分SCC和adenocarcinoma時的重要分子依據。故選 (C)\n[Ref.] 1. Morris LGT et al. JAMA Oncol. 2017. 2. Novoplansky O et al. Front Oncol. 2022.",
     "tags": []
   },
   {
@@ -116,7 +116,7 @@ export const questions114 = [
     "topic": "Adjuvant",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "(A) 3 cycles of gemcitabine/cisplatin following by standard chemoradiotherapy與standard chemoradiotherapy相較，可明顯改善locally advanced NPC的overall survival, distant recurrence-free survival，但對於locoregional recurrence-free survival沒有幫助。正確\n[Ref.] Zhang Y et al. N Engl J Med 2019: induction GP*3 cycles → CCRT vs. cisplatin-based CCRT alone\n\n(A) 3 cycles of gemcitabine/cisplatin following by standard chemoradiotherapy與standard chemoradiotherapy相較，可明顯改善locally advanced NPC的overall survival, distant recurrence-free survival，但對於locoregional recurrence-free survival沒有幫助。正確。Primary endpoint 3yr RFS 85.3% vs. 76.5%; HR 0.51 (0.34-0.77)。Secondary endpoint的部分，OS有benefit，但LRFS沒有；作者認為跟IMRT技術進步有關。\n\n(A) 3 cycles of gemcitabine/cisplatin following by standard chemoradiotherapy與standard chemoradiotherapy相較，可明顯改善locally advanced NPC的overall survival, distant recurrence-free survival，但對於locoregional recurrence-free survival沒有幫助。正確。目前NCCN induction chemotherapy中, GP and TPF 皆是category 1 recommendation。\n\n(B) Gemcitabine/ cisplatin 作為 NPC induction chemotherapy or adjuvant chemotherapy 皆有良好的效果。錯誤\n[Ref.] 1. Liu LT et al. Lancet Oncol. 2023. 2. Chen YP et al. Lancet. 2021\n就NCCN guideline而言，adjuvant GP並不是 recommended treatment之一。雖然這麼說，2023年Liu et al在中國進行的phase III RCT，比較adjuvant GP vs. PF，3-year PFS GP 83.9% vs. PF 71.5% (HR 0.54 [0.32–0.93], p=0.023)；但OS沒有顯著差異 (3-year OS GP 90.7% vs. PF 94.0%)。另外，目前在adjuvant setting確定有OS benefit的是metronomic 650 mg/m2 for 1 year。\n\n(C) (D) Induction gemcitabine/cisplatin vs. cisplatin/5-FU。(D) 可能正確\n[Ref.] 1. Li Q et al. Cancer Med. 2018. 2. Chan SK et al. Oral Oncol. 2021\n根據2018年Li et al.的meta-analysis，總共收錄了13個RCT，其中6篇有OS的data，而pooled analysis顯示induction GP vs. PF有顯著的survival benefit；而且toxicity部分，GP的toxicity profile也優於PF。\n\n(E) 作為Induction chemotherapy，docetaxel/cisplatin/5-FU 顯著優於 docetaxel/cisplatin。錯誤。\n目前現有的證據反而支持在induction chemotherapy，TP的效果不亞於TPF (2yr RFS 91.3% with TP vs 82.4% with TPF)。NCCN guideline目前將GP和TPF均放在induction的category 1; TP則是2B。\n[Ref.] Wang Y et al. EClinicalMedicine. 2022",
     "tags": []
   },
   {
@@ -136,7 +136,7 @@ export const questions114 = [
     "topic": "Toxicity",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "這題的每個選項其實都有ILD risk，其中 (A) 和 (E) ILD risk均高於10%，而(C) irAE ILD 也是well-documented的副作用。(C) TDM1在 KATHERINE中 overall ILD的risk約2.6%，而 (D) abemaciclib在trial中並沒有report ILD risk，是postmarketing時FDA才加註的，risk比TDM1稍高一些，overall約3%。所以硬要選的話，選risk最低的 (C)。\n以下列出常見具pulmonary toxicity的抗癌藥物\n\n[Ref.]\nTarantino P et al. JAMA Oncol. 2021.\nSchneider BJ et al. J Clin Oncol. 2021.\nVerzenio FDA label. Updated date: 2025-08-25.\nRaschi E et al. Breast Cancer Res Treat. 2021\nZhu Z et al. EClinicalMedicine. 2025.\nHwang IH et al. Expert Opin Drug Saf. 2025.",
     "tags": []
   },
   {
@@ -158,7 +158,7 @@ export const questions114 = [
       "OlympiA"
     ],
     "answer": null,
-    "explanation": "",
+    "explanation": "(A) 正確。\n根據NCCN guideline, olaparib和talazoparib為HER2-/gBRCAm轉移性乳癌一線或後線建議用藥\n[OlympiAD] Olaparib showed improved PFS than physician’s choice ChT in HER2-/gBRCAm mBC (with prior anthracycline and taxane exposure)\n[EMBRACA] Talazoparib 同上\n\n(B) 正確。\n以下是OlympiA trial內容：\nAnn Oncol. 2022 Dec;33(12):1250-1268.\nN Engl J Med. 2021 Jun 24;384(25):2394-2405.\n\n(C) (E) 正確。\n關於PARPi機轉如圖：\n\n(D) 錯誤。\nPARPi目前沒有乳癌neoadjuvant治療的indication.\n根據[PARTNER] trial, neoadjuvant olaparib + platinum-taxane and anthracycline-based chemotherapy in TNBC did not improve pCR, EFS, or OS.",
     "tags": []
   },
   {
@@ -178,7 +178,7 @@ export const questions114 = [
     "topic": "Neoadjuvant",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "(A) 正確\n[NeoSphere] 證實neoadjuvant dual anti-HER2 blockade可以提高pCR rate in LA-HER2+ EBC.\n\n(D) 正確\n根據[KATHERINE] trial, T-DM1 > trastuzumab in DFS (HR 0.5) and OS in non-pCR patients. 亦是NCCN and ESMO guideline標準建議。\n\n(E) 正確\n所以HR+/HER2- EBC絕大部分不做neoadjuvant chemotherapy unless for tumor down staging.\n根據Houssami et al. meta-analysis (European Journal of Cancer, 2012)\npCR rate in each subtypes:\nHR+/HER2-   8.3%\nHR+/HER2+ 18.7%\nHR-/HER2+  38.9%\nHR-/HER2-   31.1%\n\n(B) 正確 (C) 錯誤\n[KEYNOTE-522] trial design本來就包括neoadjuvant + adjuvant pembrolizumab. 因此guideline建議無論pCR與否, 都應該完成adjuvant pembrolizumab x 9 cycle.\n該試驗在2024 NEJM發表的OS結果, 內容如下: In the population without pCR, 30.4% v.s. 39.3% (pembolizumab v.s. placebo group) had died (absolute difference in 5-year survival, 6.1% ; 95% CI, −2.7 to 14.9). Although the results of this nonrandomized comparison warrant cautious interpretation, they suggest that the overall survival benefit with pembrolizumab may exceed that expected from the improvement in pathological complete response alone.",
     "tags": []
   },
   {
@@ -200,7 +200,7 @@ export const questions114 = [
       "Right-CHOICE"
     ],
     "answer": null,
-    "explanation": "",
+    "explanation": "(A) (B) (D) 皆正確。附上NCCN & ESMO guideline\n\n(A) (B) (D) 皆正確。關於此病患的Endocrine therapy選擇：\n依照NCCN guideline，病人屬於premenopausal (menopause is usually a clinical diagnosis made after ≥12 months of amenorrhea)，建議選擇OFS+anti-estrogen therapy\n\n(E) 正確。以下是RIGHT choice trial內容:\n(*overall survival still immature in 2026/5, 所以選項敘述我覺得有點小瑕疵)\nClin Oncol. 2024 Aug 10;42(23):2812-2821.\n\n(C) 錯誤\n如果有PIK3CA突變，PI3K inhibitors目前只有二線治療indication (failed endocrine therapy)。\n本題應該是要考[INAVO120]看似一線，但收案條件是progression during or within 12 months after completion of adjuvant ET",
     "tags": []
   },
   {
@@ -220,7 +220,7 @@ export const questions114 = [
     "topic": "Biomarker",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "(A) 正確\nSecretory breast cancer formerly known as juvenile breast carcinoma, is an extremely rare (<0.15% of all breast cancers) type of invasive breast cancer, characterized by high-grade secretory material, slow growth (indolent behavior), and an excellent prognosis.\nNTRK fusions are relatively common in select rare solid tumors, including secretory breast cancer, mammary analogue secretory carcinoma of the salivary gland, congenital infantile fibrosarcoma, and congenital mesoblastic nephroma.128 For these diseases, NTRK fusion testing should be routinely performed.\nChakravarty D, et al. Somatic Genomic Testing in Patients With Metastatic or Advanced Cancer. JCO 2022\n\n(B) 正確\n\n(C) 正確\n[SOLAR-1] HR+ mBC二線使用alpelisib+fulvestant vs placebo+fulvestrant\nPIK3CA mutant cohort在PFS的表現優於non-mutant cohort\nPIK3CA+\nmPFS 11.0 vs 5.7m\nHR 0.65, p<0.001\nN Engl J Med 2019;380:1929-1940\nPIK3CA-\nmPFS 7.4 vs 5.6m\nHR 0.85, 95% CI 0.58-1.25\n\n(D) 正確\nCapivasertib為AKT inhibitor。根據[CAPITello-291]收案族群有40%為AKT pathway-altered (PIK3CA/PTEN/AKT mutation), 二線使用Fulvestrant+Capivasertib之PFS優於placebo\nAKT pathway-altered\nmPFS 7.3 vs 3.1m\nHR 0.5, p<0.001\nN Engl J Med 2023;388:2058-2070\n\n(E) 錯誤\nESR1 mutation為Aromatase inhibitor使用後常見(40-50%)的抗藥機轉，而非Fulvestrant",
     "tags": []
   },
   {
@@ -242,7 +242,7 @@ export const questions114 = [
       "Destiny-Breast-03"
     ],
     "answer": null,
-    "explanation": "",
+    "explanation": "(A)(B)(C)(E) 正確\n(D) 錯誤，有PFS但沒有OS benefit。以下是[NALA] trial內容：\nJ Clin Oncol. 2020 Sep 20;38(27):3138-3149.",
     "tags": []
   },
   {
@@ -262,7 +262,7 @@ export const questions114 = [
     "topic": "Biomarker",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "(A)(B)(E) 正確\nCutaneous melanoma subtypes:\nSuperficial spreading (associated with low cumulative sun damage [≈70%])\nLentigo maligna (associated with high cumulative solar damage [≈15%])\nNodular (≈5%)\nAmelanotic (2%-8%)\nDesmoplastic (4%)\nSpitzoid (<2%)\nAcral lentiginous (plantar/palmar/subungual [≈1%])\n與紫外線暴露無關，在深膚色族群中占比顯著較高，\n是亞洲、非洲及西班牙裔最常見的黑色素癌\nNon-cutaneous melanoma subtypes:\nUveal (4%-5%)\nMucosal (oral/nasal/conjunctival/anogenital [1%-2%]\nJAMA 2025;334;(23):2113-2125.\n\n(C)正確 (D)錯誤，Uveal melanoma多帶有GNAQ or GNA11 mutations。\nGeneral來說，黑色素癌常見的基因突變為BRAF-mutant (~50%), NRAS-mutant (~25%), NF1-mutant (~15%)，但Acral, mucosal and uveal melanoma的molecular profile跟其他比較不同。\nAcral: BRAF (~18–20%), NRAS (~21%), KIT (~9–15%)\nMucosal: KIT mutations are significantly enriched (10–39%)\nUveal: GNAQ (~45%) and GNA11 (~35%) mutations, which are mutually exclusive and present in 80–90% of cases",
     "tags": []
   },
   {
@@ -282,7 +282,7 @@ export const questions114 = [
     "topic": "Neoadjuvant",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "(A)(B)(E)正確\n附上ESMO guideline (2025)\n\n(C)正確 (D)錯誤，[NADINA] trial的control arm是adjuvant Nivolumab。\n證實Neoadjuvant Nivo/Ipi +- adjuvant Nivo之優於adjuvant Nivo in stage III melanoma，EFS HR 0.32\nN Engl J Med 2024;391:1696-1708",
     "tags": []
   },
   {
@@ -302,7 +302,7 @@ export const questions114 = [
     "topic": "Metastatic",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "14/120\n對於 metastatic melanoma 的第一線治療，根據 NCCN guideline\nCheckMate 066 : first line Nivolumab vs. Dacarbazine in BRAF V600E(-) advanced\n→ improved ORR (42% vs 14%), 20% CR rate\n→ prolonged five-year OS (39% vs 17%) and PFS (28% vs 3%); among patients\nKEYNOTE-006 : first line Pembrolizumab vs. Ipilimumab (MDX010-20) in advanced\nmelanoma (~35% BRAF V600 mutation)\n→ improved mOS (32.7 vs 15.9 months), and mPFS (9.4 vs 3.8 months)\n\n14/120\n對於 metastatic melanoma 的第一線治療，根據 NCCN guideline\nCheckMate 067 : first line Nivolumab + Ipilimumab vs. Nivolumab vs. Ipilimumab\nin advanced melanoma\n→ improved mOS (71.9 vs 36.9 vs. 19.9 months)\nRELATIVITY-047 : first line Nivolumab + Relatlimab vs. Nivolumab in advanced\n→ improved mPFS (10.1 vs. 4.6 months), mOS (51.0 vs 34.1 months)\n→ improved ORR (43.7% vs 33.7%)\n\n14/120\n對於 metastatic melanoma 的第一線治療，根據 NCCN guideline\nCOMBI-d : first line Dabrafenib + Trametinib vs. Dabrafenib + Placebo in BRAF\nV600E/K(+) advanced melanoma\n→ improved mPFS (9.3 vs. 8.8 months), ORR (67% vs 51%)\n→ HR for interim OS 0.63 (95% CI 0.42, 0.94; p=0.023)\n→ Increased incidence and severity of pyrexia, but fewer cutaneous hyperprolifer-\native events\nCOMBI-v : first line Dabrafenib + Trametinib vs. Vemurafenib in BRAFV600E/K(+)\nadvanced melanoma\n→ improved mOS (25.6 vs 18.0 months)\n→ 後續兩個 trial 合併分析, 5-year PFS 19%, 5-year OS 34%\n\n14/120\n對於 metastatic melanoma 的第一線治療，根據 NCCN guideline\nDREAMseq (ECOG-ACRIN EA6134) :\nNivo + Ipi → Dabra + Trame (藍線) vs. Dabra + Trame vs. Nivo + Ipi (紅線) in BRAF\nV600 mutant advanced melanoma\nSECOMBIT trial\n也得到相似的結果 (不同 TKI)\n其中的 arm C，讓我們推論出針對患者一開始就 high-volume, symptomatic dz，可以先用BRAF/MEK TKI 8-12 周，然後銜接到 Nivo + Ipi\n\n14/120\n對於 metastatic melanoma 的第一線治療，根據 NCCN guideline\n在 1998-2011 年，high-dose IL-2 沒有做過大型第三期隨機對照的一線試驗，但\nFDA 整合 8 個 single arm, non-randomized, phase II study 做 pooled analysis\nIL-2 (600,000 或 720,000 IU/kg) IV Q8H\nORR : ~16%, with CR rate ~5%-7% (prolonged CR)\n但後續 immunotherapy 以及 TKI 的出現，已經讓 High dose IL-2 脫離第一線治療\n\n14/120\n對於 metastatic melanoma 的第一線治療，根據 NCCN guideline",
     "tags": []
   },
   {
@@ -324,7 +324,7 @@ export const questions114 = [
       "PALETTE"
     ],
     "answer": null,
-    "explanation": "",
+    "explanation": "14/120\n(A)正確 (B)錯誤\nEORTC 62043 (Phase II, 2009) : Pazopanib in R/R advanced soft tissue sarcoma\nwith ≤ 2 line chemotherapy (只有 ~2% 的人沒有接受過 chemotherapy)\nAdipocytic STS group was closed after the first stage, given insufficient activity\nLancet. 2012 May 19;379(9829):1879-86.\n\n14/120\n(A)正確 (B)錯誤\nPALETTE : Pazopanib vs Placebo in angiogenesis inhibitor naive, advanced\nnon-adipocytic soft tissue sarcoma, PD despite previous standard chemotherapy\n(Insufficient activity to adipocytic STS, so exclude this group of patient)\nLancet. 2012 May 19;379(9829):1879-86.\n\n14/120\n(C)正確\nLancet. 2012 May 19;379(9829):1879-86.\n\n14/120\n(D)正確\nPALETTE : Pazopanib vs Placebo\nSynovial sarcomas: PR in 5 of 37 patients (~14-15%)\nLeiomyosarcoma: PR in 1 of 41 patients (~2-3%)\nOther types: PR in 3 of 41 patients (~7-8%)\nOsteosarcoma & Chondrosarcoma 屬於 Bone Sarcomas，而不是 STS\nRhabdomyosarcoma, Ewing’s sarcoma, Primitive neuroectodermal tumor 屬於 child small round cell tumor，對化療敏感\nGIST 有 KIT or PDGFRA mutation，可以順序使用 Imatinib → Sunitinib → Regorafenib → Ripretinib 治療\nDermatofibrosarcoma protuberance (DFSP)\t有 COL1A1-PDGFB fusion [t(17;22)]，對 Imatinib 很有效\n*** 所以被排除在 PALETTE trial 之外 ***\nLancet. 2012 May 19;379(9829):1879-86.\n\n14/120\n(E)正確\nLancet. 2012 May 19;379(9829):1879-86.",
     "tags": []
   },
   {
@@ -344,7 +344,7 @@ export const questions114 = [
     "topic": "Lung",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "14/120\n35歲女性、mediastinum 多顆腫瘤，病理為adenocarcinoma，應該被 treated as？\n看到病理是 adenocarcinoma，基本上可以排除\nGerm cell tumor: seminoma, embryonal carcinoma, yolk sac tumor, choriocarcinoma, teratoma，都不是以 adenocarcinoma 做表現\nThymic cancer: 主要是 SqCC，adenocarcinoma 可以說是 case report 級，世界上還不超過 100 個 case\n剩下就要透過淋巴結轉移的狀況去做區分......\nLancet. 2012 May 19;379(9829):1879-86.\n\n14/120\n35歲女性、mediastinum 多顆腫瘤，病理為adenocarcinoma，應該被 treated as？\nBMJ. 1994 Nov 5;309(6963):1222-5.\nFront Oncol. 2022 Dec 7;12:960527.\nFront Surg. 2020 Sep 22;7:580203.\nBreast cancer\nLung cancer\nintralobular → interlobular → lobar → hilar → mediastinal nodes\nColon cancer",
     "tags": []
   },
   {
@@ -364,7 +364,7 @@ export const questions114 = [
     "topic": "Biomarker",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "(A) Lenvatinib, as compared with placebo, was associated with significant improvements in progression-free survival and the response rate among patients with iodine-131–refractory thyroid cancer.\n\n14/120\n(A)正確\nESMO guideline 針對 RAI-refractory advanced/metastatic DTC，主要有兩種藥物可\n以使用 -- Lenvatinib & Sorafenib\nLancet. 2012 May 19;379(9829):1879-86.\n\n14/120\n(A)正確\n這主要是根據兩篇 study\nSELECT: Lenvatinib 24mg QD vs Placebo in RAI-refractory DTC with crossover\n→ improved mPFS (18.3 vs 3.6 months), HR 0.21 (99% CI, 0.14-0.31; p < 0.001)\n→ improved ORR (64.8% vs 1.5%) (1% CR, 42% PR)\n→ Median time to first response: 2 months\nN Engl J Med. 2015 Feb 12;372(7):621-30.\n\n14/120\n(A)正確\n這主要是根據兩篇 study\nDECISION: Sorafenib 400mg BID vs Placebo in RAI-refractory DTC with crossover\n→ improved mPFS (10.8 vs 5.8 months), HR 0.59 (95% CI, 0.45-0.76; p < 0.0001)\n→ improved ORR (12.2% vs 0.5%), DCR (54.1% vs 33.8%)\n→ No OS difference (maybe due to crossover)\nLancet. 2014 Jul 26;384(9940):319-28.\n\n14/120\n(C)正確\nROAR: Dabrafenib 150 + Trametinib in BRAF V600E(+) ATC\n這其實包含兩篇 study，發表在\n2018 年: 16 patients with BRAF V600E(+) ATC, 6 had received prior systemic Tx\nORR 69% (95% CI, 41% to 89%)\nCommon AEs: fatigue (38%), pyrexia (37%), and nausea (35%)\n2022 年: 36 patients with BRAF V600E(+) ATC\nORR 56% (95% CI, 38.1% to 72.1%) (3 CR)\n12-month DOR rate: 50%\nmPFS 6.7 months; mOS 14.5 months\nJ Clin Oncol. 2018 Jan 1;36(1):7-13.\nAnn Oncol. 2022 Apr;33(4):406-415.\n\n14/120\n(D)錯誤\nThyroid. 2023 Sep;33(9):1039-1044.\n2023 年最新版的 Bethesda 做了幾個更新:\nBethesda III (AUS) Subcategorization\nAUS-nuclear atypia: a/w BRAF V600E or RET/PTC rearrangement\nAUS-other: a/w RAS-like\nRisk of Malignancy (ROM):\nWHO 2022 將 NIFTP 這個診斷移出惡性，Bethesda III 的 ROM 降至 ~6%-18%，Bethesda IV 降至 ~10%-40%\n\n14/120\n(D)錯誤\nThyroid. 2023 Sep;33(9):1039-1044.\n由於 Bethesda III & IV 的惡性度降低，molecular testing 可以幫助判斷是否為腫瘤的可能性，避免病人直接推病人去開刀\n\n14/120\n(E)正確\n簡單來區分甲狀腺癌較常見的基因突變\nPTC/FTC: BRAF (PTC 為主), RAS (FTC 為主), RET/PTC rearrangement, PAX8-PPARγ fusion\nPDTC/ATC: TERT promoter & TP53 mutation (~73% in ATC)\nCells. 2021 May 1;10(5):1082.\n\n14/120\n(E)正確\nCells. 2021 May 1;10(5):1082.",
     "tags": []
   },
   {
@@ -384,7 +384,7 @@ export const questions114 = [
     "topic": "Radiation/CCRT",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "14/120\n(A)(B)(D)(E)正確 (C)錯誤\nSaberian C, et al. (2024): retrospective study on pts with melanoma and LMD\n178 melanoma patients diagnosed with LMD between 1999 and 2015 revealed a mOS of 3.5 months\n172 melanoma patients diagnosed with LMD by MRI between 2015 and 2020, received systemic immunotherapy, and revealed mOS of 10.2 months.\n47% had concurrent uncontrolled systemic disease\nDecreased PS, CSF cytology (+), elevated LDH a/w worse OS\nNeurooncol Pract. 2024 Mar 30;11(4):452-463.",
     "tags": []
   },
   {
@@ -404,7 +404,7 @@ export const questions114 = [
     "topic": "Neoadjuvant",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "14/120\n(A)錯誤 (B)錯誤\n膀胱癌最常見的初始症狀:\n無痛性肉眼血尿 (painless gross hematuria)\n80%~85% 的膀胱癌患者，間歇性發生\n頻尿 (Frequency)\n尿急 (Urgency)\n臨床上判斷膀胱癌侵犯深度 (NMIBC or MIBC)，主要是透過 TURBT 的病理報告\n→ MRU 雖然能協助評估局部期別、膀胱外壁侵犯或淋巴結轉移，但無法取代 TURBT\n作為診斷深度的黃金標準\nNeurooncol Pract. 2024 Mar 30;11(4):452-463.\n\n14/120\n(C)錯誤 (D) 正確 (E)錯誤\nCisplatin 具有很強的腎毒性，當病患因尿路阻塞導致腎功能異常時，通常不適合使用\nCisplatin。此時，臨床上常會改用以 Carboplatin-based regimen，因為 Carboplatin\n的腎毒性較低，適合用於腎功能不全的病患\n若病人沒有接受過 neoadjuvant 的 MIBC，而病理分期為 pT3-T4a or pN+，則應該考\n慮 adjuvant Cisplatin-based chemotherapy 或是 adjuvant Nivolumab 以及\nPembrolizumab\nNeurooncol Pract. 2024 Mar 30;11(4):452-463.",
     "tags": []
   },
   {
@@ -424,7 +424,7 @@ export const questions114 = [
     "topic": "Toxicity",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "14/120\n(A)(B)(C)(E)正確 (D)錯誤\nSide effects of androgen deprivation therapy\nSexual dysfunction:  loss of libido, then erectile dysfunction\nOsteoporosis and risk of bone fractures:\nCVD and DM:  most common noncancer-related cause of death\nDecreased muscle and increased fat: due to reduced testosterone levels\nCognitive dysfunction\nAnemia: develops in ~90% males, respond to EPO therapy\nHot flashes, Fatigue, Gynecomastia, Depression, Acute kidney injury\nEur Urol. 2015 May;67(5):825-36.",
     "tags": []
   },
   {
@@ -444,7 +444,7 @@ export const questions114 = [
     "topic": "Metastatic",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "(A) 抑制 single-strain DNA breaks repair 正確\n(B) 根據臨床試驗及美國FDA同意，post androgen receptor pathway inhibitors (ARPI) 其適應 之族群為BRCA 1/2 alternation 基本正確，但Olarparib FDA label還包含其他HRR genes\n\n(C) 根據最新第三期臨床試驗結果，可建議合併PARPi與ARPI使用於mCRPC病患之第一線 治療 正確，但僅限於相關HRR model\n(D) 最常見的副作用是貧血 正確(PROpel study)\n\n錯在\"只要\", Biomarker為 “germline and/or somatic”",
     "tags": []
   },
   {
@@ -464,7 +464,7 @@ export const questions114 = [
     "topic": "Adjuvant",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "63歲男性，過去2個月出現血尿和體重非故意下降。他有30包/年的吸菸史，但5年前已戒菸。 身體檢查發現左側腰部腫塊。CT掃描顯示左腎腫塊6.5公分，局限於腎臟，無淋巴結腫大或轉移。患者接受了根治性腎切除手術。病理學檢查顯示clear cell RCC，Fuhrman grade 3，切緣陰性。 有腎週脂肪侵犯但未見腎靜脈侵犯。下列的後續治療，證實可以延長overall survival，正確的是？pT3aN0M0 符合KN-564收案條件\n(A) adjuvant sunitinib therapy S-TRAC: 僅延長DFS 6.8 vs 5.6yrs, OS沒有顯著差異\nKN-564: 24m-DFS 77.3 vs 68.1% (HR 0.68), 24m-OS 76.6 vs 93.5% (HR 0.54)",
     "tags": []
   },
   {
@@ -484,7 +484,7 @@ export const questions114 = [
     "topic": "Metastatic",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "解題重點在判定是否為mCRPC\n題幹並未給Serum testosterone level, if <50ng/dL 則符合castration status;\nClinical and Radiographic SD, 而biochemical 也尚未達到(根據PCWG3定義)\n定義起點需至少連續兩次測量結果上升，且與最低點相比增加幅度>=25% (絕對值增加>=2ng/mL)\n(A) 嘗試改用Abiraterone acetate 錯誤，與Enzalutamide機轉相似互換無幫助\n(B) 續用Enzalutamide，定期影像追蹤 正確，依照題幹目前未達mCRPC，可續用並密切追蹤\n(C) 檢查 BRCA1/2 mutation, 若有改用Olaparib 錯誤，依照題幹目前未達mCRPC\n(D) 身體許可，Docetaxel 75 mg/m2 Q3 week with prednisolone 錯誤，依照題幹目前未達mCRPC\n(E) 做PSMA-PET影像上，若有顯影的病灶，根據Vision study, 適合Lu-177-PSMA-617 錯誤，理由同上",
     "tags": []
   },
   {
@@ -504,7 +504,7 @@ export const questions114 = [
     "topic": "Biomarker",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "關於腎細胞癌中 Von Hippel–Lindau (VHL) 基因變異的描述，不正確的是？\n\n關於腎細胞癌中 Von Hippel–Lindau (VHL) 基因變異的描述，不正確的是？\n正確:  VHL tumor包含 retinal or central nervous system haemangioblastoma, clear cell RCC, phaeochromocytoma, pancreatic endocrine tumour or endolymphatic sac tumour.\n有爭議: TCGA data分析指出\n”... Notably, the most frequent arm-level events\ninvolved loss of chromosome 3p3 (91% of samples),\nencompassing all of the four most commonly\nmutated genes (VHL, PBRM1, BAP1 and SETD2)”\n(Nature. 2013. PMID: 23792563)\n應該是\"oxygen-sensing genes (including VHL)\"\n\n關於腎細胞癌中 Von Hippel–Lindau (VHL) 基因變異的描述，不正確的是？\n錯誤: 根據TCGA analyses,\nChRCC典型 genomic profile 與 ccRCC 不同。\n(Cancer Cell. 2014. PMID 25155756)\n\n關於腎細胞癌中 Von Hippel–Lindau (VHL) 基因變異的描述，不正確的是？\n正確: pVHL 是 E3 ubiquitin ligase complex 的 substrate recognition component，負責在 normoxia 下辨識 hydroxylated HIF-α 並促進 ubiquitination/proteasomal degradation。\n(Curr Pharm Des 2013. PMID 19671042)\n\n關於腎細胞癌中 Von Hippel–Lindau (VHL) 基因變異的描述，不正確的是？\n正確: ccRCC cell lines with impaired pVHL function to degrade HIFα express elevated levels of PD-L1. (Clinical Cancer Research, 2016. PMID 26945902)",
     "tags": []
   },
   {
@@ -527,7 +527,7 @@ export const questions114 = [
       "GOG-212"
     ],
     "answer": null,
-    "explanation": "",
+    "explanation": "正確: Maintenance therapy with P and PP did not improve OS among patients with newly diagnosed O/tubal/peritoneal cancer, but may modestly increase PFS. GI and neurologic toxicities were more frequent in the taxane treatment arms.\n\n(B) The GOG-0218 study showed that the use of bevacizumab during and up to 10 months after carboplatin and paclitaxel chemotherapy prolongs the median progression-free survival and overall survival in patients with advanced epithelial ovarian cancer. 錯誤: bevacizumab concurrent + maintenance 僅改善PFS, 並未改善OS.\n(C) The GOG-0218 study showed that bevacizumab must be continued beyond chemotherapy to delay disease progression. 正確\n(D) The GOG-0218 study showed that patients who had stage IV disease and received bevacizumab-concurrent plus maintenance treatment had improvement of overall survival. 正確\n\n(E) The GOG-0218 study showed that BRCA1/2 mutations were good prognostic factors but were not predictive of bevacizumab activity. 正確",
     "tags": []
   },
   {
@@ -550,7 +550,7 @@ export const questions114 = [
       "KEYNOTE-826"
     ],
     "answer": null,
-    "explanation": "",
+    "explanation": "(A) KEYNOTE-826 試驗結果顯示，對於持續性、復發性或轉移性子宮頸癌病人，接受化學治療(合併或不合併 bevacizumab)之外，再加上pembrolizumab 能夠顯著延長無惡化存活期和總體存活期。 正確\n(B) KEYNOTE-826 試驗中，PD-L1 CPS 小於 1 的病人僅佔試驗總病人數的 11.2%，其無 惡化存活期和總生存期的風險比(hazard ratio)的95%信賴區間都包含1。 正確\n\n(D) 對於持續性、復發性或轉移性子宮頸癌病人，GOG-204 臨床試驗比較了cisplatin/ topotecan, cisplatin/paclitaxel, cisplatin/gemcitabine, cisplatin/vinorelbine的組合療法。試驗 結果顯示，接受這四種以cisplatin為基礎的治療方案的病人，其結果並沒有顯著差異。 正確\nVC, GC, and TC are not superior to PC in terms of overall survival (OS). However, the trend in RR, PFS, and OS favors PC.\n\n錯誤，JCOG-0505 result 為\nITT: TC was not inferior to TP for OS 17.5 mo in TC and 18.3 mo in TP, HR 0.99 (p = 0.032);\nprior platinum group: OS TC > TP (19.0 mo in TC and 16.3 mo in TP, HR 0.69).\nnon prior platinum group: OS TP > TC (13.0 mo in TC and 23.2 mo in TP, HR 1.57)",
     "tags": []
   },
   {
@@ -570,7 +570,7 @@ export const questions114 = [
     "topic": "Adjuvant",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "(A) adjuvant osimertinib for 3 years 正確 ADAURA study",
     "tags": []
   },
   {
@@ -590,7 +590,7 @@ export const questions114 = [
     "topic": "Neoadjuvant",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "(A) KEYNOTE-671 trial，設計之初就是要收集early stage NSCLC(stage II, IIIA, or IIIB (N2))的病人進行peri-operative pembrolizuman + neoadjuvant platinum base chemotherapy，而不是收unrescetable disease的病人嘗試進行conversion therapy\n(B) 根據LAURA trial，unresectable stage III EGFR-mutant non-small cell lung cancer， chemoradiotherapy結束後使用osimertinib相較於chemoradiotherapy結束後使用placebo， 可明顯延長progression-free survival,正確!\n\n(C) 2008 JCO 上的三期臨床試驗(Scagliotti GV, et al. J Clin Oncol. 2008 Jul 20;26(21):3543-51.\n)發現，squamous lung cancer 使用 pemetrexed + platinum 的OS與PFS較 gemcitabine + cisplatin 還要差。在這之後squamous lung cancer就已 non-pemetrexed + platinum 為chemotherapy base, 目前也沒有三期臨床試驗以pemetrexed + platinum + RT治療SqLC\n\n(D) Postoperative radiotherapy(PORT)在1998年的meta-analysis( Lancet. 1998 Jul 25;352(9124):257-63.)中看到pN0, pN1是偏向不要做術後RT，而pN2 則是equivocal, 一直到Lung ART study中確定了pN2 做PORT有DFS benefit\nLung ART\nMeta-analysis\n\n(E)PACIFIC trial的設計是CCRT結束之後使用Durvalumab做consolidation而不是作為CCRT同時並用的處方，而這一題另外想問的應該是PACIFIC II study,在CCRT同時加上Durvalumab 比上CCRT加上Placebo，結果看起來沒有統計上的顯著差異，所以目前維持consolidation而不是並用CCRT\nPACIFIC II\nPACIFIC",
     "tags": []
   },
   {
@@ -610,7 +610,7 @@ export const questions114 = [
     "topic": "Lung",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "(A) Pleural mesothelioma 經常陽性且可以協助診斷的IHC stain有:AE1, CAM5.2, CK OSCAR, calretinin, CK5/6, WT-1, D2-40 [podoplanin], HEG1,正確!\n(B)Neuroendocrine tumors 經常陽性且可以協助診斷的IHC stain有:AE1 / AE3, CAM 5.2,\nChromogranin A, synaptophysin, INSM1, SSTR2A,有疑義的部分是CD56(NCAM) 根據pathology outline的整理，不建議用CD56鑑別NET，因為specificity不高，但是D選項錯誤更大\n(C) TTF-1 是常見用來鑑別lung adenocarcinoma與lung squamous cell carcinoma的IHC stain, 正確!!\n(D)錯誤，p40/p63 是Squamous cell的marker，無法分辨器官的來源\n(E) CDX2 在GI origin的表現遠比Lung origin來得多，大體來說正確，題幹說得很保守,用Favor所以沒有問題",
     "tags": []
   },
   {
@@ -630,7 +630,7 @@ export const questions114 = [
     "topic": "Metastatic",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "題幹問的是metastatic NSCLC with classical EGFR mutation 的治療，我們先看(A)(B)兩個第一線的選項，都是正確，FLAURA trial顯示 Osimertinib比當時的standard TKI(Gefitinib/Erlotinib)在PFS與OS上有優勢，FLAURA 2 trial顯示 Osimertinib + chemotherapy比單用 Osimertinib在PFS與OS上有優勢\nFLAURA\nFLAURA 2\n\n(C )metastatic NSCLC with classical EGFR mutation 使用TKI 後產生抗藥性的主要機轉包括::acquired resistance(T790M之於一二代TKI,C797X之於Osimertinib), Bypass pathway activation(ERBB2/MET amplification), Downstream pathway alteration(KRAS mutation, BRAF mutation), Histologic transformation 等等，其中組織學的改變用liquid biopsy較為侷限，有progression tissue biopsy更好, 選項正確!\n\n(D)(E)兩個選項題幹問的是metastatic NSCLC with classical EGFR mutation使用一線Osimertinib PD之後的治療選擇，MARIPOSA-2 trial顯示Amivantamab +/- lazertinib + carboplatin/pemetrexed 比carboplatin/pemetrexed 的化療在PFS有優勢(OS not mature yet)。\n然而，KEYNOTE-789 顯示 Pembrolizumab + platinum +pemetrexed比較platinum +pemetrexed，在PFS與OS上沒有統計的顯著差異，故(E)錯誤!\nMARIPOSA 2\nKeynote-789",
     "tags": []
   },
   {
@@ -650,7 +650,7 @@ export const questions114 = [
     "topic": "Biomarker",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "(A) 2003 年JCO上刊登的phase 2 study(Johnson DH, et al. J Clin Oncol. 2004 Jun 1;22(11):2184-91.)Bevacizumab 在Squamous cell lung cancer有很高的肺出血機率，serious or fatal pulmonary hemorrhage 發生率為 4/13，即 31%；non-squamous 則為 2/53，即 4%，於此之後就不建議使用Bevacizumab 治療Squamous cell lung cancer；而IMPOWER150 的inclusion criteria是metastatic nonsquamous NSCLC，所以Atezolizumab + Bevacizumab + Carboplatin + Paclitaxel沒有取得Squamous cell lung cancer的indication\n\n(B) 根據 KEYNOTE-407,不論PD-L1的狀態，第一線使用Pembrolizumab + Carboplatin + Paclitaxel/Nab-paclitaxel比起Placebo + Carboplatin + Paclitaxel/Nab-paclitaxel在OS 與PFS都有顯著的優勢\nKeynote-407\n\n(C)(D) 根據KEYNOTE-024與IMPOWER110 study, PD-L1, TPS >50%(Dako 22C3) 單用Pembrolizumab, 與TC3/IC3(PD-L1 expression on ≥50% tumor cells/PD-L1-positive tumor-infiltrating immune cells covering ≥10% tumor area)單用Atezolizumab兩者ICI都優於platinum-based chemotherapy\nIMPOWER110\nKeynote-024\n\n(E) 根據CheckMate-017/057, KEYNOTE-010, OAK study, 單用Durvalumab pembrolizumab(PD-L1>1%) ),Atezolizumab作為二線治療比Docetaxel單用有OS統計上的優勢。\nKeynote-010\nOAK\nCM-017/057",
     "tags": []
   },
   {
@@ -672,7 +672,7 @@ export const questions114 = [
       "CROWN"
     ],
     "answer": null,
-    "explanation": "",
+    "explanation": "(A)針對ALK rearrangement的TKI當中，第一代Crizotinib 在CNS的穿透力差，濃度低；第二代（Alectinib, Ceritinib, Brigatinib）與第三代（Lorlatinib)穿透BBB能力獲得改進，對於CNS metastasis有較好的控制力，正確。\n(B)(C) 以下整理ALK rearrangement的TKI 常見的副作用與特性，如上一頁的表格所整理(感謝林口長庚張杰茵醫師整理)，Lorlatinib 是 CYP3A4 的Inducer(會增強功能)，且本身也受其代謝影響，指引建議選用不經 CYP3A4 代謝的 Rosuvastatin、Pravastatin 或 Pitavastatin。\n(D) NCCN guideline 後方的discussion有提到ALK rearrangement NSCLC使用mono IO效果都不好，不論其PD-L1的表現量，在AACR曾經發表過(Clin Cancer Res. 2016 Sep 15;22(18):4585-93.) Constitutive Expression的概念： 這些患者的 PD-L1 高表達並非源於免疫活化，而是由 ALK 融合蛋白 (EML4-ALK) 直接啟動下游信號通路（如 PI3K-AKT 或 MEK-ERK）所造成。這種「假性」高表達無法預測免疫治療的療效。\n\n(E) CROWN study 是Lorlatinib 跟 Crizotinib的比較，不是Alectinib，明顯錯誤。\nLorlatinib 跟 Crizotinib五年follow up顯示progression free rate 確實是60%跟5%。",
     "tags": []
   },
   {
@@ -692,7 +692,7 @@ export const questions114 = [
     "topic": "Lung",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "題幹考的是SVC syndrome的處置，我們先看看ESMO handbook的處置方式\n\n題幹考的是SVC syndrome的處置，原則是只有grade 4以上才先做支架處置，其他的要確定診斷才能處置\n(A) 需立即行氣管插管避免窒息>>錯誤，病人沒有上呼吸道阻塞的跡象\n(B) 若無呼吸道症狀，應安排病理診斷後再考慮放療或化療>>正確\n(C) 系統性類固醇為第一線標準治療>>錯誤，可能會讓lymphoma partial treated而困難診斷，要加類固醇至少要在切片完成之後，原則是盡快開始正確的治療。\n(D) 主動脈支架置放為所有SVCS患者首選治療>>錯誤，aortic stent對於SVC syndrome幫助有限，正確的診斷跟治療才是首選\n(E) 建議使用高劑量抗凝藥物預防肺栓塞>>錯誤，影像顯示(CT/echo)在SVC裡面開始有thrombus形成時才需要使用抗凝藥物，不需要primary prevention",
     "tags": []
   },
   {
@@ -712,7 +712,7 @@ export const questions114 = [
     "topic": "Adjuvant",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "題幹考的是neutropenic fever的處置，我們先看看NCCN的處置方式：\n\n(A) (B)錯誤，不能單用Ciprofloxacin 口服, G-CSF也不一定需要\n(C) 暫緩抗生素，待抽血培養結果出爐後決定是否給藥>>錯誤，要立刻給適合的抗生素\n(D) 立即住院並給予靜脈性 broad-spectrum 抗生素（如 cefepime）>>相對正確，因為題目的選項裡頭沒有給正確的OPD選項，所以住院使用廣效抗生素是本題的答案\n(E) 住院，同步給予 Meropenem 與 Vancomycin 以涵蓋多重抗藥菌>>住院單用Meropenem已經足夠，不需要emperical 使用Vancomycin(IDSA建議需要Empirical使用Vancomycin的情境包括:hemodynamic unstable/CRBSI/Skin or soft tissue infection/Pnrumonia/已知MRSA colonization)",
     "tags": []
   },
   {
@@ -732,7 +732,7 @@ export const questions114 = [
     "topic": "Trial interpretation",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "Imatinib 是第一代 CML TKI，長期安全性與成本優勢明顯；dasatinib、nilotinib、bosutinib 是第二代 TKI，通常能帶來更快、更深的分子反應與較少早期進展，但毒性較具藥物特異性，且整體存活未必明顯優於 imatinib。\n\n(E) T315I 的情況下，ponotinib有較好的療效 （錯誤：是T315I 的藥，但不是標準第一線首選。）\nPonatinib 是第三代 BCR-ABL1 TKI，主要用於對其他 TKI 產生 resistance 或 intolerance 的成人 CML 病人，尤其是具有 T315I mutation 的病人。\nPonatinib 副作用：Arterial occlusive events、Hypertension、Vascular events，使用前要評估心血管風險。\nT315I BCR-ABL1 mutation 是 CML 治療中的重要 resistance mutation。它會造成多數 TKI 效果不佳，包括：imatinib, dasatinib, nilotinib, bosutinib.\nELN 2020建議：若病人對初始使用的 第二代 TKI 產生 resistance，不管該第二代 TKI 是作為第一線或第二線使用，通常不容易對另一個第二代 TKI 產生持久反應。",
     "tags": []
   },
   {
@@ -754,7 +754,7 @@ export const questions114 = [
       "ECHELON-1"
     ],
     "answer": null,
-    "explanation": "",
+    "explanation": "36/120\n(A) Escalated BEACOPP 比起ABVD有較高的反應率（正確）\n(B) ABVD的副作用較escalated BEACOPP 少（正確）\nMounier N, et al. Lymphoma Study Association (LYSA). ABVD (8 cycles) versus BEACOPP (4 escalated cycles ≥ 4 baseline): final results in stage III-IV low-risk Hodgkin lymphoma (IPS 0-2) of the LYSA H34 randomized trial. Ann Oncol. 2014 Aug;25(8):1622-8.\nLYSA H34 trial : 在 stage III–IV 但 IPS 0–2 的低風險 Hodgkin lymphoma 病人中，BEACOPP 比 ABVD 有更好的疾病控制，尤其 5-year PFS 明顯較佳，93% vs 75%，且 relapse/progression 較少。 但 OS 沒有明確顯著差異，而 BEACOPP 的毒性與長期副作用較高，因此臨床選擇仍需在 降低復發風險 與 治療毒性 之間取得平衡。\n\n36/120\n(C) brentuximab vedotin 是抗CD30抗體並 connjugated with monomethyl auristatin-E toxic payload. 可用於 relapsed or refractory CD30-positive Hodgkin lymphoma(正確）\n(E) brentuximab vedotin最常見的治療相關副作用是過敏反應,因而導致停用。（錯誤，常見的是 peripheral neuropathy、neutropenia、GI symptoms、fatigue etc.)\nIndications :\nHodgkin Lymphoma (HL) after failure of autologous stem cell transplant (ASCT) or after failure of at least two prior multi-agent chemotherapy regimens in patients who are not ASCT candidates\nPatients with systemic Anaplastic Large Cell Lymphoma (ALCL) after failure of at least one prior multi-agent chemotherapy regimen\nSide effect : Peripheral neuropathy, Fatigue, Nausea, Diarrhea, Neutropenia, Fever, Alopecia, oral mucositis\n\n36/120\n(D) A randomized phase III trial (ECHELON-1 trial) 顯示若使用brentuximab vedotin 合併AVD 對比 ABVD可有意義 (p<0.05)提高兩年PFS.（正確）\nECHELON-1 : 探討 Newly diagnosed stage III–IV classical Hodgkin lymphoma治療，將標準 ABVD 裡的 bleomycin 替代為 brentuximab vedotin，形成 A+AVD，評估是否改善療效。\n6-year PFS : 82.3% vs 74.5%\n6-year OS :\n93.9% vs 89.4%",
     "tags": []
   },
   {
@@ -774,7 +774,7 @@ export const questions114 = [
     "topic": "Heme",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "36/120\n(A) 年齡大於35歲 (正確）\n(B) Immunophenotype of early T-cell precursor（正確，ETP為高風險 T-ALL phenotype）\n(C) hypodiploidy (正確）\n(D) iAMP21(正確, 下頁 table 2）\n(E) Leukocytosis with > 30x10⁹/L in T lineage （錯誤，B-ALL >30 × 10⁹/L；T-ALL >100 × 10⁹/L)\n\nGökbuget N, et al. Diagnosis, prognostic factors, and assessment of ALL in adults: 2024 ELN recommendations from a European expert panel. Blood. 2024 May 9;143(19):1891-1902.",
     "tags": []
   },
   {
@@ -794,7 +794,7 @@ export const questions114 = [
     "topic": "Heme",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "36/120\n(A) IgM monoclonal gammopathy of undetermined significance (MGUS)約有每年1%～5%會 惡化為MM。(錯誤，IgM MGUS 主要進展為 Waldenström macroglobulinemia 或其他 lymphoid malignancy，不是典型進展為 MM。）\n(B) t(4;14), t(14;16), t(14;20)之表現為high-risk myeloma。（正確）\nSonneveld P, et al. Treatment of multiple myeloma with high-risk cytogenetics: a consensus of the International Myeloma Working Group. Blood. 2016 Jun 16;127(24):2955-62.12\n\n36/120\n(C) 於不適合執行自體幹細胞移植之病患，第一線使用daratumumab, lenalidomide, dexamethasone (DRd)為合理的治療策略之一。（正確）\nMAIA trial 評估 transplant-ineligible newly diagnosed multiple myeloma, NDMM 病人中，第一線使用 D-Rd versus Rd 之效益\nD-Rd：daratumumab + lenalidomide + dexamethasone ; Rd：lenalidomide + dexamethasone\nLong-term result : 在不適合自體幹細胞移植的新診斷多發性骨髓瘤病人中，D-Rd 相較 Rd 顯著改善 PFS、OS、≥CR 與 MRD negativity，且未出現新的安全性問題，支持 D-Rd 作為此族群的重要第一線標準治療。\nFacon T, et al. Daratumumab/lenalidomide/dexamethasone in transplant-ineligible newly diagnosed myeloma: MAIA long-term outcomes. Leukemia. 2025.\n\n36/120\n(D) 第一線使用bortezomib, lenalidomide, dexamethasone (VRd)治療之病人，接受自體幹細胞移植之預後比沒有接受者較佳。（正確）\n在NDMM中，ASCT一直是適合移植病人的標準治療。IFM 2009 trial 想探討 在目前新藥組合VRd療效不錯的狀況下，那是否還需要upfront ASCT？\n結論：VRd induction 後接受 upfront ASCT 相較於 VRd alone 可顯著延長 PFS、提高 CR 與 MRD-negative rate，但未帶來明確 overall survival benefit，且毒性較高。\nSonneveld P, et al. Daratumumab, Bortezomib, Lenalidomide, and Dexamethasone for Multiple Myeloma. N Engl J Med. 2024 Jan 25;390(4):301-313.\n\n36/120\n(E) 於適合執行自體幹細胞移植之病患，第一線使用daratumumab, bortezomib, thalidomide, dexamethasone (DVTd)為合理的治療策略。（正確）\nCASSIOPEIA trial 評估在 transplant-eligible newly diagnosed multiple myeloma 病人中，於標準 VTd induction/consolidation + ASCT 基礎上加入 daratumumab 是否能改善治療深度與疾病控制。\n結論：D-VTd 相較 VTd 可顯著提高 sCR、MRD negativity 並延長 PFS，且安全性可接受，因此支持 D-VTd 作為 transplant-eligible NDMM 的一線 induction/consolidation 選項之一。\n(A) The results of the Kaplan-Meier estimates of PFS among patients in the ITT population. (B) The results of the Kaplan-Meierestimates of PFS among patients who did and did not achieve sCR (post-hoc analysis).\nMoreau P, et al. The Lancet Oncology, 2024; 25, 1003-1014",
     "tags": []
   },
   {
@@ -814,7 +814,7 @@ export const questions114 = [
     "topic": "Heme",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "36/120\n(A) Early-stage Hodgkin lymphoma的風險因子包含: bulky disease、ESR及侵犯的淋巴區域。（正確）\n(B) Interim PET/CT scan的評估結果可用以決定後續治療。（正確）\nJohnson P, Federico M, Kirkwood A, et al. Adapted treatment guided by interim PET-CT scan in advanced Hodgkin’s lymphoma. N Engl J Med. 2016;374:2419–2429. — interim PET-adapted strategy.\nRATHL trial 主要探討在 advanced-stage Hodgkin lymphoma 中，是否可以根據 interim PET/CT 結果調整後續治療強度。\nKey problem : 接受 2 cycles ABVD 後，如果 interim PET 陰性，是否可以拿掉 bleomycin，改用 AVD，以降低肺毒性而不明顯犧牲療效\nResult :\nPET2-negative：可省略 bleomycin，改 AVD (降低 bleomycin-related pulmonary toxicity。)\nPET2-positive：考慮升階治療，如 BEACOPP-based regimen (改善早期反應不佳病人的 disease control。)\nInterim PET/CT 成為 advanced HL 治療調整的重要工具\n\n36/120\n(C) 高復發風險的Hodgkin lymphoma，於自體幹細胞移植後，接受anti-CD30 antibody-drug conjugate (ADC)–brentuximab vedotin的鞏固治療可改善PFS。（正確）\nAETHERA  trial : 評估在 relapsed/refractory classical Hodgkin lymphoma 且具有高復發風險的病人中，接受 autologous stem-cell transplantation, ASCT 後，使用 brentuximab vedotin, BV 作為 consolidation 是否能改善預後。\nBV consolidation after ASCT 可顯著改善 PFS，但原始分析中尚未顯示明確 OS benefit。\n結論：對於 ASCT 後仍有高復發風險的 classical HL，早期給予 anti-CD30 ADC consolidation 可以延後復發、改善 PFS。\nMoskowitz CH, Nademanee A, Masszi T, et al. Brentuximab vedotin as consolidation therapy after autologous stem-cell transplantation in patients with Hodgkin’s lymphoma at risk of relapse or progression. Lancet. 2015;385:1853–1862.\n42.9 vs 24.1 months\n\n36/120\n(D) 根據ECHELON-1的結果: 在stage III/IV Hodgkin lymphoma的第一線治療中， brentuximab vedotin合併化療相較於傳統的化療ABVD，有較長的PFS及OS，且較少 的febrile neutropenia。(錯誤，A+AVD 的 febrile neutropenia 較常見)\nECHELON-1 trial 評估在 Previously untreated stage III/IV classical Hodgkin lymphoma中，比較A+AVD和ABVD的療效差異。希望以brentuximab vedotin 取代 bleomycin，既改善療效，同時避免 bleomycin-related pulmonary toxicity。\nA+AVD：brentuximab vedotin + doxorubicin + vinblastine + dacarbazine\nABVD：doxorubicin + bleomycin + vinblastine + dacarbazine\n結論：A+AVD 改善PFS也有OS benefit, 可避免bleomycin-related pulmonary toxicity，但較多neutropenia/febrial neutropenia, peripheral neuropathy, 需注意supportive care (G-CSF)\nAnsell SM, Radford J, Connors JM, et al. Overall survival with brentuximab vedotin in stage III or IV Hodgkin’s lymphoma. N Engl J Med. 2022;387:310–320.\n\n36/120\n(E) relapse/refractory Hodgkin lymphoma 接受PD-1 inhibitor，若接受異體幹細胞移植， 可能有較高風險產生graft versus host disease (GVHD)。（正確）\nPD-1 blockade 在 R/R cHL 有很高的反應率，但多數病人最後仍可能進展；而 allo-HCT 仍是部分病人具潛在治癒性的治療。\nBlood consensus 強調：PD-1 inhibitor 是 R/R Hodgkin lymphoma 的有效橋接治療，但在 allo-HCT 前後使用會增加 GVHD / immune toxicity 風險，因此需謹慎安排 washout、GVHD prophylaxis 與移植後監測。\n主要建議如下：\nPD-1 inhibitor 後接 allo-HCT 可行但有高風險。對於適合的 R/R cHL 病人仍可考慮，但需要更謹慎的移植策略與毒性監測。\n建議 PD-1 blockade 結束後與 allo-HCT 之間應有一段間隔（washout interval)，以降低早期 immune toxicity/GVHD 風險。\nGVHD prophylaxis 很重要。\nAllo-HCT 後再使用 PD-1 inhibitor：風險更高，需非常謹慎。\n若病人在 allo-HCT 後復發，再使用 PD-1 inhibitor 可能有效，但也可能誘發或加重 GVHD。應該：\n慎選病人 ; 從低劑量或謹慎劑量開始, 密切監測 GVHD\n避免在 active GVHD 或仍需高度免疫抑制時使用\n與 transplant team 共同決策\nMerryman RW, Armand P, Wright KT, Rodig SJ. Checkpoint blockade and allogeneic transplantation in Hodgkin lymphoma. Blood. 2018;132:9–16.",
     "tags": []
   },
   {
@@ -834,7 +834,7 @@ export const questions114 = [
     "topic": "Toxicity",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "(A) Tisagenlecleucel (tisa-cel)為針對CD19的CAR-T。(正確）\n\n(B) 曾接受bendamustine治療CAR-T 細胞治療效果和存活較差。(正確）\nRef. Iacoboni G, et al. Recent Bendamustine Treatment Before Apheresis Has a Negative Impact on Outcomes in Patients With Large B-Cell Lymphoma Receiving Chimeric Antigen Receptor T-Cell Therapy. J Clin Oncol. 2024 Jan 10;42(2):205-217.\n(A) Response rates in patients who were exposed to bendamustine before apheresis (Bendamustine) and who were not exposed before apheresis (No Bendamustine). The P value stands for the difference in overall response rate.\n(B) Response rates after IPTW analysis, in bendamustine-exposed and bendamustine-na¨ıve subsets.\n(C) PFS according to bendamustine exposure before apheresis.\n(D) PFS after IPTW analysis for bendamustine-exposed and bendamustine naive subsets.\n(E) OS according to bendamustine exposure before apheresis.\n(F) OS after IPTW analysis for bendamustine-exposed and bendamustine-naive subsets\n\n(C) Cytokine release syndrome (CRS)為CAR-T常見的副作用，所有發生CRS 的病人都 必須進行血液培養、尿液培養、胸部X 光等檢查，用以排除感染的可能性。（正確）\n(D) 當出現grade 2 以上CRS時應給予tocilizumab治療。（正確）\n\n(E) 當病人接受CAR-T後出現意識混亂、癲癇發作或語言障礙等神經學表現，應評估 是否為immune effector cell-associated neurotoxicity syndrome (ICANS)，並應先給予 tocilizumab治療。（錯誤，建議先給予steroid, 沒有建議Tocilizumab, Ref : NCCN 2026, V2 ）",
     "tags": []
   },
   {
@@ -854,7 +854,7 @@ export const questions114 = [
     "topic": "Metastatic",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "Overall ToGA population : 22.1%.  The proportion of patients with HER2- positive disease was similar for Europe (23.6%), Asia (23.5%), and Japan (27.6%)\nHsu JT, et al.  Impact of HER-2 overexpression/amplification on the prognosis of gastric cancer patients undergoing resection: a single-center study of 1,036 patients. Oncologist. 2011;16(12):1706-13.\n\n(B) 根據ToGA trial的結果: HER2 positive的晚期胃腺癌接受trastuzumab合併化學治療，相較於化學治療,顯著延長病患的整體存活期 (Overall Survival) (正確：13.8 vs 11.1months, HR 0.74, p=0.0046)\nToGA trial 探討 Trastuzumab+化療(5FU/Xeloda+Cisplatin) 作為 HER2-positive advanced gastric/GEJ adenocarcinoma 第一線標準治療的重要trial。\n\n(C) 根據KEYNOTE 811 trial結果顯示: HER2 positive的晚期胃腺癌, 即使CPS<1, trastuzumab 和pembrolizumab合併化學治療，相較於trastuzumab合併化學治療，顯著延長病患的整體存活期 (Overall Survival) (錯誤，在 CPS <1 的病人benefit 不明確。）\nKN-811 trial 探討在 ToGA trial 標準治療的基礎上，加上 Pembrolizumab 是否能更進一步改善HER2-positive advanced gastric/GEJ adenocarcinoma 療效。\nPFS (Intent-to-treat)\nPFS (CPS ≥1)\nOS (Intent-to-treat)\nOS (CPS ≥1)\nPFS\n\n(D) 根據DESTINY Gastric 04 結果顯示: HER2 positive的晚期胃腺癌在二線接受T-DXd治療， 相較於Ramucirumab+ paclitaxel，顯著延長病患的整體存活期 (Overall Survival) (正確）\n(E) HER2 的表現會因為病人接受過trastuzumab而有所改變, 因此建議接受後線T-DXd之前可再切片確認HER2 的表現 (正確）\nDESTINY Gastric 04 探討 T-Dxd 在HER2-positive advanced gastric/GEJ adenocarcinoma 第二線是否優於標準治療Ramucirumab+Paclitaxel。\n文中提到 HER2 expression 可能在 trastuzumab 治療後下降，後線使用 T-DXd 前可考慮 re-biopsy 重新確認 HER2 status。\n原文：This trial required rebiopsy after progression occurred during previous treatment with trastuzumab in order to confirm HER2 status. These results support the current recommendation and consideration of rebiopsy to confirm HER2 status before trastuzumab deruxtecan treatment, if feasible.",
     "tags": []
   },
   {
@@ -878,7 +878,7 @@ export const questions114 = [
       "KEYNOTE-859"
     ],
     "answer": null,
-    "explanation": "",
+    "explanation": "詳解：CM649是轉移性胃癌HER2陰性，一線比較Nivolumab加上化療與單獨化療\n\n詳解：Primary endpoint為CPS>=5的OS，顯著延長(14.4個月 vs 11.1個月)\nPS: 其實研究設計應該是>=5才對，不過題目選項說>5，好像也不能說他錯?\n\n詳解：根據KN859和CM649，IO+ChT在HER2陰性胃癌的all-comer有OS的顯著好處\n\n詳解：但在CPS<1的subgroup差異不顯著，因此FDA不建議在CPS<1的族群合併IO\nPS: 但是注意KN-859和CM-649的原始設計都是all-comer，沒有設定CPS收案(CM-649的primary endpoint是看CPS>=5)\n\n詳解：跟CM649類似的設計，把Nivolumab換成Pembrolizumab\n\n詳解：All-comer的OS有顯著差異，但同樣FDA只給在CPS>=1族群的適應症\n\n詳解：根據KN-062和CM-649的subgroup，在MSI-H/dMMR病人可以考慮使用免疫治療。\n\n詳解：ATTRACTION-2在二線以上的晚期胃癌，與PBO相比可顯著改善OS。",
     "tags": []
   },
   {
@@ -898,7 +898,7 @@ export const questions114 = [
     "topic": "Metastatic",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "43/120\n詳解：目前轉移性胃癌第一線治療需要檢驗的項目包括HER2、PDL1 CPS、Claudin 18.2、MSI-H/dMMR status。其他如NTRK、FGFR2b也在考慮選項或是仍在臨床試驗當中。",
     "tags": []
   },
   {
@@ -920,7 +920,7 @@ export const questions114 = [
       "SPOTLIGHT"
     ],
     "answer": null,
-    "explanation": "",
+    "explanation": "43/120\n詳解：Claudin是一種跨膜蛋白，其中的分型18.2在正常狀態下主要位於胃黏膜細胞，但在惡性腫瘤情況下會異常高度表達/暴露出來，亦為Zolbetuximab target site。\n\n43/120\n詳解：Monoclonal Ab (Zolbetuximab)定義的CLDN18.2陽性是IHC染色75%以上，目前仍在研究中的BiTE、CAR-T等定義為40%以上，而ADC定義為1%以上。\n\n43/120\n詳解：現有關於CLDN18.2的study，並無發現與HER2、PDL1或MSI-H/dMMR status有相關性。\n\n43/120\n詳解：SPOTLIGHT (+FOLFOX)和GLOW (+CAPOX)皆證實合併Zolbetuximab可改善OS。\nPS: 注意加上Zolbetuximab並沒有增加response rate。\n\n43/120\n(E) Zolbetuximab最常見副作用為Nausea及Vomiting，第一次打並不明顯，但會隨著打的次數而增加\n詳解：Zolbetuximab導致的N/V最常出現在第一個cycle，第二次以後減少。\nPS: 不過trial吐的那麼厲害某方面可能是因為一開始實驗設計不能用dexan。",
     "tags": []
   },
   {
@@ -940,7 +940,7 @@ export const questions114 = [
     "topic": "Metastatic",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "43/120\n詳解：根據CM-648，Nivolumab合併化療相對於單純化療，在all-comer可改善OS。\n\n43/120\n詳解：根據CM-648，Nivo+Ipi相對於單純化療，在all-comer和TC ≥1%族群可改善OS。\nPS: 嚴格說起來B選項也錯，因為CM-648是看TC而不是看TPS。\n\n43/120\n詳解：根據CM-648，Nivo+Ipi相對於單純化療，在all-comer和TC ≥1%族群都沒有改善PFS，甚至較差。\n\n43/120\n詳解：根據CM-648，Nivo+Ipi相對於單純化療，在all-comer和TC ≥1%族群有numerical較好的ORR，但DCR不如化療。",
     "tags": []
   },
   {
@@ -960,7 +960,7 @@ export const questions114 = [
     "topic": "GU",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "43/120\n詳解：根據NETTER-1和NETTER-2 study，收案對象為well-differentiated NET (NETTER-1為midgut G1-2 NET，SSA後failure；NETTER-2為GEP G2-3 NET，一線治療)。\n\n43/120\n詳解：NCCN guideline關於PRRT的principle。Neuroendocrine hormone crisis或carcinoid crisis為PRRT的副作用。另外注意NETTER-1和2的副作用都有MDS。",
     "tags": []
   },
   {
@@ -980,7 +980,7 @@ export const questions114 = [
     "topic": "GI",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "43/120\n詳解：NCCN guideline的HCC screening，對象包括HBV、HCV、酒精、MASLD導致的Child A-B cirrhosis，Child C cirrhosis且為肝移植候選人，以及所有慢性HBV患者。\n\n43/120\n詳解：所有慢性HBV患者皆應考慮定期篩檢HCC。\n\n43/120\n詳解：正確，MASLD有合併肝硬化應定期篩檢HCC。\n\n43/120\n詳解：HCV患者如在治療到SVR前已合併肝硬化，罹患HCC的風險並不會消失，仍應篩檢。\n\n43/120\n詳解：AFP與超音波為定期篩檢的核心。\n\n43/120\n詳解：AFP與超音波為定期篩檢的核心。如AFP升高或超音波陽性，則考慮做dynamic CT/MRI進一步評估。",
     "tags": []
   },
   {
@@ -1242,7 +1242,7 @@ export const questions114 = [
     "topic": "Radiation/CCRT",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "concurrent cisplatin-RT 優於 RT alone\n比起單純使用RT，加入 concurrent chemotherapy 可提升存活， 5 年 absolute OS benefit 約 6.5%；其中在subgroup分析(右下圖)， cisplatin-based chemoradiotherapy 效果較優。\nPignon, J. P. et al. (2009). Meta-analysis of chemotherapy in head and neck cancer (MACH-NC): an update. Radiotherapy and Oncology, 92(1), 4–14. https://doi.org/10.1016/j.radonc.2009.04.014\n\nRT + cetuximab 優於 RT alone\nBonner phase III trial 顯示，局部晚期頭頸癌接受 radiotherapy + cetuximab 的 median OS 為 49.0 個月，單純 RT 為 29.3 個月；5 年 OS 為 45.6% vs 36.4%\nBonner, J. A. et al. (2010). Radiotherapy plus cetuximab for locoregionally advanced head and neck cancer: 5-year survival data. Lancet Oncology, 11(1), 21–28.\nhttps://doi.org/10.1016/S1470-2045(09)70311-0\n\nRT + cisplatin 優於 RT + cetuximab\nRTOG 1016 在 HPV-positive oropharyngeal cancer 比較 cisplatin-RT vs cetuximab-RT，5 年 OS 約 84.6% vs 77.9%，cetuximab 死亡風險較高(95% CI 1·03–2·05; p=0·0163)(左下)\nDe-ESCALaTE HPV 也顯示 2 年 OS 97.5% vs 89.4%，cisplatin 較佳。(中)\nARTSCAN III (Phase III randomized trial) 在HPV-negative HNSCC比較 cisplatin-RT vs cetuximab-RT，3年OS 約88% vs 78%(HR 1.63; 95% CI, 0.93 to 2.86; P = .086) (右下)\n\n對於locally advanced head and neck cancer，下列三種治療的存活率綜合比較\n因此答案為",
     "tags": []
   },
   {
@@ -1262,7 +1262,7 @@ export const questions114 = [
     "topic": "Adjuvant",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "重點-> 可省略 RT 的典型族群： elderly + ER(+) + T1 + N0 + endocrine therapy\nCALGB 9343 trial 納入70歲以上、T1N0、HR(+)的病人，接受lumpectomy 後分為Tamoxifen alone or Tamoxifen+RT，結果顯示有加RT可以降低local recurrence rate(10% vs 2%)，但是對overall survival 沒有差異。\nPRIME II trial 納入65歲以上、tumor≤3 cm、N0、HR(+)的病患，接受breast-conserving surgery 後接受endocrine therapy with or without RT，結果顯示有加RT可以降低local recurrence rate(9% vs 0.9%)，但對OS 和distant recurrence沒有差異。(10-yr OS 都是80%左右)\nHughes KS, Schnaper LA, Bellon JR, et al. Lumpectomy plus tamoxifen with or without irradiation in women age 70 years or older with early breast cancer: long-term follow-up of CALGB 9343. J Clin Oncol. 2013;31(19):2382-2387. doi:10.1200/JCO.2012.45.2615\nKunkler, I. H. et al. (2023). Breast-conserving surgery with or without irradiation in early breast cancer. New England Journal of Medicine / PRIME II long-term update.\n\n(B) 年齡 50–60 歲，腫瘤分級 3（高分化），HER2 陽性，Ki67 高者。\nEBCTCG meta-analysis 顯示: 乳房保留手術後 RT 可大幅降低 recurrence (十年平均為35% vs 19%) ，也下降breast cancer related death (15yr 下降3.8%)，特別是在越年輕的族群、high-grade tumor、ER-poor。\n10年breast cancer specific survival : 79% in luminal A, 64% in luminal B, 57% in luminal-HER2。顯示ki-67高的、HER2+的，預後更差，所以目前在ASTRO guideline還是建議這類病患接受術後RT。\nEarly Breast Cancer Trialists’ Collaborative Group (EBCTCG). (2011). Effect of radiotherapy after breast-conserving surgery on 10-year recurrence and 15-year breast cancer death. Lancet, 378(9804), 1707–1716. https://doi.org/10.1016/S0140-6736(11)61629-2\nCheang, M. C. et al. (2009). Ki67 index, HER2 status, and prognosis of patients with luminal B breast cancer. Journal of the National Cancer Institute, 101(10), 736–750. https://doi.org/10.1093/jnci/djp082\n\n(C) 任何年齡，腫瘤直徑 >3 cm，淋巴結陽性者。\nEBCTCG meta-analysis 顯示: 在pN+的病患接受\nPMRT，更顯著下降recurrence rate (locoregional\nor distant, 10 yr recurrence rate 63.7%-> 42.5%) 和\nbreast cancer death (15yr death rate 51.3%->42.8%)\nPRIME II trial 列入tumor≤3 cm的病患\nCALGB 9343 trial 列入T1N0的病患\n→ 目前tumor >3cm 沒有被列為low-risk\nEarly Breast Cancer Trialists’ Collaborative Group (EBCTCG). (2011). Effect of radiotherapy after breast-conserving surgery on 10-year recurrence and 15-year breast cancer death. Lancet, 378(9804), 1707–1716. https://doi.org/10.1016/S0140-6736(11)61629-2\n\nTNBC 在 breast-conserving therapy 後，比起其他subtype在5-yr distant-metastasis free rate 為 67% vs 82%, p=0.002。TNBC 被列為是independent predictor of distant metastasis and poor survival rate。\nHaffty, B. G. et al. (2006). Locoregional relapse and distant metastasis in conservatively managed triple negative early-stage breast cancer. Journal of Clinical Oncology, 24(36), 5652–5657. https://doi.org/10.1200/JCO.2006.06.5664",
     "tags": []
   },
   {
@@ -1282,7 +1282,7 @@ export const questions114 = [
     "topic": "Adjuvant",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "(A) 術後合併temozolomide和放射線治療，可以增加多型性神經膠母細胞瘤(glioblastoma)無惡化存活期\nStupp trial : RT alone vs RT + concurrent/adjuvant TMZ in newly-diagnosed GBM\n84% patients had undergone debulking surgery\nRT  dose : 60Gy/30Fx\ntemozolomide dose: 75mg/m2/day during RT, and followed by six cycles of adjuvant temozolomide 150-200 mg/m2/day for 5 days during 28-day cycle\nStupp, R. et al. (2005). Radiotherapy plus concomitant and adjuvant temozolomide for glioblastoma. New England Journal of Medicine, 352, 987–996. https://doi.org/10.1056/NEJMoa043330\nHR 0.63, p<0.001\nHR 0.54, p<0.001\n\n(A) 術後合併temozolomide和放射線治療，可以增加glioblastoma無惡化存活期\nMGMT promoter methylation 是 MGMT  (O6-methylguanine–DNA methyltransferase) epigenetic silencing 的一種方式，會導致DNA repair受損，讓TMZ-induced DNA damage 無法修復，進而延長病患存活率。 (MGMT在GBM病患盛行率約為40-45%)\nHegi study :  整體而言，帶有MGMT methylation的病患有較好的OS (18.2 mon vs 12.2 mon)(左下圖)\n而在帶有MGMT methylation的病患，接受RT+TMZ 比起只接受RT 的mOS為21.7mon vs 15.3 mon (p=0.007) ，但是在non MGMT methylation的病患，OS 在兩組間沒有significant benefits (p=0.06)\n(右下圖)\nHegi, M. E. et al. (2005). MGMT gene silencing and benefit from temozolomide in glioblastoma. New England Journal of Medicine, 352, 997–1003. https://doi.org/10.1056/NEJMoa043331\n\nRoa trial (2004): 收錄elderly (age ≥60)的病患，比較60 Gy/30 fx and 40 Gy/15 fx，發現OS 沒有顯著差異 (mOS 5.1 mon for 60Gy and 5.6 mon for 40Gy, p=0.57) → 支持可以在elderly 使用hypofraction RT\nRoa W, Brasher PM, Bauman G, et al. Abbreviated course of radiation therapy in older patients with glioblastoma multiforme: a prospective randomized clinical trial. J Clin Oncol. 2004;22(9):1583-1588. doi:10.1200/JCO.2004.06.082\nIAER trial (2015): 收錄elderly (age ≥65 and KPS 80-100%)/elderly and frail (age ≥65 and KPS 50-70%)/frail (age >50 and KPS 50-70%) ，發現40 Gy/15 fx或25Gy/5Fx 沒有OS 差異(mOS 7.9 mon vs 6.4 mon, p=0.988) →支持在elderly and/or frail patient 可以再更減少RT dosage\nRoa W, Kepka L, Kumar N, et al. International Atomic Energy Agency Randomized Phase III Study of Radiation Therapy in Elderly and/or Frail Patients With Newly Diagnosed Glioblastoma Multiforme. J Clin Oncol. 2015;33(35):4145-4150. doi:10.1200/JCO.2015.62.6606\nNordic trial(2012): 收錄elderly (age ≥60)的病患，比較60 Gy/30 fx 和34 Gy/10 fx，發現OS 沒有差異，但是在age ≥70的病患，更偏好使用34 Gy/10 fx (HR 0.59, p=0.02)→支持在elderly 使用hypofraction RT\nMalmström A, Grønberg BH, Marosi C, et al. Temozolomide versus standard 6-week radiotherapy versus hypofractionated radiotherapy in patients older than 60 years with glioblastoma: the Nordic randomised, phase 3 trial. Lancet Oncol. 2012;13(9):916-926. doi:10.1016/S1470-2045(12)70265-6\n\nEORTC 22844 : 研究 low-grade glioma RT dose escalation ，比較45Gy/25fx 與59.4Gy/33fx 的存活率，發現增加dose到59.4Gy/33fx並沒有增加OS and PFS benefit\nKarim, A. B. et al. (1996). A randomized trial on dose-response in radiation therapy of low-grade cerebral glioma: EORTC 22844. International Journal of Radiation Oncology Biology Physics, 36(3), 549–556.\n\nEORTC 22033-26033 : 研究 單獨使用Temozolomide(TMZ) vs 單獨接受RT 在 high-risk low-grade glioma 的比較\nTMZ 75 mg/m²/day for 21 days every 28 days, up to 12 cycles\nRT 50.4Gy/28Fx\n發現沒有PFS benefit (mPFS 39 mon vs 46 mon, HR 1.16, p=0.22) (OS not reach)\nBaumert, B. G. et al. (2016). Temozolomide chemotherapy versus radiotherapy in high-risk low-grade glioma (EORTC 22033-26033): a randomised, open-label, phase 3 intergroup study. Lancet Oncology, 17(11), 1521–1532. https://doi.org/10.1016/S1470-2045(16)30313-8",
     "tags": []
   },
   {
@@ -1302,7 +1302,7 @@ export const questions114 = [
     "topic": "Radiation/CCRT",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "放射治療劑量體積大小(GTV, gross tumor volume; CTV, clinical target volume; ITV, Internal target volume; PTV, planning target volume)定義如下\n1. GTV, gross tumor volume: 影像上看得見的腫瘤 ，包含primary tumor and gross LNs\n2. CTV, clinical target volume: GTV +microscopic disease extension (Ex: 頭頸癌GTV 為影像上看見的LN，但是我們還會包含CTV (adjacent tissue infiltration 、elective nodal area)\n3. ITV, Internal target volume: CTV + internal motion margin (Ex: lung cancer 用respiratory gating，所以比CTV 又更大)\n4. PTV, planning target volume: 為ITV + setup margin，要多考慮setup uncertainty + machine uncertainty ，就是實際 treatment planning 要 cover 的範圍\n所以選(E) PTV>ITV>CTV>GTV\nICRU Report 50. Prescribing, Recording and Reporting Photon Beam Therapy. International Commission on Radiation Units and Measurements. 1993.\nICRU Report 62. Prescribing, Recording and Reporting Photon Beam Therapy (Supplement to ICRU Report 50). 1999.\nICRU Report 83. Prescribing, Recording, and Reporting Intensity-Modulated Photon-Beam Therapy (IMRT). 2010.",
     "tags": []
   },
   {
@@ -1322,7 +1322,7 @@ export const questions114 = [
     "topic": "Heme",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "腫瘤治療後經常以各種影像檢查方式評估治療的療效(assessment of clinical response)。 以下， 『適用的腫瘤評估標準』與『腫瘤別或特殊治療』的組合中，不正確的是：\n(A) Modified RECIST：Melanoma (X)\n(E) iRECIST：for immunotherapy (O)\nModified RECIST 適用在HCC，因為在接受TACE, RFA之後，腫瘤不一定會縮小，但是enhancement會減少，所以用mRECIST評估viable enhancing tumor 。\nLencioni, R., & Llovet, J. M. (2010). Modified RECIST (mRECIST) assessment for hepatocellular carcinoma. Seminars in Liver Disease, 30(1), 52–60. https://doi.org/10.1055/s-0030-1247132\nMelanoma ，特別是在使用immunotherapy時，用的是irRC（immune-related response criteria） or immune RECIST，因為免疫治療常出現pseudoprogression，可定義為iUPD（unconfirmed PD)，繼續使用免疫藥物，於4-8周後再接受confirmation scan ，若還是繼續變大，才正式定義為iCPD(confirmed PD)。\nSeymour, L. et al. (2017). iRECIST: guidelines for response criteria for use in trials testing immunotherapeutics. Lancet Oncology, 18(3), e143–e152. https://doi.org/10.1016/S1470-2045(17)30074-8\n\n腫瘤治療後經常以各種影像檢查方式評估治療的療效(assessment of clinical response)。 以下， 『適用的腫瘤評估標準』與『腫瘤別或特殊治療』的組合中，不正確的是：\n(B) RANO criteria：CNS tumors (O)\nRANO(Response Assessment in Neuro-Oncology )，專門設計給Glioma, GBM, brain metastasis，因為brain tumor 常常有steroid effect、pseudoprogression、non-enhancing disease，所以RANO 加入MRI T2/FLAIR change 、steroid use、neurologic status評估。\nWen, P. Y. et al. (2010). Updated response assessment criteria for high-grade gliomas: Response Assessment in Neuro-Oncology Working Group. Journal of Clinical Oncology, 28(11), 1963–1972. https://doi.org/10.1200/JCO.2009.26.3541\n\n腫瘤治療後經常以各種影像檢查方式評估治療的療效(assessment of clinical response)。 以下， 『適用的腫瘤評估標準』與『腫瘤別或特殊治療』的組合中，不正確的是：\n(C) Choi criteria：GIST (O)\nGIST 在使用藥物之後，可能會產生tumor necrosis或density下降但大小沒有變小，用傳統RECIST 無法準確評估治療療效，所以Choi 除了看size，還加入CT attenuation（HU density）評估，partial response 定義為 size 縮小 ≥10% 或 density 下降 ≥15%\nChoi, H. et al. (2007). Correlation of CT and PET in patients with metastatic GIST treated at a single institution with imatinib mesylate. AJR American Journal of Roentgenology, 189(5), 1204–1213.\n\n腫瘤治療後經常以各種影像檢查方式評估治療的療效(assessment of clinical response)。 以下， 『適用的腫瘤評估標準』與『腫瘤別或特殊治療』的組合中，不正確的是：\n(D) IWG criteria：lymphoma (O)\nInternational Working Group criteria (IWG) 是 lymphoma response assessment 傳統標準。 需要考慮nodal disease、PET response、bone marrow involvement。\nCheson, B. D. et al. (2007). Revised response criteria for malignant lymphoma. Journal of Clinical Oncology, 25(5), 579–586. https://doi.org/10.1200/JCO.2006.09.2403",
     "tags": []
   },
   {
@@ -1342,7 +1342,7 @@ export const questions114 = [
     "topic": "Trial interpretation",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "Intention-to-treat (ITT) 定義: 只要randomized後，即使沒接受治療、沒完成療程、protocol violation、crossover 都要納入分析。\n因為randomization目的就是要平衡各種confounders ，可以避免selection bias、atribution bias或是post-randomization bias。\nCONSORT guideline 明確規定: all randomized participants should be analyzed in assigned groups.\n→ 所以(A)對、(B)錯\nGupta, S. K. (2011). Intention-to-treat concept: A review. Perspectives in Clinical Research, 2(3), 109–112. https://doi.org/10.4103/2229-3485.83221\n\nInterim analysis 應由獨立 DMC review ，因為Interim analysis可能看到early efficacy or toxicity signals，若由 investigator 自己看會出現operational bias，所以應該由Independent Data Monitoring Committee (IDMC/DMC) 協助檢視。\nIDMC/DMC主要功能是監督病人安全、治療效果、是否符合人體試驗規範，再決定這個trial是否要繼續或提早停止。\nEllenberg, S. S. et al. (2002). Data Monitoring Committees in Clinical Trials.\n\n臨床試驗的設計都必須 pre-specify\n1. hypothesis : superiority, noninferiority, equivalence\n2. significance level : 通常是 α = 0.05\n3. confidence interval : 通常是 hazard ratio 、treatment effect  的 95% CI\n這些都是要避免post hoc hypothesis creation 、selective reporting 、p-hacking (為了得到 statistically significant（p<0.05）而反覆操作分析方式)  等等問題。\nICH E9 Statistical Principles for Clinical Trials.\n\nKaplan-Meier 是最常被使用的survival analysis 。\n可以估計overall survival , progression-free survival , disease-free survival 等等，可以處理censored data ，讓survival不會被低估。\n定義補充:\nEvent : 已知發生死亡/復發\nCensored : 只知道「至少活到某時間」\nKaplan, E. L., & Meier, P. (1958). Nonparametric estimation from incomplete observations. Journal of the American Statistical Association, 53(282), 457–481.",
     "tags": []
   },
   {
@@ -1362,7 +1362,7 @@ export const questions114 = [
     "topic": "Metastatic",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "Pharmaceuticals (Basel). 2025;18(2):280. Published 2025 Feb 19.\nFruquintinib> 適應症: 適⽤於治療先前曾接受下列療法的轉移性⼤腸直腸癌(mCRC)成⼈病⼈，包括fluoropyrimidine-、 oxaliplatin-、irinotecan-為基礎的化療，和抗⾎管內⽪⽣⻑因⼦(anti-VEGF)等療法；若KRAS為原⽣ 型(wild type)，則需接受過抗表⽪⽣⻑因⼦受體(anti-EGFR)療法。\nRegorafenib > 台灣健保給付: 轉移性大腸癌 後線、二線HCC、三線晚期GIST\n\n根據Phase III trial adverse events 分析，使用Lenvatinib的組別: 高血壓 (42%)、蛋白尿(25%)、Hypothyroidism (16%) 皆屬常見\nBr J Cancer. 2020;122(12):1754-1759.\nJ Hepatocell Carcinoma. 2023;10:1069-1083. Published 2023 Jul 10.\n\n!! Cabozantinib 不走RAS路徑\nFront Oncol. 2021;11:756672. Published 2021 Oct 13.\n\n> 這題根據A、C選項可以推論Fruquintinib較專一，但沒有Head-to-head trial可以比較，根據各自的Phase III trial Fruquintinib的副作用比例好像沒有比Regorafenib少，但Off-target的副作用較少! 副作用比較不雜:\nVEGFR inhibition →\nHTN、proteinuria、HFS（class effect）\n非 VEGFR（off-target）→\nRAF → rash、diarrhea\nKIT/PDGFR → marrow / skin toxicity\nFGFR → metabolic / endocrine effects\nLancet. 2013;381(9863):303-312.  (CORRECT trial)\nLancet. 2023;402(10395):41-53.  (FRESCO-2 trial)",
     "tags": []
   },
   {
@@ -1382,7 +1382,7 @@ export const questions114 = [
     "topic": "Metastatic",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "(A, B, C) 皆為正確敘述 用圖表說明\nSci Rep. 2022;12(1):12528. Published 2022 Jul 22.\n重要資訊\nType1: classic V600E\nType2: BRAF dimer\nType3: RAS dependent\n\n> 專一設計給BRAF V600E的藥物\n> 健保給付: 與cetuximab 併用，作為具有BRAF V600E 突變的轉移性結腸直腸癌成人病人之第二線治療\nSci Rep. 2022;12(1):12528. Published 2022 Jul 22.\n\n> 目前沒有建議要合併MEK inhibitor，非標準治療(Standard of Care)\n> Class 2 對於BRAF inhibitor 效果不好，因為BRAF inhibitor大多都是設計給Class1 (monomer)，Dimer結構的Class 2 族群效果不好\n> Class 3 的driver 在 RAS / upstream RTK（例如 EGFR)，臨床上anti-EGFR效果較好\n> 針對Class2/3的病人尚無標準治療，目前臨床試驗嘗試用Pan-RAF inhibitor or ERK inhibitor 突破困境 (Nat Commun. 2026;17(1):2484. Published 2026 Feb 7.)\nSci Rep. 2022;12(1):12528. Published 2022 Jul 22.",
     "tags": []
   },
   {
@@ -1402,7 +1402,7 @@ export const questions114 = [
     "topic": "Biomarker",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": ">白金類藥物主要是形成 DNA intra-/inter-strand crosslink，進而阻斷 DNA 的複製與轉錄。\n\nLarotrectinib 是針對 NTRK基因融合的標靶藥物。\n若要治療具有 RET 基因突變或融合的腫瘤，臨床上常用的藥物是 Selpercatinib 或 Pralsetinib。\nDacarbazine 雖然屬於烷化劑 (Alkylating agent)，但它是一種單功能基 (Monofunctional) 烷化劑，主要作用是將 DNA 鹼基甲基化，而非直接與 DNA 鹼基形成 cross-link。典型的「Cross-link」通常是由雙功能基烷化劑（如 Cyclophosphamide 或鉑類）產生的。\n\n(E) TAS-102 (Lonsurf)：此選項將兩種成分的作用顛倒了。此藥物用於晚期大腸直腸癌後線\nTrifluridine (FTD)： 是具有細胞毒性的活性成分，會嵌入 DNA。\nTipiracil (TPI)： 才是用來抑制 Thymidine phosphorylase (TP) 的成分，目的是防止 Trifluridine 被分解，從而維持其血中濃度。",
     "tags": []
   },
   {
@@ -1422,7 +1422,7 @@ export const questions114 = [
     "topic": "Biomarker",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "> dMMR主要是透過免疫組織化學染色(IHC) 觀察四種 MMR 蛋白的「表現缺失」來判定，而非測定「酵素活性」。\n> MSI-H 為檢測DNA中微衛星序列的長度變化，用於評估腫瘤細胞修復DNA的能力。通常是PCR-based，比對正常與腫瘤組織的微衛星標記。\n(B) MSI-L（Microsatellite instability–low）屬錯配修復功能缺損類型，因此與 MSI-H 具有相似之免疫療效反應性\n> 不相似!!! MSI-L 跟Microsatellite Stable 差不多，幾乎沒有免疫治療 benefit\n> 看到完全一致這種敘述一定錯；discordance 約 1–10%\n\n(D) dMMR 腫瘤(大腸癌)中 MLH1 缺失若伴隨 BRAF V600E 突變，根據臨床資料，暗示通常 為偶發性(sporadic) 而非遺傳性腫瘤。 (正確)\n> dMMR/MSI-H 的成因有兩種：遺傳性（如 Lynch Syndrome）或 偶發性（Sporadic）。\n> 偶發性機制： 通常是因為 MLH1 基因的啟動子（Promoter）發生高度甲基化，導致蛋白質不表現。這類偶發性個案常伴隨 BRAF V600E 突變。 BRAF 突變在 Lynch Syndrome 患者中極為罕見。\n> 臨床應用： 因此，當看到 MLH1 蛋白缺失且偵測到 BRAF V600E 突變時，臨床上強烈暗示這是「偶發性」腫瘤，通常不需要再進一步進行遺傳諮詢或生殖細胞（Germline）檢測。\nMMR 蛋白的正確名稱：\n臨床 IHC 常規檢測的四種 MMR 蛋白是：MLH1、MSH2、MSH6、PMS2。",
     "tags": []
   },
   {
@@ -1442,7 +1442,7 @@ export const questions114 = [
     "topic": "Adjuvant",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "> Degarelix是GnRH antagonist；直接競爭性結合垂體的 GnRH 受體，從而立即抑制 LH 和 FSH 的分泌，使睪固酮濃度迅速下降，不會產生初期刺激作用。(D選項)\n>GnRH agnoist（如 Leuprolide、Goserelin）： 才會像選項中所述，初期先刺激受體導致激素暫時升高（Hormonal surge），長期使用後才透過受體下調（Down-regulation）達到去勢效果。",
     "tags": []
   },
   {
@@ -1462,7 +1462,7 @@ export const questions114 = [
     "topic": "Biomarker",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "這題主要問的就是\"Acquired mutation\"\nEGFR 使用 gefitinib 後典型 acquired mutation / gatekeeper mutation 是 T790M，不是 L858R。\nL858R：EGFR 的 activating/sensitizing mutation (發病時就可有的)\n其他選項好像就是記下來...整理如表",
     "tags": []
   },
   {
@@ -1482,7 +1482,7 @@ export const questions114 = [
     "topic": "Metastatic",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "引用懷玨大師的整理 (推薦閱讀!)，Cancer Hallmarks 在2000出版之後，2011, 2022, 2026都有更新\n\n(C) Unlocking phenotypic plasticity → added since 2022…\n原題題幹有提到(Cell 2000; Cell 2011)，所以可能只能選C\n\n補充2026 Hallmarks of Cancer (Cell, 2026)\n細胞內部 (四個):\n持續生長: Proliferative signaling, Inactive growth suppressor;\n不死永生: Resisted program death, replicative immortality\n其他 (五個):\nCellular metabolism\nPhenotypic plasticity\nVasculature\nInvasion and metastasis\nEvade immune destruction\n還有其他的維度interaction可以增強以上九項能力",
     "tags": []
   },
   {
@@ -1502,7 +1502,7 @@ export const questions114 = [
     "topic": "Biomarker",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "Sotorasib: KRAS G12C inhitibor → 抑制proliferative signalling, correct\nOlaparib: PARP inhibitor, 讓cancer cell 累積genomic instability → correct\nEncorafenib: BRAF V600E 是 proliferative signal → 應該是抑制Sustaining proliferative signaling這一個hallmark\nVenetoclax: bcl-2 inhibitor; 癌細胞表達 BCL-2 來anti-apoptosis, correct\nAxitinib: VEGFR 1/2/3 inhibotor → angiogenesis related, correct",
     "tags": []
   },
   {
@@ -1522,7 +1522,7 @@ export const questions114 = [
     "topic": "Trial interpretation",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "原題已經設定好non-inferiority margin: 1.2\n因此若新藥(T), 要符合宣稱的non-inferiority,\n其發生event rate必須要小於1.2 (整個confidence interval要在裡面)",
     "tags": []
   },
   {
@@ -1542,7 +1542,7 @@ export const questions114 = [
     "topic": "Metastatic",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "(1) 目前發表的隨機三期試驗，均未證實免疫檢查點抑制劑合併同步放化療能顯著延長progression-free survival或event-free survival。 → Correct\n(2) 目前國際治療指引並未將免疫檢查點抑制劑合併同步放化療列為局部晚期頭頸癌標準 一線治療。 → Correct\n這題主要是考2024發表的 KEYNOTE-412\nUnresected locally advanced HNSCC, suitable for definite CCRT\npembro+CCRT vs CCRT alone\nEFS: NR vs 46.6m, 但是overall NOT significant (HR 0.83)\n→ definite CCRT  add on IO 目前沒有明確evidence\n補充 KEYNOTE-689 (NEJM 2025)\n可開刀的病人, peri-operative pembro improved EFS!!\n\n(3) 高CPS的亞族群使用免疫檢查點抑制劑合併化學放射治療，仍然有較高機會受益。 → Correct\n(4) 合併免疫檢查點抑制劑於化學放射同步治療的副作用，較既有標準治療明顯增加。 → 錯\nKEYNOTE-412 subgroup:\nPD-L1 CPS >=1 still may benefit\nGr 3 AE 差不多No new safety signals",
     "tags": []
   },
   {
@@ -1562,7 +1562,7 @@ export const questions114 = [
     "topic": "Adjuvant",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "選項(1), (2)皆 correct:  Adjuvant Camrelizumab for NPC (ph3 DIPPER, JAMA 2025):\n11 centers in China, NPC pt completed definite CCRT,\nCamrelizumab 200mg Q3W * 12 cycles  vs OBS\n3y-EFS: 86.9 % vs 77.3% (p=0.01); 特別的AE: Reactive capillary endothelial proliferation (85.8%)\n\nFor locoregionally advanced disease, 2 approach:\ninduction Chemo→ CCRT\nCCRT → adjuvant therapy\n\n標準的adjuvant: Cisplatin/5-FU, 但是poor tolerance\nAdjuvant metronomic capecitabine for 1 year (Lancet, 2021)\nCapecitabine: 650 mg*BSA BID\nvs OBS, improved failure-free survival\n(3) 在高風險之局部晚期鼻咽癌，完成化學放射治療後，使用低劑量capecitabine一年，可顯著降低病患復發風險。=> Correct\n\n=> 沒有單一trial討論這個，不過跟其他癌別一樣，大部分的adjuvant IO 都是6-12 months",
     "tags": []
   },
   {
@@ -1582,7 +1582,7 @@ export const questions114 = [
     "topic": "Radiation/CCRT",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "(1) 最常見的亞型是HPV16。=> Correct (HPV 16: 大概9成, 接著是HPV 18: 2%)\n(2) 臨床上p16免疫染色可做為HPV的標記。=> Correct\n(3) HPV陽性口咽癌的化學放射治療效果較HPV陰性口咽癌為佳。=> Correct\n(4) HPV陽性口咽癌分期，T4N2M0在AJCC第八版為stage IV。=> Incorrect\n** HPV-positive oropharyngeal cancer, 預後很好，只有M1才會到stage IV",
     "tags": []
   },
   {
@@ -1602,7 +1602,7 @@ export const questions114 = [
     "topic": "Biomarker",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "詳解:\n(1) AdCC大宗(50~86%)為t(6;9) MYB-NFIB fusion (undruggable), 和較高c-kit expression(undruggable)\n(2) SDC有AR, HER2等目前有廣泛藥物選擇的subtype(ESMO guideline建議要常規染色), 此外也有BRAF, RAS, PIK3CA等表現\n(3) MEC大部分為t(11;19) CRTC1-MAML2 or CRTC3-MAML2 fusion, 現階段也還沒有標靶藥\n(4) 大多數(>90%)有ETV6-NTRK3 fusion, 有NTRK inhibitor可以使用(Larotrectinib, Entrectinib)\n綜上所述，較多druggable mutation的為(2)>(4)>(1)&(3)，選(C)\nReference: Head & Neck. 2019;41:239–247.",
     "tags": []
   },
   {
@@ -1624,7 +1624,7 @@ export const questions114 = [
       "MONARCH"
     ],
     "answer": null,
-    "explanation": "",
+    "explanation": "詳解: 正確\nMONARCH-1 是 single-arm phase II trial，評估 abemaciclib monotherapy 用於 refractory HR+/HER2− metastatic breast cancer，族群是 heavily pretreated、預後較差的病人。\n研究結論支持 abemaciclib 作為單藥仍有臨床活性。\n詳解: 錯誤\nYoung-PEARL 比較 palbociclib + endocrine therapy/OFS vs capecitabine，後續資料顯示 PFS 有統計上顯著差異，但無 OS benefit。\n\n詳解: 正確\nRaloxifene 是 SERM，原本主要用於 postmenopausal osteoporosis。\nMORE trial 顯示 raloxifene 可增加 BMD、降低 vertebral fracture 風險；後續分析也顯示可降低新發乳癌，特別是 ER-positive invasive breast cancer。\nReference: Ann N Y Acad Sci. 2001;949:134-142.\n\n詳解: 錯誤\nMONARCH-E的結論中僅IDFS與DRFS有達到significance\n因此可做為高風險族群的adjuvant options\n但OS並沒有達到significant benefit",
     "tags": []
   },
   {
@@ -1644,7 +1644,7 @@ export const questions114 = [
     "topic": "Toxicity",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "詳解:\n(1) 此敘述主詞應為TDXd; TDM1的linker是non-cleavable stable thioether linker故無明顯Bystander effect (請參照DB-03內文對於TDXd藥物設計的部分)，此選項錯誤。\n(3) phase 1 DB-01 study時就有44%沒有over-expression的病人有resopnse，DB-04中更是證明了 Low HER2族群在OS上也相較傳統化療有benefit\n在Low HER2腫瘤中，可以透過bystander effect進入細胞內，此選項錯誤。\nReference: N Engl J Med 2022;386:1143-54.\n\n詳解:\n(2) 取決於payload的性質，以TDXd的deruxtecan為例，DXd payload作為topoisomerase inhibitor的efficacy大約為SN-38(CPT-11的活性代謝物)的10倍左右，在Destiny breast 03的trial也可以看到TDM1與TDXd都有頗高的myelotoxicity, alopecia或N/V的比例。\n(4) Dato-DXd為新一代針對TROP-2的ADC\n同時有另一個中國大陸的藥物Sacituzumab tirumotecan也是針對TROP-2\n選項僅(4)正確，此題答案為(D)\nReference: N Engl J Med 2022;386:1143-54.",
     "tags": []
   },
   {
@@ -1664,7 +1664,7 @@ export const questions114 = [
     "topic": "Adjuvant",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "詳解:\n前半對，但嚴格說來最後一句ATLAS study本身並沒有提到nodal positive的族群；考量high risk of recurrence 和ATLAS的subgroup analysis，敘述上仍然算是正確的，依題意此選項還是可以選。\nReference: Lancet 2013; 381: 805–16.\n\n詳解:\n•SOFT study主要探討Tamoxifen alone vs. Tamoxifen+ Ovarian function suppression(OFS), Exemestane+ OFS的outcome (DFS,OS)\n•TEXT study比較TAM+OFS vs. Exemestane+OFS (在文章的分析上與SOFT study的兩個experimental arm合併分析)\n由下二圖的結果可得知，DFS上OFS的重要性，以及卵巢功能抑制搭配Exemestane 效果較Tamoxifen更好，正確。\n前半敘述:\nT-OS vs. T alone; p=0.009\n後半敘述: E-OS vs. T-OS\nReference: N Engl J Med 2018;379:122-37.\n\n詳解:\n如上圖所示，TAM+OFS在DFS上較TAM優，estimated 5y-OS當年p=0.029，選項正確。\n但是!!!\n2023年發表的8-year follow up資料顯示：DFS仍有顯著差異，但OS最終是沒有顯著差異的(見下圖)\nReference: J Clin Oncol 38:434-443.\nReference: J Clin Oncol 41:4864-4871\n\n詳解: 參照右圖結果\nMA.17的DFS outcome有significance (95%CI:0.47-0.79; p<0.001)\n但OS沒有(95%CI: 0.48-1.21; p=0.25)\n敘述上的降低乳癌的復發風險是指DFS，故選項錯誤。\nReference: N Engl J Med 2003;349:1793-802.\n此題(2)選項正確，(4)選項為誤，考量(1)和(3)選項雖然在題幹上有瑕疵但敘述本身是正確的。\n先刪去有(4)的(C)(D)(E)，而(2)選項正確，選(A)",
     "tags": []
   },
   {
@@ -1684,7 +1684,7 @@ export const questions114 = [
     "topic": "Adjuvant",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "詳解:\n純考guideline，有背有分\n(1)(2)(3)正確，(4)錯誤，故選(A)",
     "tags": []
   },
   {
@@ -1704,7 +1704,7 @@ export const questions114 = [
     "topic": "Adjuvant",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "詳解:\n根據systemic review，CNB比Incisional biopsy風險更低，且accuracy相當。同時NCCN guideline也有明講建議以Core needle biopsy為優先，選項錯誤。\n(2) NCCN guideline中有提到單次RT的劑量落在1.8-2.0 Gy\n•For retroperitoneal sarcomas: 50-50.4 Gy in conventional fractionation\n•For extremity/trunk sarcomas: Standard fractionation is used\n•For phyllodes tumors: \"There are no data supporting the use of hypofractionated radiation regimens in phyllodes tumors therefore conventionally fractionated whole breast/post-mastectomy radiation is recommended\"\n故整體來說sarcoma目前還是以Conventional fractionated RT為標準，正確。\n\n詳解:\n(3)(4) 題幹的敘述主要是針對extremity/trunk sarcoma\n在retroperitoneum的部分因腸道、腎臟等器官，目前以pre-OP RT為主，盡量達到R0 resection為主。\n(2)(4)正確，選(C)",
     "tags": []
   },
   {
@@ -1724,7 +1724,7 @@ export const questions114 = [
     "topic": "Melanoma/Sarcoma",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "https://doi.org/10.1016/S1470-2045(20)30451-4  Tazemetostat in advanced epithelioid sarcoma with loss of INI1/SMARCB1: an international, open-label, phase 2 basket stud，Lancet Oncol 2020; 21: 1423–32 y\n『Various genetic and epigenetic mechanisms can result in loss of INI1 expression,which leads to the unopposed, constitutive, oncogenic activation of EZH2, an enzyme that trimethylates lysine 27 of histone H3. Loss of INI1, SMARCB1, or both is the molecular hallmark of epithelioid sarcoma 』\n詳解：Epithelioid sarcoma 的典型分子特徵是 SMARCB1 / INI1 loss 或 inactivation 不是 activation 。故（1）錯誤\n\nNavarrete-Dechent C, Mori S, Barker CA, Dickson MA, Nehal KS. Imatinib Treatment for Locally Advanced or Metastatic Dermatofibrosarcoma Protuberans: A Systematic Review. JAMA Dermatol. 2019;155(3):361–369. doi:10.1001/jamadermatol.2018.4940\n詳解：DFSP 典型分子異常是COL1A1–PDGFB fusion 不是 PDGFA，前半錯，後半對。\n『patients receiving imatinib as monotherapy, adjuvant, or neoadjuvant therapy, complete response, partial response, stable disease, and progressive disease were reported in 5.2%, 55.2%, 27.6%, and 9.2% of patients, respectively.』\nfrom\n\n詳解：前半敘述正確，對化學藥物反應不佳這句話錯誤\nfrom\n\n詳解：LMS通常不是典型 single fusion-driven sarcoma ，而是常見 Complex karyotype ，多重 chromosomal gains / losses ，複雜基因體異常 。\nLosses of chromosomal ：PTEN (10q), RB1 (13q), CDH1 (16q) and TP53 (17p)\nGains ：17p11.2 (MYOCD) and 15q25-26 (IGF1R).\nGenes Chromosomes Cancer. 2016 February ; 55(2): 124–130. doi:10.1002/gcc.22318\nGenes Chromosomes Cancer. 2016 February ; 55(2): 124–130. doi:10.1002/gcc.22318",
     "tags": []
   },
   {
@@ -1744,7 +1744,7 @@ export const questions114 = [
     "topic": "Toxicity",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "詳解：敘述正確\nFrom NCCN guideline discussion\n\n詳解：\nPazopanib來自 DESMOPAZ trial （phase II , lancet oncology)： pazopanib 比上 chemo(MTX+vinblastin)\n內文：“The 1-year progression-free survival was 85·6% [95% CI 70·7–93·2] and the 2-year progressionfree survival was 67·2% “\nSorafenib 來自  NEJM 2018 phase 3 trial\nprogressive, symptomatic, or recurrent desmoid tumors , sorafenib  比上 placebo group\n內文：”Although the median progression-free survival has not yet been reached, the estimates of the progression-free survival rates at 1 year were 89% (95% confidence interval [CI], 80 to 99) in the sorafenib group and 46% (95% CI, 32 to 67) in the placebo group, and the estimates at 2 years were 81% (95% CI, 69 to 96) and 36% (95% CI, 22 to 57), respectively “\n(N Engl J Med 2018;379:2417-28. DOI: 10.1056/NEJMoa1805052 )\n（2）敘述正確\n\nNirogacestat had a significant progression-free survival benefit over placebo (hazard ratio for disease progression or death, 0.29; 95% confidence interval, 0.15 to 0.55; P<0.001); the likelihood of being event-free at 2 years was 76% with nirogacestat and 44% with placebo. Between-group differences in progression-free survival were consistent across prespecified subgroups. The percentage of patients who had an objective response was significantly higher with nirogacestat than with placebo (41% vs. 8%; P<0.001), with a median time to response of 5.6 months and 11.1 months, respectively; the percentage of patients with a complete response was 7% and 0%, respectively\nFrequent adverse events with nirogacestat included diarrhea (in 84% of the patients), nausea (in 54%), fatigue (in 51%), hypophosphatemia (in 42%), and maculopapular rash (in 32%); 95% of adverse events were of grade 1 or 2.\n詳解：敘述正確,完全來自於paper內文\nFrom NEJM",
     "tags": []
   },
   {
@@ -1764,7 +1764,7 @@ export const questions114 = [
     "topic": "Lung",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "詳解：\n（1）敘述毫無疑問正確，特殊染色來協助tumor origin的判斷\nNCCN guideline CUP discussion 中 ：\n－80% CUP median OS 3－10個月，adenocaricnoma和undifferentiated tumor 更差 3 年 3.5% ，敘述中的5年存活率30%太美好 ，故（2）敘述錯誤\n－如內文建議 <65歲的retroperiteneal mass病人要考慮是否是testicular germ cell primary,需要檢測HCG,AFP和testicular ultrasound，（3）敘述正切\n\n詳解：\nNCCN guideline CUP discussion 中 ： CUP 最常見的subtype是moderately differentiated adenocaricnoma(60%) 再來才是poorly differentiated adenocarcinoma(25%) ,此項敘述錯誤",
     "tags": []
   },
   {
@@ -1784,7 +1784,7 @@ export const questions114 = [
     "topic": "Biomarker",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "詳解：(NCCN guideline discussion內文）\nMEN syndrome是泛指從身體的內分泌器官長出來的tumor，可分為MEN1， MEN2\nMEN1是 autosomal-dominant inherited syndrome表現為：hyperparathyroidism,pituitary, Pancreas NET （3P)\nMEN2也是autosomal-dominant inherited syndrome 跟這些有關：MTC (98%); PCC (50%), often bilateral; and hyperparathyroidism (25%)\n敘述1－3皆正確\n\n詳解：(NCCN guideline discussion內文）（4）敘述正切",
     "tags": []
   },
   {
@@ -1804,7 +1804,7 @@ export const questions114 = [
     "topic": "GU",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "詳解：來自2020 NEJM JAVELIN Bladder 100 trial\n1st line chemotherapy後CR,PR,SD的病人Avelumab maintance VS best supportive care\n\nddMVAC，是 cisplatin-eligible 病人的有效 regimen，通常需搭配 growth factor support。此病人 ECOG 0、腎功能可、心臟功能佳、無神經病變，因此若年紀與整體狀況可承受，ddMVAC 是可考慮選項。NCCN也列出 metastatic disease 後續 maintenance 可使用 avelumab\n\n詳解：來自2023 NEJM CheckMate 901\n\n詳解：來自2012 JCO EORTC Intergroup Study 30987\nNCCN guideline不建議作為標準選項",
     "tags": []
   },
   {
@@ -1824,7 +1824,7 @@ export const questions114 = [
     "topic": "Metastatic",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "詳解：Enfortumab vedotin 是 Nectin-4-directed antibody-drug conjugate ，Nectin-4 在癌細胞中高度expression，尤其是在UC 中。\n在一開始的EV-101 phase 1 study中，對於 nectin-4的expression他們使用H-score作為定義表現量， 其中的median H-score為290。而只有其中 5個病人是low expression，且即使 low Nectin-4 expression (median H-score, ,150) 也有達到 PR.\n所以後來在EV-301 trial 中，不再對入組前 NECTIN-4 expression進行評估。\n因此，目前 EV 的應用無需事先評估 NECTIN-4 expression , (1)敘述錯誤\n\n詳解：來自2017 NEJM KEYNOTE-045\nPembrolizumab was associated with a benefit over chemotherapy in all the subgroups examined, including among patients with liver metastases and those who had a tumor PD-L1 combined positive score of less than 1%\n題幹特別提到不考慮健保 （因健保申請條件為CPS >=10)但實際trial是all subgroup benefit\n\n詳解：NCCN 中 biomarker－directed therapy：（2）（4）正確",
     "tags": []
   },
   {
@@ -1844,7 +1844,7 @@ export const questions114 = [
     "topic": "Metastatic",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "(1) Nivo + Ipi 可考慮使用於 IMDC favorable risk ✅ 正確\n觀念演變是關鍵考點：\n2018 初發表：sunitinib ORR 52% > nivo+ipi 29%，favorable risk 不建議\n8 年追蹤：OS HR 0.82 (95% CI 0.60–1.13)，開始有 trend\n最終分析 (9 年+)：中位 OS 77.9 vs 66.7 個月，OS 傾向 nivo+ipi\n關鍵發現：\n更多 CR、更持久反應\nTreatment-free survival favor nivo+ipi\n指引立場：\nNCCN：列為 favorable risk 的 Other Recommended (Category 2A)\nEAU：alternative option for favorable risk\n⚠️ 題目用「可考慮」(非「首選」)，因此現代可接受為正確敘述\n\n(2) Cabozantinib 與 nivo 併用時維持 60 mg / 天 ❌ 錯誤\n典型陷阱題！\nMonotherapy (如 METEOR 二線情境)：60 mg QD\nCheckMate 9ER：併用 nivolumab：40 mg QD ✓\nCheckMate 9ER 標準方案：nivolumab 240 mg Q2W + cabozantinib 40 mg QD\n原因：併用 nivo 時為提高耐受性而調降起始劑量\n🔑 「9ER 用 40，單藥用 60」\n\n(3) Pembro + Lenvatinib：高血壓、腹瀉、蛋白尿是常見嚴重副作用 ✅ 正確\nCLEAR / KEYNOTE-581 毒性數據：\nHypertension：Any grade 55.4%，Grade ≥3 27.6%\nDiarrhea：Any grade 61.4%，Grade ≥3 9.7%\nProteinuria：Any grade 29.5%，Grade ≥3 7.7%\n其他常見：\n疲勞、食慾不振\nPPE (palmar-plantar erythrodysesthesia)\n臨床意義：Lenvatinib 多標靶 TKI 典型 toxicity profile，常需 dose reduction\n\n(4) 三合一 (nivo+ipi+cabo) 較 nivo+ipi 有更好 OS benefit ❌ 錯誤\nCOSMIC-313 最終分析 (45 個月 follow-up)：\nPFS：HR 0.73–0.82，中位 PFS 16.6 vs 11.2 個月 ✅ 顯著改善\nOS：HR 1.02 (95% CI 0.85–1.23)，P=0.8366 ❌ 無差異\nGrade 3-4 AEs：79% vs 56% ❌ 毒性顯著增加\n結論：PFS 贏，但 OS 並無 benefit；不推薦作為標準治療\n🔑 「COSMIC-313：PFS 贏，OS 無 benefit 」",
     "tags": []
   },
   {
@@ -1867,7 +1867,7 @@ export const questions114 = [
       "KEYNOTE-A18"
     ],
     "answer": null,
-    "explanation": "",
+    "explanation": "91/120\n(1) KEYNOTE-A18：pembro + CCRT 顯著改善 PFS ✅ 正確\n族群：高風險 LACC\nFIGO 2014 IB2-IIB node+\n或 III-IVA (regardless of node)\n關鍵數據：\nPFS HR 0.70 (95% CI 0.55–0.89)，p=0.002\n24 個月 PFS：68% vs 57%\n3 年 OS：82.6% vs 74.8% (HR 0.67, p=0.0040) — 後續證實 OS benefit\n臨床意義：2024 FDA 核准 pembro + EBRT + concurrent chemo 用於 FIGO III–IVA\n\n91/120\n(2) 次族群分析：PFS 改善主要在 FIGO III-IVA，IB2-IIB 無此現象 ✅ 正確\nFIGO III-IVA 次族群：PFS HR 0.58 (95% CI 0.42–0.80) ✅ 顯著\nFIGO IB2-IIB (node+) 次族群：PFS HR 0.91 (95% CI 0.63–1.31) ❌ 跨越 1\nFDA 核准範圍：僅限 FIGO 2014 stage III-IVA\n判讀：KEYNOTE-A18 整體 PFS benefit 主要由 III-IVA 族群驅動\n\n91/120\n(3) INTERLACE：誘導化療 6 週 + CRT 改善存活率 ✅ 正確\n方案：\nCarboplatin + paclitaxel weekly × 6 週\n隨後接標準 cisplatin-based CRT\n族群：FIGO 2008 IB1 node+、IB2、II、IIIB、IVA (n=500)\n結果：\n5 年 PFS：72% vs 64%，HR 0.65 (95% CI 0.46–0.91, p=0.013)\n5 年 OS：80% vs 72%，HR 0.60 (95% CI 0.40–0.91, p=0.015)\n臨床意義：Lancet 2024 — \"should be considered a new standard of care\"\n\n91/120\n(4) CALLA：durvalumab + CRT 顯著改善 PFS ❌ 錯誤\n陰性試驗！未達主要終點\nPFS HR 0.84 (95% CI 0.65–1.08)，p=0.174\n12 個月 PFS：76.0% vs 73.3% (差異不顯著)\n🔑 對比記憶：「KEYNOTE-A18 正向，CALLA 陰性」 — pembro 贏，durvalumab 輸",
     "tags": []
   },
   {
@@ -1889,7 +1889,7 @@ export const questions114 = [
       "KEYNOTE-775"
     ],
     "answer": null,
-    "explanation": "",
+    "explanation": "核心試驗\nNCT01367002 (Fader trial)：HER2+ uterine serous，Carbo/Pac ± trastuzumab — ✅ 陽性\nDUO-E：All-comers (dMMR/pMMR)，Chemo + durvalumab ± olaparib — ✅ 陽性\nKEYNOTE-775 (Study 309)：二線 (post-platinum)，Pembro+lenva vs chemo — ✅ 陽性\nENGOT-en9 / LEAP-001：一線 (untreated)，Pembro+lenva vs chemo — ❌ 陰性\n\n91/120\n(1) HER2+ uterine serous carcinoma：化療 + trastuzumab 改善 PFS/OS ✅ 正確\nRandomized Phase II trial (NCT01367002, Fader et al.)\n關鍵數據：\n中位 PFS：Carbo/Pac 8.0 個月 vs Carbo/Pac + Trastu 12.9 個月，HR 0.46 (P=0.005)\nStage III-IV (primary) PFS：9.3 vs 17.7 個月，HR 0.44\n中位 OS：24.4 vs 29.6 個月 (改善)\n臨床意義：\nNCCN 子宮腫瘤指引採納\nHER2 檢測在 USC 成為標準\n\n91/120\n(2) DUO-E：dMMR EC + durvalumab 改善 PFS ✅ 正確\nPhase III trial — 3 arms：\nCarbo/Pac + placebo → placebo maintenance\nCarbo/Pac + durvalumab → durvalumab maintenance\nCarbo/Pac + durvalumab → durvalumab + olaparib maintenance\n次族群 PFS HR：\nDurva vs Control：HR 0.42 (mPFS NR vs 7.0m)\nDurva+Olaparib vs Control：HR 0.41\nDurva vs Control：HR 0.77\nDurva+Olaparib vs Control：HR 0.57 (加 olaparib 後更佳)\n臨床意義：2024 FDA 核准 durvalumab + 化療於 dMMR primary advanced/recurrent EC\n\n91/120\n(3) KEYNOTE-775 (二線)：pMMR EC，pembro + lenva 優於化療 ✅ 正確\n族群：≥1 線含 platinum 化療後 progression\npMMR 族群：\nPFS：6.6 vs 3.8 個月 (HR 0.60)\nOS：17.4 vs 12.0 個月 (HR 0.68)\nAll-comers：\nPFS HR 0.56\nOS HR 0.62\n臨床意義：已成為 pMMR EC 的二線標準治療\n\n91/120\n(4) LEAP-001 (一線)：pembro + lenva 優於化療 ❌ 錯誤\n陰性試驗！未達 PFS 與 OS 預設統計標準\npMMR 族群：\nPFS HR 0.99\nOS HR 1.02 (連 non-inferiority 都未達)\n🔑 對比記憶：「775 (二線) 贏，001 (一線) 輸」",
     "tags": []
   },
   {
@@ -1909,7 +1909,7 @@ export const questions114 = [
     "topic": "Metastatic",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "91/120\n(1) MET Exon 14 Skipping Mutation ❌ 錯誤\nIHC 偵測的是 MET 蛋白過表現 (overexpression)\nProtein overexpression ≠ exon 14 skipping mutation\n必須用 NGS (RNA-based 較佳) 或 RT-PCR 確認\nNCCN：IHC 不適用於 MET ex14 skipping 偵測\n(2) ROS1 Rearrangement ❌ 錯誤\nROS1 IHC (D4D6 clone) 靈敏度高但特異度不足\n假陽性率較高\nNCCN：「IHC for ROS1 fusions has low specificity, follow-up confirmatory testing is a necessary component」\n可作 screening，但不能 stand-alone，需 FISH / NGS 確認\n(3) RET Rearrangement ❌ 錯誤\n目前沒有 FDA 核准的 RET IHC companion diagnostic\nNCCN：應用 FISH break-apart、RT-PCR 或 NGS (RNA-based 較佳)\nRET IHC 在 NSCLC 敏感度與特異度都不理想\n\n91/120\n(4) ALK Rearrangement ✅ 正確\nVENTANA ALK (D5F3) CDx 為 FDA 核准 companion diagnostic\nIHC 強陽性 (3+) 可直接使用 ALK 抑制劑 (alectinib、lorlatinib 等)\n不需 FISH 確認\nNCCN：「FDA-approved IHC can be utilized as a stand-alone test, not requiring confirmation by FISH」\n🔑 唯一記憶：「只有 ALK」 — NSCLC 中唯一 IHC 可作 stand-alone CDx",
     "tags": []
   },
   {
@@ -1931,7 +1931,7 @@ export const questions114 = [
       "CheckMate-743"
     ],
     "answer": null,
-    "explanation": "",
+    "explanation": "91/120\n(1) KRAS G12C NSCLC 一線失敗後可考慮 sotorasib / adagrasib ✅ 正確\nSotorasib：FDA 2021 核准 (CodeBreaK 100, phase 3 CodeBreaK 200)\nAdagrasib：FDA 2022 加速核准 (KRYSTAL-1, phase 3 KRYSTAL-12)\n兩者均為「previously treated」二線以上適應症\n第一線標準：仍為 chemo-IO 或 ICI mono (依 PD-L1) KRAS G12C inhibitor 為後線選項\n(2) KRAS G12C 單獨 ICI RR < 5%，故不考慮合併使用 ❌ 錯誤\n錯誤原因：\nKRAS G12C 突變 ≠ ICI 無效 (不像 EGFR/ALK 是 ICI poor responder)\nKRAS-mutated NSCLC (吸菸、PD-L1 高、TMB 高) 對 ICI 仍可能有反應\n單獨 ICIs RR 約 13–26%，並非 <5%\n第一線仍可用 chemo-IO 或 ICI mono\n\n91/120\n(3) CheckMate 743：MPM 用 nivo+ipi 延長 OS，主要在 biphasic/sarcomatoid ✅ 正確\nOS 數據 (nivo+ipi vs chemo)：\n整體：mOS 18.1 vs 14.1 個月，HR 0.74 (p=0.002)\nNon-epithelioid (biphasic/sarcomatoid)：mOS 18.1 vs 8.8 個月，HR 0.46 ⭐\nEpithelioid：mOS 18.7 vs 16.5 個月，HR 0.86 (獲益較小)\n臨床意義：FDA 2020 核准為 first-line MPM\n(4) MPM 最常用化療為 Paclitaxel/Platinum ± Bevacizumab ❌ 錯誤\n正確標準方案：\nPemetrexed + Cisplatin/Carboplatin (NCCN Category 1)\nBevacizumab 可加 (MAPS trial)：cisplatin/pemetrexed + bevacizumab\nPaclitaxel 不是 MPM 標準化療！\n🔑 「胸膜 pem，不 pac」",
     "tags": []
   },
   {
@@ -1951,7 +1951,7 @@ export const questions114 = [
     "topic": "Neoadjuvant",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "核心概念\nNCCN Thymomas and Thymic Carcinomas v2.2025/2026\nThymoma 對 ICI 有極高 irAE 風險 (myocarditis 43–57%)\nThymoma vs Thymic carcinoma 化療方案不同\n\n91/120\n(1) Resectable thymoma 做 transpleural CT-guided biopsy 安全低風險 ❌ 錯誤\nNCCN 明確避免 transpleural approach：\n\"Biopsy of a possible thymoma should avoid a transpleural approach because of the substantial risk of converting a stage I thymoma to a stage IV thymoma by spreading tumor within the pleural space.\"\n臨床原則：\n可切除 thymoma 應避免術前 biopsy (capsule violation 有 seeding 風險)\nBiopsy 僅用於：不可切除、需 induction therapy、或鑑別 lymphoma/germ cell tumor\n(2) R0 thymoma stage II/III 可考慮 adjuvant chemotherapy ❌ 錯誤\n正確指引立場：\nESMO：R0–R1 thymoma 切除後不建議 adjuvant chemotherapy [III, E]\nNCCN：Masaoka-Koga stage II–IV R0 可考慮 postoperative RT (非 chemo)\nAdjuvant chemo 保留給：R1/R2 切除、不可切除、或轉移性疾病\n\n91/120\n(3) Pembro + 化療為 thymoma 第一線，severe irAE 不高 ❌ 錯誤\nNCCN 明確：「PD-1/PD-L1 inhibitor therapy is NOT recommended for patients with thymoma」\nThymoma + ICI 嚴重 irAE 風險：\nMyocarditis：thymoma 發生率 43–57% (其他癌症 < 1%)\nMyasthenia gravis：thymoma 3–14% (其他癌症罕見)\n整體 Grade 3-5 irAE：thymoma 58.3% vs Thymic carcinoma 17.1%\nPembrolizumab 僅為 thymic carcinoma 後線選項\n\n91/120\n(4) Thymoma 用 CAP；Thymic carcinoma 用 Paclitaxel/Platinum ± Ramucirumab ✅ 正確\nNCCN v2.2025/2026 Preferred Regimens：\nThymoma — Preferred First-line：\nCAP (Cisplatin + Doxorubicin + Cyclophosphamide)\nNCCN：「seems to yield the best outcomes」\nRR ~44–50%\nThymic Carcinoma — Preferred First-line：\nCarboplatin + Paclitaxel ± Ramucirumab\nNCCN：highest RR (22–36%) in thymic carcinoma\n🔑 記憶：「腺瘤吃 CAP，腺癌吃 Paclitaxel」",
     "tags": []
   },
   {
@@ -1971,7 +1971,7 @@ export const questions114 = [
     "topic": "Trial interpretation",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "分析如下：\n(1) 錯誤： 根據 KEYNOTE-604 試驗，雖然 Pembrolizumab 合併化療有達到 PFS 的終點，但在整體存活期（OS）上未跨越預設的統計學顯著門檻（HR=0.80, p=0.0164）。因此，目前 NCCN guideline 並未將 Pembrolizumab 推薦為 ES-SCLC 的第一線標準用藥。此外，SCLC 的第一線免疫治療不需要常規檢測 PD-L1 表現量（如 PD-L1 ≧1%）來作為給藥條件。\n(2) 錯誤： IMpower133 試驗確立了 Atezolizumab 合併 Carboplatin + Etoposide 作為第一線治療的地位，但其標準配方中並不包含 Bevacizumab。\n(3) 錯誤： CASPIAN 試驗中確實有一個組別使用了雙重免疫（Durvalumab + Tremelimumab）合併化療，但最終結果顯示加上 Tremelimumab 並未比單用化療帶來具統計學意義的 OS 延長。目前 NCCN guideline 推薦的標準療法是單用 Durvalumab 合併鉑類與 Etoposide，不含 Tremelimumab。\n(4) 正確： 根據第三期臨床試驗 DeLLphi-304 的數據，針對第一線含鉑化療失敗的 ES-SCLC 病患，使用 DLL3/CD3 雙特異性抗體 Tarlatamab 相較於傳統化療（Lurbinectedin 或 Topotecan），能顯著降低 40% 的死亡風險（HR ~0.60），帶來明確的整體存活期（OS）與無惡化存活期（PFS）助益，確立了其在二線治療的地位。",
     "tags": []
   },
   {
@@ -1991,7 +1991,7 @@ export const questions114 = [
     "topic": "Other",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "正確答案是 (E)(1),(2),(3),(4)。\n分析如下：\n這四個選項完全對應了 Khorana Risk Score 中的臨床與血液學指標。\nKhorana Score 是目前 NCCN、ASCO 以及 ITAC 指引中最廣泛建議用來評估癌症病患接受化學治療前，發生靜脈血栓栓塞（Venous Thromboembolism, VTE）風險的預測模型。\n\nKhorana Risk Score 評估項目\n該評分系統根據不同的風險因子給予相對應的分數，總分越高代表發生 VTE 的風險越大：",
     "tags": []
   },
   {
@@ -2011,7 +2011,7 @@ export const questions114 = [
     "topic": "Lung",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "這是典型的小細胞肺癌（SCLC）合併伴隨性症候群（Paraneoplastic syndrome）的臨床情境。\n分析如下：\n(1) 正確： 此病患表現出低血鈉（118 mEq/L）、低血漿滲透壓、高尿滲透壓以及高尿鈉，且沒有使用利尿劑（排除藥物引起的低血鈉），這完全符合 抗利尿激素分泌不當症候群（SIADH） 的診斷標準（Bartter-Schwartz criteria）。\n(2) 正確： 在有重度吸菸史且近期體重下降的老年男性中，SIADH 最常見的惡性腫瘤原因就是 小細胞肺癌（Small cell lung cancer, SCLC）。腫瘤細胞會異位分泌（Ectopic production）抗利尿激素（ADH），導致水分滯留與稀釋性低血鈉。\n(3) 正確： 雖然無症狀的 SIADH 首選治療是限制水分攝取（Fluid restriction），但此病患的血鈉極低（118 mEq/L），且已經出現精神症狀惡化（中樞神經系統的嚴重症狀，如腦水腫引起的意識改變或譫妄）。對於這類有嚴重神經學症狀的急性/重度低血鈉患者，3% 高張鹽水（Hypertonic saline） 是首選的緊急處置，以迅速拉高血鈉濃度，解除腦部危機（但需注意校正速度，避免引起滲透性去髓鞘症候群 ODS）。\n(4) 正確： 針對 SIADH 的長期控制，若限制水分攝取效果不佳或病患無法配合，可使用藥物輔助治療。Tolvaptan 是 Vasopressin V2 receptor antagonist，能直接阻斷 ADH 在腎臟的作用，促進游離水分排出（Aquaresis）；Demeclocycline 則是一種四環黴素類抗生素，其副作用能誘發腎因性尿崩症，過去也常被用來對抗 SIADH。當然，針對病因（即治療 SCLC 本身）才是最根本的長期控制方式。",
     "tags": []
   },
   {
@@ -2031,7 +2031,7 @@ export const questions114 = [
     "topic": "Other",
     "trials": [],
     "answer": null,
-    "explanation": "",
+    "explanation": "這是一個典型的高風險腫瘤溶解症候群（Tumor Lysis Syndrome, TLS）併發急性腎損傷（AKI）與心電圖變化的急症情境。\n分析如下：\n(1) 正確： 根據 Cairo-Bishop 診斷標準，此病患完全符合臨床 TLS 的定義。\nLaboratory TLS: 化療前 3 天到化療後 7 天內，以下四項異常出現兩項以上（尿酸≥ 8 mg/dL、鉀離子 ≥ 6.0 mmol/L、磷離子 ≥ 4.5 mg/dL、鈣離子 ≤ 7.0 mg/dL）。此病患的 K⁺ (6.2)、Phosphate (7.0)、Uric acid (11.5) 均已超標。\nClinical TLS: 滿足 Lab TLS，且合併以下任一狀況：肌酸酐（Creatinine）上升 ≥ 1.5 倍正常值上限、心律不整/猝死、癲癇。此病患的 Cr 為 2.1 mg/dL（明顯發生 AKI），且心電圖出現 Peaked T waves，確診為 Clinical TLS。\n(2) 正確： 對於已經發生 Clinical TLS 並合併急性腎損傷的病患，Rasburicase（重組尿酸氧化酶）是首選的降尿酸治療。它能迅速將已生成的尿酸氧化成水溶性極高的Allantoin排出體外。相較之下，Allopurinol 只能抑制新尿酸的生成，作用緩慢（需數天），且無法處理已經存在的極高尿酸，在此緊急情況下緩不濟急。\n(3) 正確： TLS 發生時，若給予積極點滴輸液、Rasburicase、降鉀藥物（如 Calcium gluconate, Insulin+Glucose）等初步內科治療後，病患的高血鉀、嚴重的電解質失衡或寡尿/無尿狀況仍無法改善（Refractory），緊急血液透析（Emergent hemodialysis） 是必須且挽救生命的處置。\n(4) 錯誤： TLS 首要且最重要的處置是積極的靜脈輸液（Aggressive IV hydration）（通常建議 2-3 L/m²/day），以增加尿量並沖刷腎小管。不應「立即」給予利尿劑。只有在病患經過充分輸液後，出現水分重度滯留（Fluid overload）或寡尿時，才會考慮使用 Loop diuretics。如果在尚未確認血管內容積（Intravascular volume）充足前就貿然使用利尿劑，會導致脫水，反而加重尿酸或磷酸鈣結晶在腎小管內的沉積，使急性腎衰竭進一步惡化。",
     "tags": []
   },
   {
