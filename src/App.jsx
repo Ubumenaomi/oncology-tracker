@@ -323,6 +323,14 @@ function getExamCountdown(now = new Date()) {
   return diffDays > 0 ? `D-${diffDays}` : `D+${Math.abs(diffDays)}`;
 }
 
+const QUESTION_YEARS = [...new Set(questionBank
+  .map((question) => Number(question.year))
+  .filter((year) => Number.isFinite(year)))]
+  .sort((a, b) => a - b);
+const QUESTION_YEAR_KEY = QUESTION_YEARS.join(',');
+const QUESTION_YEAR_LABEL = QUESTION_YEARS.length
+  ? `${QUESTION_YEARS[0]}–${QUESTION_YEARS[QUESTION_YEARS.length - 1]}`
+  : '題庫';
 
 const defaultState = {
   sessions: {},
@@ -330,7 +338,8 @@ const defaultState = {
   settings: {
     dailyCount: 30,
     practiceMode: 'standard',
-    preferredYears: [112, 113, 114],
+    preferredYears: QUESTION_YEARS,
+    questionYearVersion: QUESTION_YEAR_KEY,
     preferredCancers: [],
   },
   planProgress: {},
@@ -1019,6 +1028,13 @@ function mergePlayerState(cloudPlayer = {}, localPlayer = {}, cloudGame = {}, lo
 }
 
 function normalizeState(state) {
+  const stateSettings = state?.settings || {};
+  const rawPreferredYears = Array.isArray(stateSettings.preferredYears)
+    ? stateSettings.preferredYears.map((year) => Number(year)).filter((year) => Number.isFinite(year))
+    : defaultState.settings.preferredYears;
+  const preferredYears = stateSettings.questionYearVersion === QUESTION_YEAR_KEY
+    ? rawPreferredYears.filter((year) => QUESTION_YEARS.includes(year))
+    : [...new Set([...rawPreferredYears, ...QUESTION_YEARS])].filter((year) => QUESTION_YEARS.includes(year)).sort((a, b) => a - b);
   const game = {
     ...defaultState.game,
     ...(state?.game || {}),
@@ -1046,8 +1062,10 @@ function normalizeState(state) {
     ...state,
     settings: {
       ...defaultState.settings,
-      ...(state?.settings || {}),
-      practiceMode: PRACTICE_MODES[state?.settings?.practiceMode] ? state.settings.practiceMode : 'standard',
+      ...stateSettings,
+      preferredYears,
+      questionYearVersion: QUESTION_YEAR_KEY,
+      practiceMode: PRACTICE_MODES[stateSettings.practiceMode] ? stateSettings.practiceMode : 'standard',
     },
     planItemProgress: normalizePlanItemProgress(state?.planItemProgress),
     dailyQuestProgress: state?.dailyQuestProgress || {},
@@ -1665,7 +1683,7 @@ function getBossRows(state, readiness = getReadinessMetrics(state)) {
       unlocked = trialCards >= 50;
     } else if (boss.id === 'final-board') {
       unlockValue = completedYears.size;
-      unlocked = [112, 113, 114].every((year) => completedYears.has(year));
+      unlocked = QUESTION_YEARS.every((year) => completedYears.has(year));
     } else {
       const row = progress[boss.module] || { total: 0, completed: 0 };
       unlockValue = row.total ? Math.round((row.completed / row.total) * 100) : 0;
@@ -3063,9 +3081,9 @@ function ManualExplanationPanel({ state, onUpdateStat }) {
         <label>
           年度
           <select name="manual_year" value={year} onChange={(e) => setYear(e.target.value)}>
-            <option value="112">112</option>
-            <option value="113">113</option>
-            <option value="114">114</option>
+            {QUESTION_YEARS.map((questionYear) => (
+              <option key={questionYear} value={questionYear}>{questionYear}</option>
+            ))}
           </select>
         </label>
 
@@ -3230,9 +3248,9 @@ function QuestionEditPanel({ state, onSaveOverride }) {
 
       <div className="filters">
         <select name="edit_year" value={year} onChange={(e) => setYear(e.target.value)}>
-          <option>112</option>
-          <option>113</option>
-          <option>114</option>
+          {QUESTION_YEARS.map((questionYear) => (
+            <option key={questionYear}>{questionYear}</option>
+          ))}
         </select>
         <input name="edit_number" value={number} onChange={(e) => setNumber(e.target.value)} placeholder="題號 (數字)" />
         <div className="inline-actions">
@@ -3361,9 +3379,9 @@ function QuestionManagerPanel({
         <input name="question_manager_search" value={search} onChange={(e) => onSearch(e.target.value)} placeholder="搜尋題幹、trial、癌別、藥名、題號..." />
         <select name="question_manager_year" value={bankYear} onChange={(e) => onYearChange(e.target.value)}>
           <option>All</option>
-          <option>112</option>
-          <option>113</option>
-          <option>114</option>
+          {QUESTION_YEARS.map((questionYear) => (
+            <option key={questionYear}>{questionYear}</option>
+          ))}
           <option>Custom</option>
         </select>
         <select name="question_manager_cancer" value={bankCancer} onChange={(e) => onCancerChange(e.target.value)}>
@@ -4375,7 +4393,7 @@ function MockExamPanel({ state, onFinishMock }) {
       <div className="section-head">
         <div>
           <h2>Mock Exam Mode</h2>
-          <p className="muted">Mock 0 是獨立 diagnostic baseline，用來產生 score-dragger map；正式 112–114 mock cycle 留在 Day 73–82。</p>
+          <p className="muted">Mock 0 是獨立 diagnostic baseline，用來產生 score-dragger map；正式 {QUESTION_YEAR_LABEL} mock cycle 留在 Day 73–82。</p>
         </div>
         <div className="inline-actions">
           <label>題數
@@ -4398,9 +4416,9 @@ function MockExamPanel({ state, onFinishMock }) {
           <label>Year
             <select value={examYear} onChange={(e) => setExamYear(e.target.value)}>
               <option>All</option>
-              <option>112</option>
-              <option>113</option>
-              <option>114</option>
+              {QUESTION_YEARS.map((questionYear) => (
+                <option key={questionYear}>{questionYear}</option>
+              ))}
             </select>
           </label>
           <label>Timer
@@ -5532,7 +5550,7 @@ export default function App() {
         <div>
           <div className="eyebrow">Oncology Tracker</div>
           <h1>Board Readiness Engine</h1>
-          <p>112–114 腫專考古題、mixed mock、confidence calibration、critical error queue、≥80 分預測。</p>
+          <p>{QUESTION_YEAR_LABEL} 腫專考古題、mixed mock、confidence calibration、critical error queue、≥80 分預測。</p>
         </div>
         <div className="header-actions">
           <button className="primary" onClick={() => createTodaySession()}>產生今日 Daily Practice</button>
@@ -5541,7 +5559,7 @@ export default function App() {
       </header>
 
       <section className="metrics-grid">
-        <MetricCard label="題庫總數" value={getQuestionPool(state).length} sub="112–114 年" />
+        <MetricCard label="題庫總數" value={getQuestionPool(state).length} sub={`${QUESTION_YEAR_LABEL} 年`} />
         <MetricCard label="已練題目" value={summary.reviewed} sub={`${summary.attempts} total attempts`} />
         <MetricCard label="正確率" value={`${summary.accuracy}%`} sub={`${summary.correct} correct / ${summary.wrong} wrong`} />
         <MetricCard label="今日待複習" value={dueReview.length} sub="依 next review date" />
@@ -6019,7 +6037,7 @@ export default function App() {
             <label>
               年份篩選
               <div className="check-row">
-                {[112, 113, 114].map((year) => (
+                {QUESTION_YEARS.map((year) => (
                   <label key={year}><input type="checkbox" checked={state.settings.preferredYears.includes(year)} onChange={(e) => {
                     const next = e.target.checked
                       ? [...state.settings.preferredYears, year]
