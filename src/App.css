@@ -1478,6 +1478,139 @@ button:disabled {
   margin: 16px 0;
 }
 
+.reward-dashboard {
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: #ffffff;
+  padding: 18px;
+  margin: 16px 0;
+}
+
+.reward-head,
+.reward-card-head,
+.reward-stat-row,
+.boss-progress-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reward-head {
+  margin-bottom: 14px;
+}
+
+.reward-head h3 {
+  margin: 4px 0 4px;
+}
+
+.reward-level {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel-soft);
+  padding: 10px 14px;
+  min-width: 120px;
+  text-align: right;
+}
+
+.reward-level strong {
+  display: block;
+  font-size: 22px;
+}
+
+.reward-level span {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.reward-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.2fr) repeat(3, minmax(210px, 1fr));
+  gap: 14px;
+}
+
+.reward-card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel-soft);
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.primary-reward {
+  background: #f8fafc;
+}
+
+.daily-chest-tasks,
+.boss-progress-list,
+.xp-event-list {
+  display: grid;
+  gap: 8px;
+}
+
+.chest-task {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #ffffff;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.chest-task span {
+  color: #64748b;
+  font-weight: 900;
+}
+
+.chest-task em {
+  color: var(--muted);
+  font-style: normal;
+  font-weight: 800;
+}
+
+.chest-task.done {
+  border-color: rgba(21, 128, 61, 0.26);
+  background: #f0fdf4;
+}
+
+.chest-task.done span,
+.chest-task.done strong {
+  color: #166534;
+}
+
+.reward-stat-row {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.boss-progress-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.boss-progress-row .progress-bar {
+  grid-column: 1 / -1;
+}
+
+.xp-event {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.xp-event strong {
+  color: var(--good);
+}
+
 .full-span {
   grid-column: 1 / -1;
 }
@@ -1550,6 +1683,21 @@ button:disabled {
   .mock-toolbar {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .reward-head,
+  .reward-card-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .reward-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .reward-level {
+    text-align: left;
+    width: 100%;
   }
 }
 
