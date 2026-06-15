@@ -530,36 +530,55 @@ const mockPlanTasks = [
   ['Phase 5: Second full mock cycle', 'Mock + correction', 'Mock', 'Final Board Boss', 'Mixed board boss: latest full mock >=75% and wrong-retest >=90%', ['Final Board Boss'], ['boss', 'mock', 'readiness'], 'Final Board Boss'],
 ];
 
-const weaknessPlanTasks = Array.from({ length: 15 }, (_, index) => ({
-  id: 76 + index,
-  day: `Day ${76 + index}`,
+const weaknessPlanTasks = Array.from({ length: 8 }, (_, index) => ({
+  id: 83 + index,
+  day: `Day ${83 + index}`,
   phase: 'Phase 4: Weakness repair only',
   module: 'Weakness Repair',
   cancer: 'Weakness Repair',
   topic: [
     'High-confidence wrong repair',
     'Wrong-rate >=50% Lung/Breast/GI',
-    'Mastery <=2 trial endpoints',
-    'Critical Error Queue pass 1',
+    'Wrong-rate >=50% GU/GYN/Heme/Head & Neck',
+    'Trial endpoint repair',
     'Biomarker cutoff repair',
-    'ADC and toxicity repair',
-    'Heme/GU/GYN repair',
-    'Head & Neck/Rare repair',
+    'Toxicity repair',
     'Statistics and trial interpretation repair',
-    'Algorithm blank recall',
-    'Previously wrong retest A',
-    'Previously wrong retest B',
-    'Red topic mini mocks',
-    'Boss rematch day',
-    'Readiness audit before retest cycle',
+    'Algorithm blank recall + Boss rematch',
   ][index],
-  details: 'Only study questions/topics matching wrongRate >=50%, mastery <=2, high-confidence wrong, repeated wrong, or failed boss categories.',
+  details: [
+    'Redo every high-confidence wrong; write why the wrong choice felt attractive.',
+    'Only Lung/Breast/GI score draggers with wrong-rate >=50%.',
+    'Repair second-tier score draggers from GU, GYN, Heme, and Head & Neck.',
+    'Turn every Trial confusion miss into a Trial Card.',
+    'Repair PD-L1 CPS/TPS, HER2, MSI/dMMR, BRCA/HRD, RAS/BRAF, FGFR, and FRalpha cutoffs.',
+    'Repair ICI, ADC, PARPi, TKI, CDK4/6, and EV toxicity traps.',
+    'Repair HR/CI, non-inferiority, subgroup, crossover, and endpoint definition misses.',
+    'Retry all failed Boss prompts and fill missing algorithm cards.',
+  ][index],
   goldenTrials: ['Weakness Review'],
   focusTags: ['wrongRate >=50', 'mastery <=2', 'high-confidence wrong', 'repeated wrong'],
   requiredQuestionIds: [],
   bossUnlockContribution: 'Final Board Boss',
   priority: 'High',
 }));
+
+const rareSupportiveRequiredTasks = [
+  ['Rare/Skin/Sarcoma/CUP/Other', 'Other', 'Melanoma / non-melanoma skin cancer', 'BRAF/MEK, PD-1, CTLA-4, relatlimab, CSCC, BCC, Merkel cell', ['COMBI-AD', 'CheckMate-238', 'KEYNOTE-629'], ['melanoma', 'skin', 'rare']],
+  ['Rare/Skin/Sarcoma/CUP/Other', 'Other', 'Sarcoma / GIST', 'Separate GIST from sarcoma; KIT/PDGFRA, imatinib dose, avapritinib, pazopanib', ['GIST Review', 'PALETTE'], ['sarcoma', 'GIST', 'rare']],
+  ['Rare/Skin/Sarcoma/CUP/Other', 'Other', 'CUP / IHC', 'CK7/CK20, TTF-1, PAX8, GATA3, CDX2, p40, thyroglobulin, NGS role', ['CUP Review'], ['CUP', 'IHC', 'biomarker']],
+  ['Rare/Skin/Sarcoma/CUP/Other', 'Other', 'NET / thyroid / MEN / VHL / tumor-agnostic', 'NET grading, somatostatin analog, PRRT, NTRK/RET/MSI/TMB/BRAF', ['NETTER-1', 'Tumor-agnostic Review'], ['NET', 'MEN', 'VHL', 'rare']],
+  ['Supportive/Emergency/Stats', 'Supportive/Stats', 'Oncologic emergencies', 'TLS, MSCC, SIADH, IICP, hypercalcemia, neutropenic fever', ['Emergency Review'], ['emergency', 'supportive', 'algorithm']],
+  ['Supportive/Emergency/Stats', 'Supportive/Stats', 'Toxicity mega-review', 'ICI pneumonitis/colitis/hepatitis/endocrine/myocarditis; ADC ILD; PARPi cytopenia/MDS; TKI HTN/QTc', ['Toxicity Review'], ['ICI', 'ADC', 'toxicity']],
+  ['Supportive/Emergency/Stats', 'Supportive/Stats', 'Statistics / endpoint design', 'HR/CI/KM, ITT, non-inferiority, crossover, subgroup forest plot, OS/PFS/EFS/DFS/iDFS/pCR/MRD', ['Stats Review', 'Endpoint Review'], ['statistics', 'endpoint', 'trial interpretation']],
+];
+
+const dailyCompletionCriteria = [
+  'Daily Practice completed',
+  'Boss 1-3 at least 2 pass',
+  'Create 3-5 high-value cards',
+  'Wrong answers classified by errorType',
+];
 
 function getTaskHighYieldWeight({ cancer, topic, details, focusTags = [], goldenTrials = [] }) {
   const text = [cancer, topic, details, ...focusTags, ...goldenTrials].join(' ').toLowerCase();
@@ -594,6 +613,7 @@ function buildStudyPlan100() {
         goldenTrials,
         focusTags,
         highYieldWeight: getTaskHighYieldWeight({ cancer: module.cancer, topic, details, focusTags, goldenTrials }),
+        completionCriteria: dailyCompletionCriteria,
         requiredQuestionIds: [],
         bossUnlockContribution: module.bossUnlockContribution,
         priority: focusTags.includes('boss') || focusTags.includes('weakness repair') ? 'High' : 'High',
@@ -601,9 +621,30 @@ function buildStudyPlan100() {
     });
   });
 
-  const withWeakness = [...tasks.slice(0, 75), ...weaknessPlanTasks];
+  const withWeakness = tasks.slice(0, 100);
+
+  rareSupportiveRequiredTasks.forEach(([module, cancer, topic, details, goldenTrials, focusTags], index) => {
+    const id = 66 + index;
+    withWeakness[id - 1] = {
+      id,
+      day: `Day ${id}`,
+      phase: 'Phase 3: Rare + Supportive/Stats required block',
+      module,
+      cancer,
+      topic,
+      details,
+      goldenTrials,
+      focusTags,
+      highYieldWeight: getTaskHighYieldWeight({ cancer, topic, details, focusTags, goldenTrials }),
+      completionCriteria: dailyCompletionCriteria,
+      requiredQuestionIds: [],
+      bossUnlockContribution: 'Rare/Supportive Readiness',
+      priority: 'High',
+    };
+  });
+
   mockPlanTasks.forEach(([phase, module, cancer, topic, details, goldenTrials, focusTags, bossUnlockContribution], index) => {
-    const id = index < 10 ? 66 + index : 91 + (index - 10);
+    const id = index < 10 ? 73 + index : 91 + (index - 10);
     withWeakness[id - 1] = {
       id,
       day: `Day ${id}`,
@@ -615,9 +656,18 @@ function buildStudyPlan100() {
       goldenTrials,
       focusTags,
       highYieldWeight: getTaskHighYieldWeight({ cancer, topic, details, focusTags, goldenTrials }),
+      completionCriteria: dailyCompletionCriteria,
       requiredQuestionIds: [],
       bossUnlockContribution,
       priority: 'High',
+    };
+  });
+
+  weaknessPlanTasks.forEach((task) => {
+    withWeakness[task.id - 1] = {
+      ...task,
+      highYieldWeight: getTaskHighYieldWeight(task),
+      completionCriteria: dailyCompletionCriteria,
     };
   });
 
@@ -638,6 +688,7 @@ function buildStudyPlan100() {
       goldenTrials,
       focusTags,
       highYieldWeight: getTaskHighYieldWeight({ cancer: 'Final Review', topic, details, focusTags, goldenTrials }),
+      completionCriteria: dailyCompletionCriteria,
       requiredQuestionIds: [],
       bossUnlockContribution: 'Final Board Boss',
       priority: 'High',
@@ -1577,6 +1628,31 @@ function getDailyQuestProgress(state, date = TODAY, task = getTodayPlanTask(stat
     bossResults: activeSaved.bossResults || {},
     failedMasteryReviewDate: activeSaved.failedMasteryReviewDate || null,
     perfectClear: Boolean(activeSaved.perfectClear),
+  };
+}
+
+function getHighValueCardsCreatedToday(state, date = TODAY) {
+  return getFlashcardList(state).filter((card) => (
+    String(card.createdAt || '').startsWith(date)
+    && normalizeExamValue(card.examValue) >= 4
+  ));
+}
+
+function getDailyWrongErrorTypeStatus(state, questionIds = [], date = TODAY) {
+  const wrongRated = questionIds
+    .map((id) => {
+      const question = getQuestionWithOverride(id, state);
+      const draft = state.sessions?.[date]?.practiceDrafts?.[id] || {};
+      const selected = String(draft.selected || '').trim().toUpperCase();
+      const correctAnswer = String(draft.correctAnswer || question?.answer || '').trim().toUpperCase();
+      const isWrong = draft.rated && selected && correctAnswer && selected !== correctAnswer;
+      return isWrong ? { id, errorType: draft.errorType || getStat(state, id).lastErrorType || '' } : null;
+    })
+    .filter(Boolean);
+  return {
+    wrongRatedCount: wrongRated.length,
+    classifiedCount: wrongRated.filter((row) => row.errorType).length,
+    complete: wrongRated.every((row) => row.errorType),
   };
 }
 
@@ -3224,6 +3300,7 @@ function QuestPanel({
   recallCards,
   bossChallenges,
   highYieldTopics,
+  completionStatus,
   onCreatePractice,
   practiceMode,
   onPracticeModeChange,
@@ -3321,6 +3398,21 @@ function QuestPanel({
               {topic.label}
               <strong>{topic.priorityScore}</strong>
             </span>
+          ))}
+        </div>
+      </section>
+
+      <section className="completion-criteria-card">
+        <h3>今日完成標準</h3>
+        <div className="completion-criteria-grid">
+          {completionStatus.map((item) => (
+            <div className={item.done ? 'completion-item done' : 'completion-item'} key={item.label}>
+              <span>{item.done ? '✓' : '○'}</span>
+              <div>
+                <strong>{item.label}</strong>
+                <p>{item.detail}</p>
+              </div>
+            </div>
           ))}
         </div>
       </section>
@@ -3912,7 +4004,7 @@ function FlashcardReviewPanel({ dueFlashcards, allFlashcards, onReviewCard, onUp
 function MockExamPanel({ state, onFinishMock }) {
   const [questionCount, setQuestionCount] = useState(80);
   const [timerMinutes, setTimerMinutes] = useState(120);
-  const [examMode, setExamMode] = useState('mixed-mock');
+  const [examMode, setExamMode] = useState('diagnostic-mock-0');
   const [examYear, setExamYear] = useState('All');
   const [exam, setExam] = useState(null);
   const [startedAt, setStartedAt] = useState(null);
@@ -4013,7 +4105,7 @@ function MockExamPanel({ state, onFinishMock }) {
       <div className="section-head">
         <div>
           <h2>Mock Exam Mode</h2>
-          <p className="muted">全癌別混合、隨機排序、結束後才顯示分數；每題記錄 confidence，供 Readiness Score 使用。</p>
+          <p className="muted">Mock 0 是獨立 diagnostic baseline，用來產生 score-dragger map；正式 112–114 mock cycle 留在 Day 73–82。</p>
         </div>
         <div className="inline-actions">
           <label>題數
@@ -4023,6 +4115,7 @@ function MockExamPanel({ state, onFinishMock }) {
           </label>
           <label>Mode
             <select value={examMode} onChange={(e) => setExamMode(e.target.value)}>
+              <option value="diagnostic-mock-0">Diagnostic Mock 0</option>
               <option value="mixed-mock">Mixed mock</option>
               <option value="lung-boss">Lung Boss</option>
               <option value="breast-boss">Breast Boss</option>
@@ -4045,7 +4138,7 @@ function MockExamPanel({ state, onFinishMock }) {
               {[60, 90, 120, 180].map((n) => <option key={n} value={n}>{n} min</option>)}
             </select>
           </label>
-          <button className="primary" onClick={startMock}>Start mixed mock</button>
+          <button className="primary" onClick={startMock}>Start mock</button>
         </div>
       </div>
 
@@ -4518,6 +4611,32 @@ export default function App() {
   const questRecallCards = useMemo(() => getQuestMemoryCards(state, questTask), [state, questTask]);
   const questBossChallenges = useMemo(() => buildBossChallenges(questTask, state), [questTask, state]);
   const highYieldTopics = useMemo(() => getRankedHighYieldTopics(state, questTask), [state, questTask]);
+  const todayHighValueCards = useMemo(() => getHighValueCardsCreatedToday(state), [state]);
+  const todayErrorTypeStatus = useMemo(() => getDailyWrongErrorTypeStatus(state, todayIds), [state, todayIds]);
+  const completionStatus = [
+    {
+      label: 'Daily Practice completed',
+      done: todayCompleted,
+      detail: todayCompleted ? '今日題目都已評分。' : `${todayIds.filter((id) => todaySession?.practiceDrafts?.[id]?.rated).length}/${todayIds.length || todayPracticeConfig.total} 題已評分。`,
+    },
+    {
+      label: 'Boss 1-3 at least 2 pass',
+      done: questProgress.bossDone,
+      detail: `${Object.values(questProgress.bossResults || {}).filter(Boolean).length}/3 passed.`,
+    },
+    {
+      label: 'Create 3-5 high-value cards',
+      done: todayHighValueCards.length >= 3,
+      detail: `${todayHighValueCards.length}/3 high-value cards created today.`,
+    },
+    {
+      label: 'Wrong answers classified by errorType',
+      done: todayErrorTypeStatus.complete,
+      detail: todayErrorTypeStatus.wrongRatedCount
+        ? `${todayErrorTypeStatus.classifiedCount}/${todayErrorTypeStatus.wrongRatedCount} wrong answers classified.`
+        : 'No wrong rated answers yet.',
+    },
+  ];
 
   const updatePracticeDraft = useCallback((questionId, patch) => {
     updateState((prev) => {
@@ -5134,6 +5253,7 @@ export default function App() {
           recallCards={questRecallCards}
           bossChallenges={questBossChallenges}
           highYieldTopics={highYieldTopics}
+          completionStatus={completionStatus}
           onCreatePractice={createTodaySession}
           practiceMode={selectedPracticeMode}
           onPracticeModeChange={setPracticeMode}
@@ -5463,6 +5583,9 @@ export default function App() {
                       <div className="trial-tags">
                         {(task.goldenTrials || []).map((trial) => <span key={trial}>{trial}</span>)}
                         {(task.focusTags || []).map((tag) => <span key={tag}>{tag}</span>)}
+                      </div>
+                      <div className="criteria-tags">
+                        {(task.completionCriteria || dailyCompletionCriteria).map((criterion) => <span key={criterion}>{criterion}</span>)}
                       </div>
                     </div>
                   </label>
