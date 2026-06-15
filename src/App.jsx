@@ -353,6 +353,8 @@ const defaultState = {
     defeatedBosses: [],
     xpEvents: [],
     dailyClaims: {},
+    dailyChests: {},
+    trialGems: 0,
   },
   cloudMeta: {
     updatedAt: null,
@@ -964,6 +966,11 @@ function mergeGameState(cloudGame = {}, localGame = {}) {
       ...(cloudGame?.dailyClaims || {}),
       ...(localGame?.dailyClaims || {}),
     },
+    dailyChests: {
+      ...(cloudGame?.dailyChests || {}),
+      ...(localGame?.dailyChests || {}),
+    },
+    trialGems: Math.max(cloudGame?.trialGems || 0, localGame?.trialGems || 0),
   };
 }
 
@@ -990,6 +997,8 @@ function normalizeState(state) {
     defeatedBosses: state?.game?.defeatedBosses || [],
     xpEvents: state?.game?.xpEvents || [],
     dailyClaims: state?.game?.dailyClaims || {},
+    dailyChests: state?.game?.dailyChests || {},
+    trialGems: state?.game?.trialGems || 0,
   };
   const xp = Math.max(game.xp || 0, state?.player?.xp || 0);
   const player = {
@@ -1035,6 +1044,21 @@ function xpLevel(xp = 0) {
   return Math.max(1, Math.floor(Math.sqrt(Math.max(0, xp) / 120)) + 1);
 }
 
+function getLevelProgress(xp = 0) {
+  const level = xpLevel(xp);
+  const currentLevelFloor = ((level - 1) ** 2) * 120;
+  const nextLevelFloor = (level ** 2) * 120;
+  const inLevel = Math.max(0, xp - currentLevelFloor);
+  const needed = Math.max(1, nextLevelFloor - currentLevelFloor);
+  return {
+    level,
+    current: inLevel,
+    needed,
+    percent: Math.round((inLevel / needed) * 100),
+    nextLevelXp: nextLevelFloor,
+  };
+}
+
 function awardXp(game = defaultState.game, amount, reason, meta = {}) {
   if (!amount) return game;
   const xp = (game.xp || 0) + amount;
@@ -1051,6 +1075,71 @@ function awardXp(game = defaultState.game, amount, reason, meta = {}) {
     xp,
     level: xpLevel(xp),
     xpEvents: [event, ...(game.xpEvents || [])].slice(0, 80),
+  };
+}
+
+function getTodayReviewQuestionCount(state, date = TODAY) {
+  return Object.values(state.stats || {}).reduce((sum, stat) => {
+    const reviewedToday = (stat.answerHistory || []).some((event) => event.date === date && event.mode === 'review');
+    return sum + (reviewedToday ? 1 : 0);
+  }, 0);
+}
+
+function getTodayFlashcardReviewCount(state, date = TODAY) {
+  return Object.values(state.flashcardStats || {}).filter((stat) => stat.lastReviewedAt === date).length;
+}
+
+function getTodayWrongNoteCount(state, date = TODAY) {
+  return Object.values(state.stats || {}).filter((stat) => stat.lastAttemptAt === date && String(stat.wrongNotes || '').trim()).length;
+}
+
+function getDailyChest(state, todayCompleted = false, date = TODAY) {
+  const reviewCount = getTodayReviewQuestionCount(state, date);
+  const flashcardCount = getTodayFlashcardReviewCount(state, date);
+  const wrongNoteCount = getTodayWrongNoteCount(state, date);
+  const rows = [
+    {
+      key: 'daily-practice',
+      label: 'Daily Practice',
+      target: '完成今日題組',
+      value: todayCompleted ? 1 : 0,
+      max: 1,
+      points: todayCompleted ? 35 : 0,
+      totalPoints: 35,
+    },
+    {
+      key: 'review-queue',
+      label: 'Review Queue',
+      target: '8 題',
+      value: Math.min(reviewCount, 8),
+      max: 8,
+      points: Math.round(Math.min(reviewCount / 8, 1) * 30),
+      totalPoints: 30,
+    },
+    {
+      key: 'flashcards',
+      label: 'Flashcards',
+      target: '10 張',
+      value: Math.min(flashcardCount, 10),
+      max: 10,
+      points: Math.round(Math.min(flashcardCount / 10, 1) * 20),
+      totalPoints: 20,
+    },
+    {
+      key: 'wrong-note',
+      label: '錯題 note',
+      target: '1 題',
+      value: Math.min(wrongNoteCount, 1),
+      max: 1,
+      points: wrongNoteCount >= 1 ? 15 : 0,
+      totalPoints: 15,
+    },
+  ];
+  const progress = Math.min(100, rows.reduce((sum, row) => sum + row.points, 0));
+  return {
+    rows,
+    progress,
+    claimed: Boolean(state.game?.dailyChests?.[date]),
   };
 }
 
@@ -2070,6 +2159,99 @@ function MetricCard({ label, value, sub }) {
       <div className="metric-value">{value}</div>
       {sub && <div className="metric-sub">{sub}</div>}
     </div>
+  );
+}
+
+function RewardDashboard({ state, dailyChest, bossRows, onClaimDailyChest }) {
+  const xp = state.game?.xp || 0;
+  const levelProgress = getLevelProgress(xp);
+  const recentEvents = state.game?.xpEvents || [];
+  return (
+    <section className="reward-dashboard">
+      <div className="reward-head">
+        <div>
+          <div className="eyebrow">Game Dashboard</div>
+          <h3>Daily Chest</h3>
+          <p className="muted">每天用小任務推進寶箱；滿 100 可開一次。</p>
+        </div>
+        <div className="reward-level">
+          <strong>Lv {levelProgress.level}</strong>
+          <span>{xp} XP</span>
+        </div>
+      </div>
+
+      <div className="reward-grid">
+        <article className="reward-card primary-reward">
+          <div className="reward-card-head">
+            <strong>今日寶箱</strong>
+            <span>{dailyChest.progress}/100</span>
+          </div>
+          <div className="progress-bar large"><span style={{ width: `${dailyChest.progress}%` }} /></div>
+          <div className="daily-chest-tasks">
+            {dailyChest.rows.map((row) => (
+              <div className={row.value >= row.max ? 'chest-task done' : 'chest-task'} key={row.key}>
+                <span>{row.value >= row.max ? '✓' : '○'}</span>
+                <strong>{row.label}</strong>
+                <em>{row.value}/{row.max} · +{row.points}/{row.totalPoints}</em>
+              </div>
+            ))}
+          </div>
+          <button className="primary" disabled={dailyChest.progress < 100 || dailyChest.claimed} onClick={onClaimDailyChest}>
+            {dailyChest.claimed ? '今日寶箱已開' : dailyChest.progress >= 100 ? '開啟今日寶箱' : '寶箱尚未滿'}
+          </button>
+        </article>
+
+        <article className="reward-card">
+          <div className="reward-card-head">
+            <strong>Level XP</strong>
+            <span>{levelProgress.current}/{levelProgress.needed}</span>
+          </div>
+          <div className="progress-bar"><span style={{ width: `${levelProgress.percent}%` }} /></div>
+          <p className="muted">下一級需要累積到 {levelProgress.nextLevelXp} XP。</p>
+          <div className="reward-stat-row">
+            <span>Streak</span>
+            <strong>{state.game?.streak || 0} days</strong>
+          </div>
+          <div className="reward-stat-row">
+            <span>Trial Gems</span>
+            <strong>{state.game?.trialGems || 0}</strong>
+          </div>
+        </article>
+
+        <article className="reward-card">
+          <div className="reward-card-head">
+            <strong>Boss Progress</strong>
+            <span>{bossRows.filter((boss) => boss.unlocked).length}/{bossRows.length}</span>
+          </div>
+          <div className="boss-progress-list">
+            {bossRows.slice(0, 5).map((boss) => (
+              <div className="boss-progress-row" key={boss.id}>
+                <span>{boss.name}</span>
+                <strong>{boss.defeated ? 'Chest opened' : `${boss.unlockValue}%`}</strong>
+                <div className="progress-bar"><span style={{ width: `${boss.defeated ? 100 : Math.min(100, boss.unlockValue) }%` }} /></div>
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <article className="reward-card">
+          <div className="reward-card-head">
+            <strong>XP Event Log</strong>
+            <span>recent 10</span>
+          </div>
+          {!recentEvents.length ? <p className="muted">還沒有 XP event。</p> : (
+            <div className="xp-event-list">
+              {recentEvents.slice(0, 10).map((event) => (
+                <div className="xp-event" key={event.id}>
+                  <strong>+{event.amount}</strong>
+                  <span>{event.reason}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </article>
+      </div>
+    </section>
   );
 }
 
@@ -4829,6 +5011,25 @@ export default function App() {
     }));
   };
 
+  const claimDailyChest = () => {
+    const currentChest = getDailyChest(state, todayCompleted);
+    if (currentChest.progress < 100 || currentChest.claimed) return;
+    updateState((prev) => {
+      const nextGame = awardXp(prev.game || defaultState.game, 80, 'Daily Chest opened', { date: TODAY, reward: 'daily-chest' });
+      return {
+        ...prev,
+        game: {
+          ...nextGame,
+          dailyChests: {
+            ...(prev.game?.dailyChests || {}),
+            [TODAY]: true,
+          },
+          trialGems: (prev.game?.trialGems || 0) + 1,
+        },
+      };
+    });
+  };
+
   const markQuestRecall = (card, rating) => {
     const cardId = typeof card === 'string' ? card : card.id;
     const isPersistentCard = typeof card !== 'string' && card.sourceType !== 'topic-recall' && normalizeFlashcards(state.flashcards)[card.id];
@@ -5000,6 +5201,7 @@ export default function App() {
   const cancerSummary = useMemo(() => getCancerSummary(state), [state]);
   const readiness = useMemo(() => getReadinessMetrics(state), [state]);
   const bossRows = useMemo(() => getBossRows(state, readiness), [state, readiness]);
+  const dailyChest = useMemo(() => getDailyChest(state, todayCompleted), [state, todayCompleted]);
   const allFlashcards = useMemo(() => getFlashcardList(state), [state]);
   const dueFlashcards = useMemo(() => getDueFlashcards(state), [state]);
 
@@ -5196,8 +5398,22 @@ export default function App() {
   };
 
   const resetPlanProgress = () => {
-    if (!window.confirm('確定要清除 100-Day Plan 的所有 checklist 完成狀態？')) return;
-    updateState((prev) => ({ ...prev, planProgress: {}, planItemProgress: {} }));
+    const updatedAt = new Date().toISOString();
+    updateState((prev) => ({
+      ...prev,
+      planProgress: {},
+      planItemProgress: {},
+      dailyQuestProgress: {},
+      bossProgress: {},
+      game: { ...defaultState.game },
+      player: { ...defaultState.player },
+      cloudMeta: {
+        ...(prev.cloudMeta || {}),
+        updatedAt,
+        device: navigator.userAgent,
+      },
+    }));
+    setSyncStatus('已重新開始 100-Day Plan，並重設完成度與 XP。');
   };
 
 
@@ -5609,8 +5825,15 @@ export default function App() {
               <h2>100-Day Plan Checklist</h2>
               <p className="muted">依照主題與 golden trial 拆成 100 個可勾選任務。完成度會依總體、癌別、golden trial 分別統計。</p>
             </div>
-            <button className="secondary" onClick={resetPlanProgress}>重設完成度</button>
+            <button className="secondary" onClick={resetPlanProgress}>重新開始 100-Day Plan</button>
           </div>
+
+          <RewardDashboard
+            state={state}
+            dailyChest={dailyChest}
+            bossRows={bossRows}
+            onClaimDailyChest={claimDailyChest}
+          />
 
           <section className="plan-overview">
             <MetricCard label="總完成率" value={`${planSummary.percent}%`} sub={`${planSummary.completed}/${planSummary.total} tasks`} />
