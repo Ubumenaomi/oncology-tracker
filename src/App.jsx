@@ -722,6 +722,12 @@ function mergeCloudState(localState, cloudState) {
     ...(cloudState.deletedFlashcardIds || {}),
     ...(localState.deletedFlashcardIds || {}),
   };
+  const localPlanResetAt = localState?.cloudMeta?.planResetAt || '';
+  const cloudPlanResetAt = cloudState?.cloudMeta?.planResetAt || '';
+  const localGameResetAt = localState?.cloudMeta?.gameResetAt || '';
+  const cloudGameResetAt = cloudState?.cloudMeta?.gameResetAt || '';
+  const planResetOwner = localPlanResetAt > cloudPlanResetAt ? 'local' : cloudPlanResetAt > localPlanResetAt ? 'cloud' : 'none';
+  const gameResetOwner = localGameResetAt > cloudGameResetAt ? 'local' : cloudGameResetAt > localGameResetAt ? 'cloud' : 'none';
 
   return normalizeState({
     ...defaultState,
@@ -740,19 +746,35 @@ function mergeCloudState(localState, cloudState) {
       ...(cloudState.settings || {}),
       ...(localState.settings || {}),
     },
-    planProgress: {
-      ...(cloudState.planProgress || {}),
-      ...(localState.planProgress || {}),
-    },
-    planItemProgress: mergePlanItemProgress(cloudState.planItemProgress, localState.planItemProgress),
-    dailyQuestProgress: {
-      ...(cloudState.dailyQuestProgress || {}),
-      ...(localState.dailyQuestProgress || {}),
-    },
-    bossProgress: {
-      ...(cloudState.bossProgress || {}),
-      ...(localState.bossProgress || {}),
-    },
+    planProgress: planResetOwner === 'local'
+      ? (localState.planProgress || {})
+      : planResetOwner === 'cloud'
+        ? (cloudState.planProgress || {})
+        : {
+            ...(cloudState.planProgress || {}),
+            ...(localState.planProgress || {}),
+          },
+    planItemProgress: planResetOwner === 'local'
+      ? normalizePlanItemProgress(localState.planItemProgress)
+      : planResetOwner === 'cloud'
+        ? normalizePlanItemProgress(cloudState.planItemProgress)
+        : mergePlanItemProgress(cloudState.planItemProgress, localState.planItemProgress),
+    dailyQuestProgress: planResetOwner === 'local'
+      ? (localState.dailyQuestProgress || {})
+      : planResetOwner === 'cloud'
+        ? (cloudState.dailyQuestProgress || {})
+        : {
+            ...(cloudState.dailyQuestProgress || {}),
+            ...(localState.dailyQuestProgress || {}),
+          },
+    bossProgress: planResetOwner === 'local'
+      ? (localState.bossProgress || {})
+      : planResetOwner === 'cloud'
+        ? (cloudState.bossProgress || {})
+        : {
+            ...(cloudState.bossProgress || {}),
+            ...(localState.bossProgress || {}),
+          },
     questionOverrides: {
       ...(cloudState.questionOverrides || {}),
       ...(localState.questionOverrides || {}),
@@ -775,8 +797,16 @@ function mergeCloudState(localState, cloudState) {
       ...(cloudState.flashcardStats || {}),
       ...(localState.flashcardStats || {}),
     },
-    game: mergeGameState(cloudState.game, localState.game),
-    player: mergePlayerState(cloudState.player, localState.player, cloudState.game, localState.game),
+    game: gameResetOwner === 'local'
+      ? mergeGameState({}, localState.game)
+      : gameResetOwner === 'cloud'
+        ? mergeGameState({}, cloudState.game)
+        : mergeGameState(cloudState.game, localState.game),
+    player: gameResetOwner === 'local'
+      ? mergePlayerState({}, localState.player, {}, localState.game)
+      : gameResetOwner === 'cloud'
+        ? mergePlayerState({}, cloudState.player, {}, cloudState.game)
+        : mergePlayerState(cloudState.player, localState.player, cloudState.game, localState.game),
     cloudMeta: {
       ...(cloudState.cloudMeta || {}),
       ...(localState.cloudMeta || {}),
@@ -5410,6 +5440,8 @@ export default function App() {
       cloudMeta: {
         ...(prev.cloudMeta || {}),
         updatedAt,
+        planResetAt: updatedAt,
+        gameResetAt: updatedAt,
         device: navigator.userAgent,
       },
     }));
