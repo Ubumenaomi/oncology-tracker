@@ -16,6 +16,7 @@ import {
 } from './firebase.js';
 
 const STORAGE_KEY = 'oncologyTracker.aiReview.v1';
+const EMPTY_ARRAY = Object.freeze([]);
 const ERROR_TYPE_OPTIONS = [
   'Knowledge gap',
   'Misread question',
@@ -2042,6 +2043,119 @@ function getCancerSummary(state) {
   }).sort((a, b) => (a.status === 'Red' ? -1 : 1) - (b.status === 'Red' ? -1 : 1) || b.wrongRate - a.wrongRate || b.attempts - a.attempts);
 }
 
+function getRecentDateKeys(endDate = TODAY, count = 7) {
+  return Array.from({ length: count }, (_item, index) => addDays(endDate, index - count + 1));
+}
+
+function getAnswerEventsByDate(state) {
+  const byDate = {};
+  Object.values(state.stats || {}).forEach((stat) => {
+    (stat.answerHistory || []).forEach((event) => {
+      if (!event?.date) return;
+      if (!byDate[event.date]) byDate[event.date] = { attempts: 0, correct: 0, wrong: 0 };
+      byDate[event.date].attempts += 1;
+      byDate[event.date].correct += event.isCorrect ? 1 : 0;
+      byDate[event.date].wrong += event.isCorrect ? 0 : 1;
+    });
+  });
+  return byDate;
+}
+
+function getTodayAttemptSummary(state, date = TODAY) {
+  const fromHistory = getAnswerEventsByDate(state)[date];
+  if (fromHistory) return fromHistory;
+
+  return Object.values(state.stats || {}).reduce((acc, stat) => {
+    if (stat.lastAttemptAt !== date) return acc;
+    acc.attempts += 1;
+    acc.correct += stat.lastResult === 'correct' ? 1 : 0;
+    acc.wrong += stat.lastResult === 'wrong' ? 1 : 0;
+    return acc;
+  }, { attempts: 0, correct: 0, wrong: 0 });
+}
+
+function getStatsDashboard(state, planSummary, readiness, cancerSummary, date = TODAY) {
+  const stats = Object.values(state.stats || {}).map((stat) => ({ ...emptyStat(), ...stat }));
+  const attempts = stats.reduce((sum, stat) => sum + (stat.attempts || 0), 0);
+  const correct = stats.reduce((sum, stat) => sum + (stat.correct || 0), 0);
+  const wrong = stats.reduce((sum, stat) => sum + (stat.wrong || 0), 0);
+  const reviewed = Object.keys(state.stats || {}).filter((id) => (state.stats?.[id]?.attempts || 0) > 0).length;
+  const answerEventsByDate = getAnswerEventsByDate(state);
+  const activeDates = new Set([
+    ...Object.keys(answerEventsByDate),
+    ...Object.keys(state.sessions || {}).filter((key) => state.sessions?.[key]?.questionIds?.length),
+    ...Object.values(state.flashcardStats || {}).map((stat) => stat.lastReviewedAt).filter(Boolean),
+  ]);
+  const todayAttempts = getTodayAttemptSummary(state, date);
+  const todaySession = state.sessions?.[date] || {};
+  const todayQuestionCount = (todaySession.questionIds || []).length;
+  const todayRatedCount = Object.values(todaySession.practiceDrafts || {}).filter((draft) => draft?.rated).length;
+  const todayFlashcards = getTodayFlashcardReviewCount(state, date);
+  const todayReviewQuestions = getTodayReviewQuestionCount(state, date);
+  const todayWrongNotes = getTodayWrongNoteCount(state, date);
+  const recentDates = getRecentDateKeys(date, 7);
+  const flashcardsByDate = Object.values(state.flashcardStats || {}).reduce((acc, stat) => {
+    if (!stat.lastReviewedAt) return acc;
+    acc[stat.lastReviewedAt] = (acc[stat.lastReviewedAt] || 0) + 1;
+    return acc;
+  }, {});
+  const recentActivity = recentDates.map((key) => {
+    const row = answerEventsByDate[key] || { attempts: 0, correct: 0, wrong: 0 };
+    return {
+      date: key,
+      attempts: row.attempts,
+      correct: row.correct,
+      wrong: row.wrong,
+      accuracy: row.attempts ? Math.round((row.correct / row.attempts) * 100) : 0,
+      flashcards: flashcardsByDate[key] || 0,
+    };
+  });
+  const maxRecentAttempts = Math.max(1, ...recentActivity.map((row) => row.attempts + row.flashcards));
+  const flashcardList = getFlashcardList(state);
+  const masteredCards = flashcardList.filter((card) => (state.flashcardStats?.[card.id]?.mastery ?? card.mastery ?? 0) >= 4).length;
+  const dueCards = getDueFlashcards(state).length;
+  const criticalErrors = readiness.criticalErrors || [];
+  const weakCancerRows = cancerSummary
+    .filter((row) => row.attempts > 0)
+    .sort((a, b) => b.wrongRate - a.wrongRate || b.wrong - a.wrong)
+    .slice(0, 5);
+  const recentQuestStars = Object.entries(state.dailyQuestProgress || {})
+    .sort(([a], [b]) => b.localeCompare(a))
+    .slice(0, 7)
+    .reduce((sum, entry) => sum + (entry[1]?.stars || 0), 0);
+
+  return {
+    attempts,
+    correct,
+    wrong,
+    reviewed,
+    accuracy: attempts ? Math.round((correct / attempts) * 100) : 0,
+    averageDailyQuestions: activeDates.size ? Math.round((attempts / activeDates.size) * 10) / 10 : 0,
+    activeDays: activeDates.size,
+    todayAttempts,
+    todayAccuracy: todayAttempts.attempts ? Math.round((todayAttempts.correct / todayAttempts.attempts) * 100) : 0,
+    todayQuestionCount,
+    todayRatedCount,
+    todayFlashcards,
+    todayReviewQuestions,
+    todayWrongNotes,
+    recentActivity,
+    maxRecentAttempts,
+    weakCancerRows,
+    criticalErrorCount: criticalErrors.length,
+    planPercent: planSummary.percent,
+    planCompleted: planSummary.completed,
+    planTotal: planSummary.total,
+    goldenPercent: planSummary.goldenPercent,
+    goldenCompleted: planSummary.goldenCompleted,
+    goldenTotal: planSummary.goldenTotal,
+    flashcardTotal: flashcardList.length,
+    masteredCards,
+    dueCards,
+    recentQuestStars,
+  };
+}
+
 
 function clampPercent(value) {
   if (!Number.isFinite(value)) return 0;
@@ -2210,6 +2324,137 @@ function MetricCard({ label, value, sub }) {
   );
 }
 
+function StatsDashboard({ stats }) {
+  const todayRows = [
+    ['今日作答', stats.todayAttempts.attempts, `${stats.todayAttempts.correct} correct / ${stats.todayAttempts.wrong} wrong`],
+    ['今日正確率', `${stats.todayAccuracy}%`, stats.todayAttempts.attempts ? 'based on today attempts' : '尚未作答'],
+    ['Daily Practice', `${stats.todayRatedCount}/${stats.todayQuestionCount || 0}`, 'rated / loaded questions'],
+    ['Review Queue', stats.todayReviewQuestions, 'review-mode questions'],
+    ['Flashcards', stats.todayFlashcards, 'cards reviewed today'],
+    ['錯題筆記', stats.todayWrongNotes, 'notes added today'],
+  ];
+
+  return (
+    <main className="panel stats-dashboard">
+      <div className="section-head">
+        <div>
+          <h2>Stats Dashboard</h2>
+          <p className="muted">把累計作答、今日進度、弱點、100-Day Plan 和 flashcards 統一看。</p>
+        </div>
+        <span className="pill soft">{TODAY}</span>
+      </div>
+
+      <section className="stats-hero-grid">
+        <MetricCard label="累計 attempts" value={stats.attempts} sub={`${stats.reviewed} questions reviewed`} />
+        <MetricCard label="Correct / Wrong" value={`${stats.correct}/${stats.wrong}`} sub={`${stats.accuracy}% accuracy`} />
+        <MetricCard label="平均每日題數" value={stats.averageDailyQuestions} sub={`${stats.activeDays} active days`} />
+        <MetricCard label="Critical errors" value={stats.criticalErrorCount} sub="HC wrong / repeated wrong" />
+      </section>
+
+      <section className="stats-layout">
+        <article className="stats-panel">
+          <div className="stats-panel-head">
+            <strong>今日統計</strong>
+            <span>{stats.todayAttempts.attempts ? `${stats.todayAccuracy}%` : 'not started'}</span>
+          </div>
+          <div className="today-stats-grid">
+            {todayRows.map(([label, value, sub]) => (
+              <div className="today-stat" key={label}>
+                <span>{label}</span>
+                <strong>{value}</strong>
+                <em>{sub}</em>
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <article className="stats-panel">
+          <div className="stats-panel-head">
+            <strong>最近 7 日趨勢</strong>
+            <span>questions + cards</span>
+          </div>
+          <div className="trend-list">
+            {stats.recentActivity.map((row) => {
+              const total = row.attempts + row.flashcards;
+              return (
+                <div className="trend-row" key={row.date}>
+                  <span>{row.date.slice(5)}</span>
+                  <div className="trend-track" aria-label={`${row.date} total activity ${total}`}>
+                    <i style={{ width: `${Math.max(4, (total / stats.maxRecentAttempts) * 100)}%` }} />
+                  </div>
+                  <strong>{total}</strong>
+                  <em>{row.attempts ? `${row.accuracy}%` : '--'}</em>
+                </div>
+              );
+            })}
+          </div>
+        </article>
+      </section>
+
+      <section className="stats-layout three">
+        <article className="stats-panel">
+          <div className="stats-panel-head">
+            <strong>弱點癌別</strong>
+            <span>wrong-rate rank</span>
+          </div>
+          {!stats.weakCancerRows.length ? <p className="muted">有作答紀錄後會自動排序弱點。</p> : (
+            <div className="rank-list">
+              {stats.weakCancerRows.map((row) => (
+                <div className="rank-row" key={row.cancer}>
+                  <div>
+                    <strong>{row.cancer}</strong>
+                    <span>{row.wrong} wrong / {row.attempts} attempts</span>
+                  </div>
+                  <em>{row.wrongRate}%</em>
+                </div>
+              ))}
+            </div>
+          )}
+        </article>
+
+        <article className="stats-panel">
+          <div className="stats-panel-head">
+            <strong>100-Day Plan</strong>
+            <span>{stats.planCompleted}/{stats.planTotal}</span>
+          </div>
+          <div className="stats-progress-block">
+            <div className="plan-cancer-head">
+              <span>總進度</span>
+              <strong>{stats.planPercent}%</strong>
+            </div>
+            <div className="progress-bar large"><span style={{ width: `${stats.planPercent}%` }} /></div>
+            <div className="plan-cancer-head">
+              <span>Golden trial</span>
+              <strong>{stats.goldenCompleted}/{stats.goldenTotal}</strong>
+            </div>
+            <div className="progress-bar"><span style={{ width: `${stats.goldenPercent}%` }} /></div>
+          </div>
+        </article>
+
+        <article className="stats-panel">
+          <div className="stats-panel-head">
+            <strong>Flashcards</strong>
+            <span>{stats.dueCards} due</span>
+          </div>
+          <div className="stats-progress-block">
+            <div className="plan-cancer-head">
+              <span>Mastered cards</span>
+              <strong>{stats.masteredCards}/{stats.flashcardTotal}</strong>
+            </div>
+            <div className="progress-bar large">
+              <span style={{ width: `${stats.flashcardTotal ? Math.round((stats.masteredCards / stats.flashcardTotal) * 100) : 0}%` }} />
+            </div>
+            <div className="quest-star-summary">
+              <span>Recent Quest stars</span>
+              <strong>{stats.recentQuestStars}</strong>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+  );
+}
+
 function RewardDashboard({ state, dailyChest, bossRows, onClaimDailyChest }) {
   const xp = state.game?.xp || 0;
   const levelProgress = getLevelProgress(xp);
@@ -2364,6 +2609,8 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
 
     setNotesExpanded(false);
     setFeedback('');
+    // Local answer state should reset only when the rendered question changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [question.id]);
 
   const onPracticeChangeRef = useRef(onPracticeChange);
@@ -2394,7 +2641,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
     if (!same) {
       onPracticeChangeRef.current(patch);
     }
-  }, [selected, revealed, correctAnswer, explanation, wrongNotes, confidence, errorType, practiceMode]);
+  }, [selected, revealed, correctAnswer, explanation, wrongNotes, confidence, errorType, practiceMode, practiceDraft]);
 
   const answerIsSingleChoice = /^[A-E]$/.test(String(correctAnswer || '').trim().toUpperCase());
   const isCorrectSelection = selected && answerIsSingleChoice && selected === String(correctAnswer).trim().toUpperCase();
@@ -2800,6 +3047,8 @@ function QuestionEditor({ question, override, onSave, onCancel }) {
       explanation: question.explanation || '',
       notionUrl: question.notionUrl || '',
     });
+    // Editing form state should reset only when a different question is selected.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [question?.id]);
 
   const save = () => {
@@ -3021,6 +3270,8 @@ function ManualExplanationPanel({ state, onUpdateStat }) {
     setExplanation(stat.explanation || question.explanation || '');
     setWrongNotes(stat.wrongNotes || '');
     setSaveMessage('');
+    // Manual editor fields should reset only when switching to another question.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [question?.id, state]);
 
   const saveManualExplanation = () => {
@@ -4881,11 +5132,17 @@ export default function App() {
 
   const todaySession = state.sessions[TODAY];
   const baseQuestTask = getTodayPlanTask(state);
-  const rawTodayIds = todaySession?.questionIds || [];
+  const rawTodayIds = todaySession?.questionIds || EMPTY_ARRAY;
   const todaySessionPlanTaskId = todaySession?.planTaskId || null;
   const todaySessionMatchesQuest = Number(todaySessionPlanTaskId) === Number(baseQuestTask?.id);
-  const todayIds = todaySessionMatchesQuest ? rawTodayIds : [];
-  const todayQuestions = todayIds.map((id) => getQuestionWithOverride(id, state)).filter(Boolean);
+  const todayIds = useMemo(
+    () => (todaySessionMatchesQuest ? rawTodayIds : EMPTY_ARRAY),
+    [todaySessionMatchesQuest, rawTodayIds]
+  );
+  const todayQuestions = useMemo(
+    () => todayIds.map((id) => getQuestionWithOverride(id, state)).filter(Boolean),
+    [todayIds, state]
+  );
   const todayCompleted = todaySessionMatchesQuest && todayIds.length > 0 && todayIds.every((id) => todaySession?.practiceDrafts?.[id]?.rated);
   const questProgress = getDailyQuestProgress(state, TODAY, baseQuestTask, todayCompleted);
   const questTask = studyPlan100.find((task) => task.id === questProgress.planTaskId) || baseQuestTask;
@@ -4896,11 +5153,11 @@ export default function App() {
   const currentPracticePage = Math.min(practicePage, Math.max(0, Math.ceil(todayQuestions.length / PRACTICE_PAGE_SIZE) - 1));
   const visibleTodayQuestions = todayQuestions.slice(currentPracticePage * PRACTICE_PAGE_SIZE, (currentPracticePage + 1) * PRACTICE_PAGE_SIZE);
   const totalPracticePages = Math.ceil(todayPracticeConfig.total / PRACTICE_PAGE_SIZE);
-  const questRecallCards = useMemo(() => getQuestMemoryCards(state, questTask), [state, questTask]);
-  const questBossChallenges = useMemo(() => buildBossChallenges(questTask, state), [questTask, state]);
-  const highYieldTopics = useMemo(() => getRankedHighYieldTopics(state, questTask), [state, questTask]);
-  const todayHighValueCards = useMemo(() => getHighValueCardsCreatedToday(state), [state]);
-  const todayErrorTypeStatus = useMemo(() => getDailyWrongErrorTypeStatus(state, todayIds), [state, todayIds]);
+  const questRecallCards = getQuestMemoryCards(state, questTask);
+  const questBossChallenges = buildBossChallenges(questTask, state);
+  const highYieldTopics = getRankedHighYieldTopics(state, questTask);
+  const todayHighValueCards = getHighValueCardsCreatedToday(state);
+  const todayErrorTypeStatus = getDailyWrongErrorTypeStatus(state, todayIds);
   const completionStatus = [
     {
       label: 'Daily Practice completed',
@@ -5249,7 +5506,7 @@ export default function App() {
   const cancerSummary = useMemo(() => getCancerSummary(state), [state]);
   const readiness = useMemo(() => getReadinessMetrics(state), [state]);
   const bossRows = useMemo(() => getBossRows(state, readiness), [state, readiness]);
-  const dailyChest = useMemo(() => getDailyChest(state, todayCompleted), [state, todayCompleted]);
+  const dailyChest = getDailyChest(state, todayCompleted);
   const allFlashcards = useMemo(() => getFlashcardList(state), [state]);
   const dueFlashcards = useMemo(() => getDueFlashcards(state), [state]);
 
@@ -5323,20 +5580,31 @@ export default function App() {
     };
   }, [planProgress]);
 
+  const statsDashboard = useMemo(
+    () => getStatsDashboard(state, planSummary, readiness, cancerSummary),
+    [state, planSummary, readiness, cancerSummary]
+  );
 
-  const missionControl = useMemo(() => {
-    const nextPlanTask = studyPlan100.find((task) => !planProgress[task.id]) || studyPlan100[studyPlan100.length - 1];
-    const topWeakCancer = cancerSummary.find((row) => row.status === 'Red') || cancerSummary[0];
-    const topRedTopic = readiness.redTopics?.[0];
-    const dueCount = dueReview.length;
-    const mockNeeded = readiness.recentMockScores.length < 3 || readiness.recentMockAverage < 80;
-    const primaryFocus = topRedTopic
-      ? `${topRedTopic.cancer}｜${topRedTopic.topic}`
-      : topWeakCancer
-        ? `${topWeakCancer.cancer} 題庫覆蓋率 ${topWeakCancer.coverage}% / 正確率 ${topWeakCancer.accuracy}%`
-        : '維持今日任務 streak';
 
-    const actions = [
+  const nextPlanTask = studyPlan100.find((task) => !planProgress[task.id]) || studyPlan100[studyPlan100.length - 1];
+  const topWeakCancer = cancerSummary.find((row) => row.status === 'Red') || cancerSummary[0];
+  const topRedTopic = readiness.redTopics?.[0];
+  const dueCount = dueReview.length;
+  const mockNeeded = readiness.recentMockScores.length < 3 || readiness.recentMockAverage < 80;
+  const primaryFocus = topRedTopic
+    ? `${topRedTopic.cancer}｜${topRedTopic.topic}`
+    : topWeakCancer
+      ? `${topWeakCancer.cancer} 題庫覆蓋率 ${topWeakCancer.coverage}% / 正確率 ${topWeakCancer.accuracy}%`
+      : '維持今日任務 streak';
+  const missionControl = {
+    goal: '通過腫瘤專科考試',
+    loop: '每日任務 → 題目作答 → 錯題修補 → Trial 卡片 → Boss / Mock 驗收',
+    planTarget: nextPlanTask ? `下一個讀書計畫：${nextPlanTask.day} ${nextPlanTask.topic}` : '100-Day Plan 已完成',
+    examLabel: EXAM_DATE.label,
+    examDate: EXAM_DATE.display,
+    examCountdown: getExamCountdown(),
+    primaryFocus,
+    actions: [
       {
         title: '今日主線任務',
         detail: `完成 ${questTask.day}：${questTask.topic}，先做題再回想 trial / algorithm。`,
@@ -5359,19 +5627,8 @@ export default function App() {
         cta: 'Mock Exam',
         tab: 'mock',
       },
-    ];
-
-    return {
-      goal: '通過腫瘤專科考試',
-      loop: '每日任務 → 題目作答 → 錯題修補 → Trial 卡片 → Boss / Mock 驗收',
-      planTarget: nextPlanTask ? `下一個讀書計畫：${nextPlanTask.day} ${nextPlanTask.topic}` : '100-Day Plan 已完成',
-      examLabel: EXAM_DATE.label,
-      examDate: EXAM_DATE.display,
-      examCountdown: getExamCountdown(),
-      primaryFocus,
-      actions,
-    };
-  }, [planProgress, cancerSummary, readiness, dueReview.length, questTask]);
+    ],
+  };
 
   const togglePlanTask = (id, checkedOverride = null) => {
     const task = studyPlan100.find((item) => Number(item.id) === Number(id));
@@ -5612,7 +5869,7 @@ export default function App() {
       )}
 
       <nav className="tabs">
-        {[['quest', 'Quest'], ['readiness', 'Board Readiness'], ['mock', 'Mock Exam'], ['critical', 'Critical Errors'], ['flashcards', 'Flashcards'], ['flashcard-review', 'Card Review'], ['today', 'Daily Practice'], ['review', 'Review Queue'], ['questions', 'Question Manager'], ['analytics', 'Analytics'], ['plan', '100-Day Plan'], ['sync', 'Cloud Sync'], ['settings', 'Settings']].map(([key, label]) => (
+        {[['quest', 'Quest'], ['stats', 'Stats'], ['readiness', 'Board Readiness'], ['mock', 'Mock Exam'], ['critical', 'Critical Errors'], ['flashcards', 'Flashcards'], ['flashcard-review', 'Card Review'], ['today', 'Daily Practice'], ['review', 'Review Queue'], ['questions', 'Question Manager'], ['analytics', 'Analytics'], ['plan', '100-Day Plan'], ['sync', 'Cloud Sync'], ['settings', 'Settings']].map(([key, label]) => (
           <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>
         ))}
       </nav>
@@ -5633,6 +5890,10 @@ export default function App() {
           onClaimStageClear={claimStageClear}
           onOpenPractice={() => setTab('today')}
         />
+      )}
+
+      {tab === 'stats' && (
+        <StatsDashboard stats={statsDashboard} />
       )}
 
       {tab === 'readiness' && (
