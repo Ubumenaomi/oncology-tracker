@@ -5527,7 +5527,17 @@ export default function App() {
     () => todayIds.map((id) => getQuestionWithOverride(id, state)).filter(Boolean),
     [todayIds, state]
   );
-  const todayCompleted = todaySessionMatchesQuest && todayIds.length > 0 && todayIds.every((id) => todaySession?.practiceDrafts?.[id]?.rated);
+  const selectedPracticeMode = state.settings?.practiceMode || 'standard';
+  const selectedPracticeConfig = getPracticeModeConfig(selectedPracticeMode);
+  const todayPracticeMode = todaySession?.practiceMode || selectedPracticeMode;
+  const todayPracticeConfig = getPracticeModeConfig(todayPracticeMode);
+  const todayPracticeTargetCount = todayPracticeConfig.total;
+  const todayPracticeTargetIds = todayIds.slice(0, todayPracticeTargetCount);
+  const todayRatedCount = todayPracticeTargetIds.filter((id) => todaySession?.practiceDrafts?.[id]?.rated).length;
+  const todayCompleted = todaySessionMatchesQuest
+    && todayPracticeTargetCount > 0
+    && todayPracticeTargetIds.length >= todayPracticeTargetCount
+    && todayRatedCount >= todayPracticeTargetCount;
   const questProgress = getDailyQuestProgress(state, TODAY, baseQuestTask, todayCompleted);
   const questTask = studyPlan100.find((task) => task.id === questProgress.planTaskId) || baseQuestTask;
   const todayFocusMinutes = sumFocusMinutesByDate(state, TODAY);
@@ -5541,10 +5551,6 @@ export default function App() {
     () => buildFocusLeaderboard(leaderboardFocusMinutes, leaderboardElapsedSeconds),
     [leaderboardFocusMinutes, leaderboardElapsedSeconds]
   );
-  const selectedPracticeMode = state.settings?.practiceMode || 'standard';
-  const selectedPracticeConfig = getPracticeModeConfig(selectedPracticeMode);
-  const todayPracticeMode = todaySession?.practiceMode || selectedPracticeMode;
-  const todayPracticeConfig = getPracticeModeConfig(todayPracticeMode);
   const currentPracticePage = Math.min(practicePage, Math.max(0, Math.ceil(todayQuestions.length / PRACTICE_PAGE_SIZE) - 1));
   const visibleTodayQuestions = todayQuestions.slice(currentPracticePage * PRACTICE_PAGE_SIZE, (currentPracticePage + 1) * PRACTICE_PAGE_SIZE);
   const totalPracticePages = Math.ceil(todayPracticeConfig.total / PRACTICE_PAGE_SIZE);
@@ -5557,7 +5563,7 @@ export default function App() {
     {
       label: 'Daily Practice completed',
       done: todayCompleted,
-      detail: todayCompleted ? '今日題目都已評分。' : `${todayIds.filter((id) => todaySession?.practiceDrafts?.[id]?.rated).length}/${todayIds.length || todayPracticeConfig.total} 題已評分。`,
+      detail: todayCompleted ? '今日題目都已評分。' : `${todayRatedCount}/${todayPracticeTargetCount} 題已評分。`,
     },
     {
       label: 'Boss 1-3 at least 2 pass',
