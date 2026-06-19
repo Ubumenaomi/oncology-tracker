@@ -19,7 +19,11 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 
-.app-shell { max-width: 1280px; margin: 0 auto; padding: 24px; }
+.app-shell {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: calc(24px + env(safe-area-inset-top)) calc(24px + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) calc(24px + env(safe-area-inset-left));
+}
 .app-header { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; background: linear-gradient(135deg, #0f172a, #1e3a8a); color: white; padding: 28px; border-radius: 28px; box-shadow: var(--shadow); }
 .eyebrow { text-transform: uppercase; letter-spacing: 0.14em; font-size: 12px; opacity: 0.75; }
 h1 { margin: 4px 0 6px; font-size: clamp(30px, 5vw, 48px); line-height: 1; }
@@ -412,7 +416,9 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.5; }
 .category-grid label, .check-row label { color: #334155; font-size: 14px; }
 
 @media (max-width: 900px) {
-  .app-shell { padding: 12px; }
+  .app-shell {
+    padding: calc(12px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left));
+  }
   .app-header, .section-head { flex-direction: column; }
   .metrics-grid { grid-template-columns: repeat(2, 1fr); }
   .stats-hero-grid, .stats-layout, .stats-layout.three { grid-template-columns: 1fr; }
@@ -424,6 +430,10 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.5; }
 }
 
 @media (max-width: 560px) {
+  .app-header, .panel, .metric-card, .question-card { border-radius: 18px; }
+  .app-header { padding: 20px; }
+  h1 { font-size: 32px; line-height: 1.08; }
+  h2 { font-size: 21px; }
   .metrics-grid { grid-template-columns: 1fr; }
   .today-stats-grid { grid-template-columns: 1fr; }
   .trend-row { grid-template-columns: 44px minmax(70px, 1fr) 30px 36px; }
@@ -433,6 +443,7 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.5; }
   .practice-mode-options { flex-wrap: wrap; }
   .practice-mode-options button { flex: 1 1 88px; }
   .primary, .secondary, .good, .bad, .danger, .file-button { width: 100%; }
+  input, select, textarea { font-size: 16px; }
 }
 
 

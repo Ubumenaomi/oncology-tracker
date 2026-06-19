@@ -1,0 +1,26 @@
+{
+  "name": "Oncology Tracker",
+  "short_name": "Oncology",
+  "description": "腫瘤科考題練習、錯題追蹤與複習規劃工具。",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#edf2f7",
+  "theme_color": "#0f172a",
+  "categories": ["education", "medical"],
+  "icons": [
+    {
+      "src": "/app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/app-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
