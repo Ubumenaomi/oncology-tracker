@@ -1356,17 +1356,182 @@ function getDailyChest(state, todayCompleted = false, date = TODAY) {
   };
 }
 
+const TAXONOMY_CANCER_TYPE_RULES = [
+  ['NSCLC', ['nsclc', 'non-small cell', 'adenocarcinoma', 'squamous cell lung']],
+  ['SCLC', ['sclc', 'small cell lung']],
+  ['Mesothelioma', ['mesothelioma']],
+  ['Thymic malignancy', ['thymic', 'thymoma']],
+  ['Early breast cancer', ['early breast', 'stage i breast', 'stage ii breast', 'stage iii breast']],
+  ['Metastatic breast cancer', ['metastatic breast', 'mbc']],
+  ['TNBC', ['tnbc', 'triple negative']],
+  ['HER2-positive breast cancer', ['her2-positive breast', 'her2+ breast']],
+  ['HR+/HER2- breast cancer', ['hr+/her2', 'er-positive', 'hormone receptor-positive']],
+  ['Colorectal cancer', ['colorectal', 'colon cancer', 'rectal cancer', 'mcrc']],
+  ['Gastric/GEJ cancer', ['gastric', 'gastroesophageal', 'gej']],
+  ['Esophageal cancer', ['esophageal', 'oesophageal']],
+  ['Pancreatic cancer', ['pancreatic']],
+  ['Biliary tract cancer', ['biliary', 'cholangiocarcinoma', 'gallbladder']],
+  ['HCC', ['hepatocellular', 'hcc']],
+  ['GIST', ['gist', 'gastrointestinal stromal']],
+  ['Prostate cancer', ['prostate', 'mcrpc', 'mhspc']],
+  ['Renal cell carcinoma', ['renal cell', 'rcc', 'clear cell']],
+  ['Urothelial cancer', ['urothelial', 'bladder cancer', 'mibc']],
+  ['Germ cell tumor', ['seminoma', 'non-seminoma', 'germ cell', 'testicular']],
+  ['Ovarian cancer', ['ovarian']],
+  ['Endometrial cancer', ['endometrial']],
+  ['Cervical cancer', ['cervical cancer']],
+  ['Head and neck cancer', ['oropharynx', 'larynx', 'hypopharynx', 'oral cavity', 'hnscc']],
+  ['Nasopharyngeal carcinoma', ['nasopharyngeal', 'npc', 'ebv dna']],
+  ['AML', ['acute myeloid', 'aml']],
+  ['CML', ['chronic myeloid', 'cml']],
+  ['MDS/MPN', ['mds', 'myelodysplastic', 'mpn', 'myelofibrosis', 'polycythemia', 'essential thrombocythemia']],
+  ['Multiple myeloma', ['multiple myeloma', 'myeloma', 'slim-crab']],
+  ['Lymphoma', ['lymphoma', 'dlbcl', 'hodgkin', 'follicular', 'mantle cell']],
+  ['CLL', ['cll', 'chronic lymphocytic']],
+  ['Melanoma', ['melanoma']],
+  ['Sarcoma', ['sarcoma']],
+  ['Supportive care', ['antiemesis', 'fatigue', 'febrile neutropenia', 'bone-modifying', 'thromboembolism', 'vte']],
+  ['Precision oncology', ['ngs', 'tumor agnostic', 'basket', 'companion diagnostic']],
+];
+
+const STAGE_RULES = [
+  ['localized', ['localized', 'early-stage', 'stage i', 'stage ii', 'stage iii', 'post-nephrectomy']],
+  ['resectable', ['resectable', 'operable', 'surgery']],
+  ['borderline resectable', ['borderline resectable']],
+  ['unresectable locally advanced', ['unresectable', 'locally advanced', 'definitive ccrt', 'stage iii nsclc']],
+  ['metastatic', ['metastatic', 'advanced', 'stage iv', 'm1']],
+  ['relapsed/refractory', ['relapsed', 'refractory', 'salvage', 'progression after', 'post-platinum', 'post-tki', 'post-io']],
+  ['palliative/supportive', ['palliative', 'supportive', 'symptom', 'fatigue', 'antiemesis']],
+];
+
+const CLINICAL_SETTING_RULES = [
+  ['diagnosis/staging/risk', ['staging', 'tnm', 'risk group', 'imdc', 'figo', 'bclc', 'iss', 'r-iss', 'eln', 'diagnosis']],
+  ['localized curative intent', ['localized', 'resectable', 'curative', 'surgery', 'margin', 'lymph node dissection']],
+  ['neoadjuvant therapy', ['neoadjuvant', 'preoperative', 'pre-operative']],
+  ['adjuvant therapy', ['adjuvant', 'postoperative', 'post-operative', 'post-nephrectomy']],
+  ['perioperative therapy', ['perioperative', 'peri-operative', 'flot']],
+  ['locally advanced unresectable', ['unresectable', 'definitive ccrt', 'concurrent chemoradiation', 'brachytherapy']],
+  ['metastatic first-line', ['first-line', '1l', '1st line', 'metastatic 1l']],
+  ['later-line/refractory', ['second-line', '2l', 'third-line', '3l', 'salvage', 'relapsed', 'refractory', 'progression after']],
+  ['maintenance therapy', ['maintenance']],
+  ['toxicity/supportive care', ['toxicity', 'adverse event', 'pneumonitis', 'colitis', 'neuropathy', 'antiemesis', 'fatigue', 'febrile neutropenia']],
+  ['biomarker/companion diagnostic', ['biomarker', 'companion diagnostic', 'ngs', 'msi', 'dmmr', 'pd-l1', 'her2', 'egfr', 'alk', 'brca']],
+];
+
+const MODALITY_RULES = [
+  ['surgery', ['surgery', 'surgical', 'resection', 'nephrectomy', 'mastectomy']],
+  ['radiation therapy', ['radiation', 'radiotherapy', 'rt', 'ccrt', 'brachytherapy', 'pci']],
+  ['chemotherapy', ['chemotherapy', 'chemo', 'folfox', 'folfiri', 'cisplatin', 'carboplatin', 'gemcitabine', 'docetaxel']],
+  ['immunotherapy', ['immunotherapy', 'ici', 'pd-1', 'pd-l1', 'ctla-4', 'pembrolizumab', 'nivolumab', 'atezolizumab', 'durvalumab', 'ipilimumab']],
+  ['targeted therapy', ['targeted', 'tki', 'osimertinib', 'alectinib', 'selpercatinib', 'olaparib', 'parp', 'braf', 'mek', 'fgfr']],
+  ['ADC', ['adc', 'antibody-drug', 'trastuzumab deruxtecan', 't-dxd', 'sacituzumab', 'enfortumab']],
+  ['endocrine therapy', ['endocrine', 'aromatase', 'tamoxifen', 'fulvestrant', 'abemaciclib', 'cdk4/6', 'abiraterone', 'enzalutamide']],
+  ['cellular/bispecific therapy', ['car-t', 'bispecific', 'tarlatamab', 'crs', 'icans']],
+  ['supportive care', ['supportive', 'antiemesis', 'denosumab', 'zoledronic', 'anticoagulation', 'fatigue']],
+];
+
+const GOLDEN_TRIAL_TERMS = [
+  'pacific', 'laura', 'adaura', 'keynote-671', 'checkmate 816', 'impower133', 'caspian',
+  'keynote-522', 'katherine', 'cleopatra', 'destiny-breast03', 'her2climb',
+  'cross', 'checkmate-577', 'flot4', 'keynote-811', 'checkmate-649', 'idea', 'rapido',
+  'prodige 23', 'opra', 'beacon', 'prodige 24', 'topaz-1', 'keynote-966', 'imbrave150',
+  'himalaya', 'keynote-564', 'checkmate 274', 'ev-302', 'javelin bladder 100',
+  'vision', 'ruby', 'keynote-a18', 'keynote-775', 'echelon-1',
+];
+
+function questionSearchText(question = {}) {
+  return [
+    question.id,
+    question.cancer,
+    question.topic,
+    question.stem,
+    ...Object.values(question.options || {}),
+    ...(question.trials || []),
+    question.explanation,
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+
+function matchesAny(text, terms = []) {
+  return terms.some((term) => text.includes(String(term).toLowerCase()));
+}
+
+function pickRuleLabel(text, rules, fallback = '') {
+  return rules.find(([, terms]) => matchesAny(text, terms))?.[0] || fallback;
+}
+
+function inferEvidenceType(question, text) {
+  if ((question.trials || []).some((trial) => matchesAny(String(trial).toLowerCase(), GOLDEN_TRIAL_TERMS)) || matchesAny(text, GOLDEN_TRIAL_TERMS)) return 'Golden trial';
+  if ((question.trials || []).length) return 'Recognized trial';
+  if (matchesAny(text, ['negative trial', 'did not improve', 'no benefit', 'failed to'])) return 'Negative trial';
+  if (matchesAny(text, ['guideline', 'nccn', 'asco', 'esmo', 'category'])) return 'Guideline-only';
+  if (pickRuleLabel(text, MODALITY_RULES) === 'supportive care') return 'Toxicity/supportive principle';
+  if (matchesAny(text, ['biomarker', 'companion diagnostic', 'msi', 'dmmr', 'pd-l1', 'her2', 'egfr', 'alk', 'brca'])) return 'Biomarker principle';
+  return 'Guideline principle';
+}
+
+function inferQuestionType(text) {
+  if (matchesAny(text, ['toxicity', 'adverse event', 'pneumonitis', 'colitis', 'neuropathy', 'crs', 'icans'])) return 'toxicity';
+  if (matchesAny(text, ['biomarker', 'mutation', 'ngs', 'companion diagnostic', 'msi', 'dmmr', 'pd-l1', 'her2', 'egfr', 'alk'])) return 'biomarker';
+  if (matchesAny(text, ['sequence', 'after progression', 'post-platinum', 'post-tki', 'second-line', 'salvage'])) return 'sequence';
+  if (matchesAny(text, ['except', 'not correct', 'incorrect', 'wrong', '錯誤', '不正確'])) return 'exception/wrong statement';
+  if (matchesAny(text, ['endpoint', 'os', 'pfs', 'efs', 'dfs', 'orr', 'hazard ratio'])) return 'endpoint recognition';
+  return 'standard of care';
+}
+
+function makeHashTags(question, taxonomy) {
+  const baseTags = [
+    taxonomy.cancerType,
+    taxonomy.stage,
+    taxonomy.clinicalSetting,
+    taxonomy.treatmentModality,
+    taxonomy.evidenceType,
+    taxonomy.questionType,
+    ...(question.trials || []),
+    ...(taxonomy.biomarker || []),
+  ];
+  return [...new Set(baseTags
+    .filter(Boolean)
+    .map((tag) => `#${String(tag).replace(/[^a-z0-9]+/gi, '')}`)
+    .filter((tag) => tag.length > 1))]
+    .slice(0, 8);
+}
+
+function tagSearchText(tags = {}) {
+  return Object.values(tags)
+    .flatMap((value) => (Array.isArray(value) ? value : [value]))
+    .filter((value) => ['string', 'number'].includes(typeof value))
+    .join(' ')
+    .toLowerCase();
+}
+
 function makeQuestionTags(question) {
-  const text = `${question.stem || ''} ${question.topic || ''} ${(question.trials || []).join(' ')}`.toLowerCase();
+  const text = questionSearchText(question);
   const includesAny = (items) => items.some((item) => text.includes(item.toLowerCase()));
+  const biomarker = [
+    ['EGFR', 'egfr'], ['ALK', 'alk'], ['KRAS', 'kras'], ['HER2', 'her2'], ['BRCA/HRD', 'brca', 'hrd'],
+    ['MSI/dMMR', 'msi', 'dmmr'], ['PD-L1', 'pd-l1', 'cps', 'tps'], ['FGFR', 'fgfr'], ['NTRK/RET', 'ntrk', 'ret'],
+    ['BRAF', 'braf'], ['CLDN18.2', 'cldn18'], ['Nectin-4', 'nectin'], ['PSMA', 'psma'],
+  ].filter(([, ...terms]) => includesAny(terms)).map(([label]) => label);
+  const taxonomy = {
+    cancerDomain: question.cancer,
+    cancerType: pickRuleLabel(text, TAXONOMY_CANCER_TYPE_RULES, question.topic || question.cancer || 'General'),
+    stage: pickRuleLabel(text, STAGE_RULES, ''),
+    clinicalSetting: pickRuleLabel(text, CLINICAL_SETTING_RULES, question.topic || 'General'),
+    treatmentModality: pickRuleLabel(text, MODALITY_RULES, ''),
+    biomarker,
+    evidenceType: inferEvidenceType(question, text),
+    questionType: inferQuestionType(text),
+  };
   return {
     domain: question.cancer,
+    cancerDomain: taxonomy.cancerDomain,
+    cancerType: taxonomy.cancerType,
+    stage: taxonomy.stage,
+    clinicalSetting: taxonomy.clinicalSetting,
+    treatmentModality: taxonomy.treatmentModality,
     subtopic: question.topic || 'General',
     trial: question.trials || [],
-    biomarker: [
-      ['EGFR', 'egfr'], ['ALK', 'alk'], ['KRAS', 'kras'], ['HER2', 'her2'], ['BRCA/HRD', 'brca', 'hrd'],
-      ['MSI/dMMR', 'msi', 'dmmr'], ['PD-L1', 'pd-l1', 'cps', 'tps'], ['FGFR', 'fgfr'], ['NTRK/RET', 'ntrk', 'ret'],
-    ].filter(([, ...terms]) => includesAny(terms)).map(([label]) => label),
+    biomarker,
     treatmentLine: includesAny(['adjuvant']) ? 'adjuvant' : includesAny(['neoadjuvant']) ? 'neoadjuvant' : includesAny(['second-line', '2nd', 'salvage']) ? 'second-line' : includesAny(['first-line', '1st']) ? 'first-line' : '',
     endpoint: ['OS', 'PFS', 'EFS', 'DFS', 'iDFS', 'pCR', 'ORR'].filter((endpoint) => text.includes(endpoint.toLowerCase())),
     toxicity: [
@@ -1378,6 +1543,9 @@ function makeQuestionTags(question) {
       ['CRS/ICANS', 'crs', 'icans'],
     ].filter(([, ...terms]) => includesAny(terms)).map(([label]) => label),
     guidelineConcept: question.topic || '',
+    evidenceType: taxonomy.evidenceType,
+    questionType: taxonomy.questionType,
+    hashTags: makeHashTags(question, taxonomy),
     examWeight: question.cancer === 'Lung' ? 5 : ['Breast', 'GI', 'Heme'].includes(question.cancer) ? 4 : ['GU', 'Head & Neck'].includes(question.cancer) ? 3 : 2,
     cardEligible: Boolean(question.explanation || (question.trials || []).length || question.answer),
   };
@@ -2628,7 +2796,16 @@ function buildAiPrompt(state) {
   return `你是一位 hematology-oncology board exam coach。請根據以下腫瘤內科專科醫師考題練習紀錄，幫我做 AI review。\n\n要求輸出：\n1. 弱點總結\n2. 高錯誤率癌別與 trial\n3. 每個弱點的補救讀書任務，需依 error type 指派 Trial Card / Cloze Card / Algorithm Card / Toxicity comparison / guideline update 等\n4. 10 題 fellow-level MCQ 題目\n5. 3 題 oral board style question\n6. 明天應該優先複習的題目與主題\n\n我的錯題/標記題：\n${weak.map(({ q, stat }) => {
     const errorType = stat.lastErrorType || stat.errorTypes?.[stat.errorTypes.length - 1] || 'none';
     const remediation = stat.lastRemediationTask?.task || (errorType !== 'none' ? getRemediationForErrorType(errorType).task : 'none');
-    return `- ${q.id} | ${q.cancer} | ${q.topic} | wrong rate ${wrongRate(stat)}% | attempts ${stat.attempts} | error type: ${errorType} | repair: ${remediation} | trials: ${(q.trials || []).join(', ') || 'none'} | note: ${stat.wrongNotes || 'none'} | stem: ${q.stem}`;
+    const taxonomy = [
+      q.tags?.cancerType,
+      q.tags?.stage,
+      q.tags?.clinicalSetting,
+      q.tags?.treatmentModality,
+      q.tags?.evidenceType,
+      q.tags?.questionType,
+      ...(q.tags?.biomarker || []),
+    ].filter(Boolean).join(' / ') || 'uncategorized';
+    return `- ${q.id} | ${q.cancer} | ${q.topic} | taxonomy: ${taxonomy} | wrong rate ${wrongRate(stat)}% | attempts ${stat.attempts} | error type: ${errorType} | repair: ${remediation} | trials: ${(q.trials || []).join(', ') || 'none'} | note: ${stat.wrongNotes || 'none'} | stem: ${q.stem}`;
   }).join('\n')}`;
 }
 
@@ -3036,6 +3213,15 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
   const answerIsSingleChoice = /^[A-E]$/.test(String(correctAnswer || '').trim().toUpperCase());
   const isCorrectSelection = selected && answerIsSingleChoice && selected === String(correctAnswer).trim().toUpperCase();
   const selectedErrorRemediation = errorType ? getRemediationForErrorType(errorType) : null;
+  const taxonomyChips = [
+    question.tags?.cancerType,
+    question.tags?.stage,
+    question.tags?.clinicalSetting,
+    question.tags?.treatmentModality,
+    question.tags?.evidenceType,
+    question.tags?.questionType,
+    ...(question.tags?.biomarker || []),
+  ].filter(Boolean);
 
   const recordRating = (rating) => {
     if (practiceMode && practiceDraft?.rated) {
@@ -3174,6 +3360,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
           <span className="pill">{question.cancer}</span>
           <span className="pill soft">{question.topic}</span>
           {question.trials?.map((trial) => <span key={trial} className="pill trial">{trial}</span>)}
+          {taxonomyChips.slice(0, compact ? 3 : 7).map((tag) => <span key={tag} className="pill tag">{tag}</span>)}
         </div>
         <div className="question-actions">
             {onEdit && <button className="secondary" onClick={() => onEdit(question.id)}>編輯題目</button>}
@@ -3187,6 +3374,11 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
       </div>
 
       <p className="stem">{question.stem}</p>
+      {!compact && question.tags?.hashTags?.length > 0 && (
+        <div className="taxonomy-tags" aria-label="Question taxonomy tags">
+          {question.tags.hashTags.map((tag) => <span key={tag}>{tag}</span>)}
+        </div>
+      )}
 
       {open && (
         <>
@@ -4026,7 +4218,7 @@ function QuestionManagerPanel({
       </div>
 
       <div className="filters">
-        <input name="question_manager_search" value={search} onChange={(e) => onSearch(e.target.value)} placeholder="搜尋題幹、trial、癌別、藥名、題號..." />
+        <input name="question_manager_search" value={search} onChange={(e) => onSearch(e.target.value)} placeholder="搜尋題幹、trial、癌別、藥名、stage、biomarker、治療線..." />
         <select name="question_manager_year" value={bankYear} onChange={(e) => onYearChange(e.target.value)}>
           <option>All</option>
           {QUESTION_YEARS.map((questionYear) => (
@@ -4056,7 +4248,7 @@ function QuestionManagerPanel({
             >
               <span className="qid">{q.id}</span>
               <strong>{q.stem || '尚未輸入題幹'}</strong>
-              <span>{q.cancer} · {q.topic}</span>
+              <span>{q.cancer} · {q.tags?.cancerType || q.topic} · {q.tags?.clinicalSetting || q.topic}</span>
             </button>
           ))}
         </section>
@@ -6217,7 +6409,7 @@ export default function App() {
     .map((q) => getQuestionWithOverride(q.id, state))
     .filter(Boolean)
     .filter((q) => {
-      const text = `${q.id} ${q.stem} ${Object.values(q.options || {}).join(' ')} ${(q.trials || []).join(' ')}`.toLowerCase();
+      const text = `${questionSearchText(q)} ${tagSearchText(q.tags)}`;
       const searchOk = !search || text.includes(search.toLowerCase());
       const cancerOk = bankCancer === 'All' || q.cancer === bankCancer;
       const yearOk = bankYear === 'All' || String(q.year) === String(bankYear);
