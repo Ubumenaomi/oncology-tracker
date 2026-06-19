@@ -434,13 +434,15 @@ const HIGH_YIELD_TOPICS = [
   },
 ];
 
-const TODAY = (() => {
-  const d = new Date();
+function formatLocalDate(date) {
+  const d = date instanceof Date ? date : new Date(date);
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
-})();
+}
+
+const TODAY = formatLocalDate(new Date());
 
 const EXAM_DATE = {
   year: 2026,
@@ -1004,7 +1006,7 @@ function makeCloudPayload(state) {
 function addDays(dateString, days) {
   const date = new Date(`${dateString}T00:00:00`);
   date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
+  return formatLocalDate(date);
 }
 
 function normalizeTextList(value = []) {
@@ -2395,6 +2397,14 @@ function getStatsDashboard(state, planSummary, readiness, cancerSummary, date = 
   const totalFocusMinutes = normalizeFocusSessions(state.focusSessions).reduce((sum, session) => sum + (session.durationMinutes || 0), 0);
   const focusStreak = getFocusStreak(state, date);
   const recentDates = getRecentDateKeys(date, 7);
+  const focusMinutesByDate = getFocusMinutesByDate(state);
+  const weeklyFocusTrend = recentDates.map((key) => ({
+    date: key,
+    label: key.slice(5).replace('-', '/'),
+    minutes: focusMinutesByDate[key] || 0,
+  }));
+  const weeklyFocusMinutes = weeklyFocusTrend.reduce((sum, row) => sum + row.minutes, 0);
+  const maxWeeklyFocusMinutes = Math.max(0, ...weeklyFocusTrend.map((row) => row.minutes));
   const flashcardsByDate = Object.values(state.flashcardStats || {}).reduce((acc, stat) => {
     if (!stat.lastReviewedAt) return acc;
     acc[stat.lastReviewedAt] = (acc[stat.lastReviewedAt] || 0) + 1;
@@ -2443,6 +2453,10 @@ function getStatsDashboard(state, planSummary, readiness, cancerSummary, date = 
     todayFocusMinutes,
     totalFocusMinutes,
     focusStreak,
+    weeklyFocusTrend,
+    weeklyFocusMinutes,
+    weeklyAverageFocusMinutes: Math.round(weeklyFocusMinutes / 7),
+    maxWeeklyFocusMinutes,
     recentActivity,
     maxRecentAttempts,
     weakCancerRows,
@@ -2628,6 +2642,53 @@ function MetricCard({ label, value, sub }) {
   );
 }
 
+function WeeklyFocusChart({ rows, maxMinutes }) {
+  const chartWidth = 420;
+  const chartHeight = 180;
+  const plotTop = 18;
+  const plotBottom = 134;
+  const plotHeight = plotBottom - plotTop;
+  const safeMax = Math.max(1, maxMinutes || 0);
+  const step = rows.length > 1 ? chartWidth / (rows.length - 1) : chartWidth;
+  const points = rows.map((row, index) => {
+    const x = rows.length > 1 ? index * step : chartWidth / 2;
+    const y = plotBottom - ((row.minutes / safeMax) * plotHeight);
+    return { ...row, x, y };
+  });
+  const linePoints = points.map((point) => `${point.x},${point.y}`).join(' ');
+
+  return (
+    <div className="weekly-focus-chart">
+      <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} role="img" aria-label="最近 7 日讀書時長折線圖">
+        <line className="weekly-focus-grid" x1="0" y1={plotTop} x2={chartWidth} y2={plotTop} />
+        <line className="weekly-focus-grid" x1="0" y1={(plotTop + plotBottom) / 2} x2={chartWidth} y2={(plotTop + plotBottom) / 2} />
+        <line className="weekly-focus-axis" x1="0" y1={plotBottom} x2={chartWidth} y2={plotBottom} />
+        {points.map((point) => {
+          const barHeight = Math.max(4, (point.minutes / safeMax) * plotHeight);
+          return (
+            <g key={point.date}>
+              <rect
+                className="weekly-focus-bar"
+                x={point.x - 13}
+                y={plotBottom - barHeight}
+                width="26"
+                height={barHeight}
+                rx="7"
+              />
+              <text className="weekly-focus-value" x={point.x} y={Math.max(12, point.y - 8)}>{point.minutes}</text>
+              <text className="weekly-focus-label" x={point.x} y="166">{point.label}</text>
+            </g>
+          );
+        })}
+        <polyline className="weekly-focus-line" points={linePoints} />
+        {points.map((point) => (
+          <circle className="weekly-focus-dot" cx={point.x} cy={point.y} r="4.5" key={`${point.date}-dot`} />
+        ))}
+      </svg>
+    </div>
+  );
+}
+
 function StatsDashboard({ stats }) {
   const todayRows = [
     ['今日作答', stats.todayAttempts.attempts, `${stats.todayAttempts.correct} correct / ${stats.todayAttempts.wrong} wrong`],
@@ -2657,19 +2718,25 @@ function StatsDashboard({ stats }) {
       </section>
 
       <section className="stats-layout">
-        <article className="stats-panel">
+        <article className="stats-panel focus-trend-panel">
           <div className="stats-panel-head">
-            <strong>今日統計</strong>
-            <span>{stats.todayAttempts.attempts ? `${stats.todayAccuracy}%` : 'not started'}</span>
+            <strong>最近 7 日讀書時長</strong>
+            <span>{stats.weeklyFocusMinutes} 分 / 週</span>
           </div>
-          <div className="today-stats-grid">
-            {todayRows.map(([label, value, sub]) => (
-              <div className="today-stat" key={label}>
-                <span>{label}</span>
-                <strong>{value}</strong>
-                <em>{sub}</em>
-              </div>
-            ))}
+          <WeeklyFocusChart rows={stats.weeklyFocusTrend} maxMinutes={stats.maxWeeklyFocusMinutes} />
+          <div className="focus-trend-summary">
+            <div>
+              <span>週總時長</span>
+              <strong>{stats.weeklyFocusMinutes} 分</strong>
+            </div>
+            <div>
+              <span>日均</span>
+              <strong>{stats.weeklyAverageFocusMinutes} 分</strong>
+            </div>
+            <div>
+              <span>最高單日</span>
+              <strong>{stats.maxWeeklyFocusMinutes} 分</strong>
+            </div>
           </div>
         </article>
 
@@ -2692,6 +2759,24 @@ function StatsDashboard({ stats }) {
                 </div>
               );
             })}
+          </div>
+        </article>
+      </section>
+
+      <section className="stats-layout single">
+        <article className="stats-panel">
+          <div className="stats-panel-head">
+            <strong>今日統計</strong>
+            <span>{stats.todayAttempts.attempts ? `${stats.todayAccuracy}%` : 'not started'}</span>
+          </div>
+          <div className="today-stats-grid">
+            {todayRows.map(([label, value, sub]) => (
+              <div className="today-stat" key={label}>
+                <span>{label}</span>
+                <strong>{value}</strong>
+                <em>{sub}</em>
+              </div>
+            ))}
           </div>
         </article>
       </section>

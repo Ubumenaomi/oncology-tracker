@@ -341,6 +341,9 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.5; }
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 16px;
 }
+.stats-layout.single {
+  grid-template-columns: 1fr;
+}
 .stats-layout.three {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -422,6 +425,74 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.5; }
   height: 100%;
   border-radius: 999px;
   background: #2563eb;
+}
+.focus-trend-panel {
+  display: grid;
+  gap: 12px;
+}
+.weekly-focus-chart {
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.weekly-focus-chart svg {
+  display: block;
+  min-width: 420px;
+  width: 100%;
+  height: auto;
+}
+.weekly-focus-grid,
+.weekly-focus-axis {
+  stroke: #dbe3ef;
+  stroke-width: 1;
+}
+.weekly-focus-axis {
+  stroke: #94a3b8;
+}
+.weekly-focus-bar {
+  fill: #bfdbfe;
+}
+.weekly-focus-line {
+  fill: none;
+  stroke: #2563eb;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+.weekly-focus-dot {
+  fill: #fff;
+  stroke: #2563eb;
+  stroke-width: 3;
+}
+.weekly-focus-value,
+.weekly-focus-label {
+  fill: #475569;
+  font-size: 11px;
+  font-weight: 800;
+  text-anchor: middle;
+}
+.weekly-focus-value {
+  fill: #1e3a8a;
+}
+.focus-trend-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.focus-trend-summary div {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  padding: 10px 12px;
+  display: grid;
+  gap: 3px;
+}
+.focus-trend-summary span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+.focus-trend-summary strong {
+  font-size: 19px;
 }
 .rank-row {
   display: flex;
