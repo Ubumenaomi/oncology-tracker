@@ -6442,10 +6442,10 @@ export default function App() {
     });
   };
 
-  const resetPlanProgress = () => {
+  const resetPlanProgress = async () => {
     const updatedAt = new Date().toISOString();
-    updateState((prev) => ({
-      ...prev,
+    const nextState = normalizeState({
+      ...state,
       planProgress: {},
       planItemProgress: {},
       dailyQuestProgress: {},
@@ -6453,14 +6453,29 @@ export default function App() {
       game: { ...defaultState.game },
       player: { ...defaultState.player },
       cloudMeta: {
-        ...(prev.cloudMeta || {}),
+        ...(state.cloudMeta || {}),
         updatedAt,
         planResetAt: updatedAt,
         gameResetAt: updatedAt,
         device: navigator.userAgent,
       },
-    }));
-    setSyncStatus('已重新開始 100-Day Plan，並重設完成度與 XP。');
+    });
+
+    setState(nextState);
+    saveState(nextState);
+
+    if (!user) {
+      setSyncStatus('已重新開始 100-Day Plan，並重設完成度與 XP。');
+      return;
+    }
+
+    try {
+      await setDoc(getCloudDocRef(user.uid), makeCloudPayload(nextState));
+      setSyncStatus('已重新開始 100-Day Plan，並重設完成度與 XP。');
+    } catch (error) {
+      setSyncError(error.message);
+      setSyncStatus('已重設本機完成度；雲端同步失敗，請稍後再試。');
+    }
   };
 
 
