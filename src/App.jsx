@@ -138,11 +138,11 @@ const XP_RULES = {
 };
 
 const FOCUS_RIVALS = [
-  { id: 'rival-lin', name: '林晨安', title: 'GI Trial Sprinter', initials: 'GI', startOffset: 42, minutesPerMinute: 0.45 },
-  { id: 'rival-chou', name: '周品妤', title: 'Toxicity Sentinel', initials: 'Tx', startOffset: 16, minutesPerMinute: 0.8 },
-  { id: 'rival-kao', name: '高子睿', title: 'Flashcard Keeper', initials: 'FC', startOffset: -8, minutesPerMinute: 1.35 },
-  { id: 'rival-chen', name: '陳映禾', title: 'Board Boss Hunter', initials: 'BB', startOffset: -24, minutesPerMinute: 1.9 },
-  { id: 'rival-wu', name: '吳柏翰', title: 'Late Night Reviewer', initials: 'LR', startOffset: -39, minutesPerMinute: 0.2 },
+  { id: 'rival-lin', name: '林晨安', title: 'GI Trial Sprinter', initials: 'GI', startOffset: 24, minutesPerMinute: 0.45, focusMinutes: 12, restMinutes: 16 },
+  { id: 'rival-chou', name: '周品妤', title: 'Toxicity Sentinel', initials: 'Tx', startOffset: -48, minutesPerMinute: 0.35, focusMinutes: 18, restMinutes: 14 },
+  { id: 'rival-kao', name: '高子睿', title: 'Flashcard Keeper', initials: 'FC', startOffset: -36, minutesPerMinute: 1.15, focusMinutes: 16, restMinutes: 10 },
+  { id: 'rival-chen', name: '陳映禾', title: 'Board Boss Hunter', initials: 'BB', startOffset: -62, minutesPerMinute: 1.7, focusMinutes: 10, restMinutes: 14 },
+  { id: 'rival-wu', name: '吳柏翰', title: 'Late Night Reviewer', initials: 'LR', startOffset: -90, minutesPerMinute: 0.25, focusMinutes: 8, restMinutes: 22 },
 ];
 
 const FOCUS_MARQUEE_MESSAGES = [
@@ -2151,14 +2151,37 @@ function formatFocusDuration(totalSeconds = 0) {
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
+function getRivalStudyCycle(rival, elapsedMinutes = 0) {
+  const focusMinutes = Math.max(1, rival.focusMinutes || 1);
+  const restMinutes = Math.max(0, rival.restMinutes || 0);
+  const cycleMinutes = focusMinutes + restMinutes;
+  const fullCycles = Math.floor(elapsedMinutes / cycleMinutes);
+  const cycleRemainder = elapsedMinutes % cycleMinutes;
+  const activeInCurrentCycle = Math.min(cycleRemainder, focusMinutes);
+  const activeMinutes = (fullCycles * focusMinutes) + activeInCurrentCycle;
+  const isResting = cycleRemainder >= focusMinutes;
+  const nextSwitchInMinutes = isResting
+    ? Math.max(1, Math.ceil(cycleMinutes - cycleRemainder))
+    : Math.max(1, Math.ceil(focusMinutes - cycleRemainder));
+
+  return {
+    activeMinutes,
+    isResting,
+    nextSwitchInMinutes,
+  };
+}
+
 function buildFocusLeaderboard(userMinutes = 0, elapsedSeconds = 0) {
   const safeMinutes = Math.max(0, Math.round(Number(userMinutes) || 0));
-  const elapsedMinutes = Math.max(0, Number(elapsedSeconds) || 0) / 60;
+  const elapsedMinutes = Math.min(90, Math.max(0, Number(elapsedSeconds) || 0) / 60);
   const rivals = FOCUS_RIVALS.map((rival) => {
-    const minutes = Math.max(0, Math.floor(safeMinutes + rival.startOffset + (elapsedMinutes * rival.minutesPerMinute)));
+    const cycle = getRivalStudyCycle(rival, elapsedMinutes);
+    const minutes = Math.max(0, Math.floor(safeMinutes + rival.startOffset + (cycle.activeMinutes * rival.minutesPerMinute)));
     return {
       ...rival,
       minutes,
+      status: cycle.isResting ? '休息中' : '讀書中',
+      nextSwitchInMinutes: cycle.nextSwitchInMinutes,
       kind: 'rival',
     };
   });
@@ -2193,7 +2216,11 @@ function StudyLeaderboard({ rows }) {
             <span className="leaderboard-avatar">{row.initials}</span>
             <div>
               <strong>{row.name}</strong>
-              <em>{row.kind === 'user' ? row.title : `${row.title} · ${row.minutesPerMinute.toFixed(1)}x`}</em>
+              <em>
+                {row.kind === 'user'
+                  ? row.title
+                  : `${row.title} · ${row.status} · ${row.nextSwitchInMinutes} 分後切換`}
+              </em>
             </div>
             <span className="leaderboard-minutes">{row.minutes} 分</span>
           </div>
@@ -4918,7 +4945,7 @@ export default function App() {
   const [practicePage, setPracticePage] = useState(0);
   const [focusStartedAt, setFocusStartedAt] = useState(null);
   const [focusTick, setFocusTick] = useState(() => Date.now());
-  const [leaderboardStartedAt] = useState(() => Date.now());
+  const [leaderboardStartedAt, setLeaderboardStartedAt] = useState(() => Date.now());
 
   useEffect(() => {
     saveState(state);
@@ -4927,6 +4954,10 @@ export default function App() {
   useEffect(() => {
     const timer = window.setInterval(() => setFocusTick(Date.now()), 1000);
     return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    setLeaderboardStartedAt(Date.now());
   }, []);
 
   useEffect(() => {
