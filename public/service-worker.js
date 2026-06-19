@@ -1,4 +1,4 @@
-const CACHE_NAME = 'oncology-tracker-v1'
+const CACHE_NAME = 'oncology-tracker-v2'
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -7,6 +7,9 @@ const APP_SHELL = [
   '/apple-touch-icon.png',
   '/app-icon-192.png',
   '/app-icon-512.png',
+  '/sounds/correct.mp3',
+  '/sounds/wrong.mp3',
+  '/sounds/task-completion.mp3',
 ]
 
 self.addEventListener('install', (event) => {
