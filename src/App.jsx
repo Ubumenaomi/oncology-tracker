@@ -137,6 +137,23 @@ const XP_RULES = {
   wrongRetest90: 300,
 };
 
+const FOCUS_RIVALS = [
+  { id: 'rival-lin', name: '林晨安', title: 'GI Trial Sprinter', initials: 'GI', startOffset: 42, minutesPerMinute: 0.45 },
+  { id: 'rival-chou', name: '周品妤', title: 'Toxicity Sentinel', initials: 'Tx', startOffset: 16, minutesPerMinute: 0.8 },
+  { id: 'rival-kao', name: '高子睿', title: 'Flashcard Keeper', initials: 'FC', startOffset: -8, minutesPerMinute: 1.35 },
+  { id: 'rival-chen', name: '陳映禾', title: 'Board Boss Hunter', initials: 'BB', startOffset: -24, minutesPerMinute: 1.9 },
+  { id: 'rival-wu', name: '吳柏翰', title: 'Late Night Reviewer', initials: 'LR', startOffset: -39, minutesPerMinute: 0.2 },
+];
+
+const FOCUS_MARQUEE_MESSAGES = [
+  '不要等待機會，而要創造機會。',
+  '經得起歷練，人生才有價值。',
+  '機會是自己創造的，而不能一味的等待別人的賜予。',
+  '專心追求卓越，成功自然就會跟著你！',
+  '一個人的勝利不取決於他的智慧，而是毅力',
+  '勝利不是將來才有的',
+];
+
 const PRACTICE_MODES = {
   minimum: {
     label: '保底',
@@ -335,6 +352,7 @@ const QUESTION_YEAR_LABEL = QUESTION_YEARS.length
 
 const defaultState = {
   sessions: {},
+  focusSessions: [],
   stats: {},
   settings: {
     dailyCount: 30,
@@ -726,6 +744,30 @@ function saveState(state) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
+function normalizeFocusSessions(focusSessions = []) {
+  if (!Array.isArray(focusSessions)) return [];
+  return focusSessions
+    .filter((session) => session?.id && session?.date)
+    .map((session) => ({
+      id: String(session.id),
+      date: session.date,
+      startedAt: session.startedAt || null,
+      endedAt: session.endedAt || null,
+      durationSeconds: Math.max(0, Math.round(Number(session.durationSeconds) || 0)),
+      durationMinutes: Math.max(0, Math.round(Number(session.durationMinutes) || ((Number(session.durationSeconds) || 0) / 60))),
+      planTaskId: session.planTaskId || null,
+      planTopic: session.planTopic || '',
+    }));
+}
+
+function mergeFocusSessions(cloudSessions = [], localSessions = []) {
+  const byId = new Map();
+  [...normalizeFocusSessions(cloudSessions), ...normalizeFocusSessions(localSessions)].forEach((session) => {
+    byId.set(session.id, session);
+  });
+  return [...byId.values()].sort((a, b) => String(b.startedAt || b.date).localeCompare(String(a.startedAt || a.date)));
+}
+
 function mergeCloudState(localState, cloudState) {
   if (!cloudState) return normalizeState({ ...defaultState, ...localState });
   const deletedFlashcardIds = {
@@ -747,6 +789,7 @@ function mergeCloudState(localState, cloudState) {
       ...(cloudState.sessions || {}),
       ...(localState.sessions || {}),
     },
+    focusSessions: mergeFocusSessions(cloudState.focusSessions, localState.focusSessions),
     stats: {
       ...(cloudState.stats || {}),
       ...(localState.stats || {}),
@@ -1075,6 +1118,7 @@ function normalizeState(state) {
     customQuestions: state?.customQuestions || {},
     deletedQuestionIds: state?.deletedQuestionIds || {},
     deletedFlashcardIds,
+    focusSessions: normalizeFocusSessions(state?.focusSessions),
     flashcards,
     flashcardStats: normalizeFlashcardStats(removeDeletedFlashcardRecords(state?.flashcardStats, deletedFlashcardIds), flashcards),
     game: { ...game, xp, level: xpLevel(xp), streak: player.streak, badges: player.badges },
@@ -2074,6 +2118,114 @@ function getTodayAttemptSummary(state, date = TODAY) {
   }, { attempts: 0, correct: 0, wrong: 0 });
 }
 
+function getFocusMinutesByDate(state) {
+  return normalizeFocusSessions(state?.focusSessions).reduce((acc, session) => {
+    acc[session.date] = (acc[session.date] || 0) + (session.durationMinutes || 0);
+    return acc;
+  }, {});
+}
+
+function sumFocusMinutesByDate(state, date = TODAY) {
+  return getFocusMinutesByDate(state)[date] || 0;
+}
+
+function getFocusStreak(state, date = TODAY) {
+  const byDate = getFocusMinutesByDate(state);
+  let streak = 0;
+  let cursor = date;
+  while ((byDate[cursor] || 0) > 0) {
+    streak += 1;
+    cursor = addDays(cursor, -1);
+  }
+  return streak;
+}
+
+function formatFocusDuration(totalSeconds = 0) {
+  const safeSeconds = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const seconds = safeSeconds % 60;
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  }
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
+function buildFocusLeaderboard(userMinutes = 0, elapsedSeconds = 0) {
+  const safeMinutes = Math.max(0, Math.round(Number(userMinutes) || 0));
+  const elapsedMinutes = Math.max(0, Number(elapsedSeconds) || 0) / 60;
+  const rivals = FOCUS_RIVALS.map((rival) => {
+    const minutes = Math.max(0, Math.floor(safeMinutes + rival.startOffset + (elapsedMinutes * rival.minutesPerMinute)));
+    return {
+      ...rival,
+      minutes,
+      kind: 'rival',
+    };
+  });
+  return [
+    ...rivals,
+    {
+      id: 'you',
+      name: '你',
+      title: 'Oncology Board Climber',
+      initials: 'ME',
+      minutes: safeMinutes,
+      kind: 'user',
+    },
+  ].sort((a, b) => b.minutes - a.minutes || (a.kind === 'user' ? -1 : 1));
+}
+
+function StudyLeaderboard({ rows }) {
+  const userRank = rows.findIndex((row) => row.kind === 'user') + 1;
+  return (
+    <section className="study-leaderboard" aria-label="Study focus leaderboard">
+      <div className="study-leaderboard-head">
+        <div>
+          <span>讀書時長排行榜</span>
+          <strong>今日專注排名 #{userRank || '-'}</strong>
+        </div>
+        <em>{rows.length} players</em>
+      </div>
+      <div className="study-leaderboard-list">
+        {rows.map((row, index) => (
+          <div className={`study-leaderboard-row ${row.kind === 'user' ? 'you' : ''}`} key={row.id}>
+            <span className="leaderboard-rank">{index + 1}</span>
+            <span className="leaderboard-avatar">{row.initials}</span>
+            <div>
+              <strong>{row.name}</strong>
+              <em>{row.kind === 'user' ? row.title : `${row.title} · ${row.minutesPerMinute.toFixed(1)}x`}</em>
+            </div>
+            <span className="leaderboard-minutes">{row.minutes} 分</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function FocusMarquee() {
+  const [messages, setMessages] = useState(() => [...FOCUS_MARQUEE_MESSAGES, ...FOCUS_MARQUEE_MESSAGES]);
+
+  useEffect(() => {
+    const shuffled = [...FOCUS_MARQUEE_MESSAGES];
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(Math.random() * (index + 1));
+      [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+    }
+    setMessages([...shuffled, ...shuffled]);
+  }, []);
+
+  return (
+    <div className="focus-marquee" aria-label="Focus encouragement ticker">
+      <div className="focus-marquee-track">
+        {messages.map((message, index) => (
+          <span key={`${message}-${index}`}>{message}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function getStatsDashboard(state, planSummary, readiness, cancerSummary, date = TODAY) {
   const stats = Object.values(state.stats || {}).map((stat) => ({ ...emptyStat(), ...stat }));
   const attempts = stats.reduce((sum, stat) => sum + (stat.attempts || 0), 0);
@@ -2084,6 +2236,7 @@ function getStatsDashboard(state, planSummary, readiness, cancerSummary, date = 
   const activeDates = new Set([
     ...Object.keys(answerEventsByDate),
     ...Object.keys(state.sessions || {}).filter((key) => state.sessions?.[key]?.questionIds?.length),
+    ...Object.keys(getFocusMinutesByDate(state)),
     ...Object.values(state.flashcardStats || {}).map((stat) => stat.lastReviewedAt).filter(Boolean),
   ]);
   const todayAttempts = getTodayAttemptSummary(state, date);
@@ -2093,6 +2246,9 @@ function getStatsDashboard(state, planSummary, readiness, cancerSummary, date = 
   const todayFlashcards = getTodayFlashcardReviewCount(state, date);
   const todayReviewQuestions = getTodayReviewQuestionCount(state, date);
   const todayWrongNotes = getTodayWrongNoteCount(state, date);
+  const todayFocusMinutes = sumFocusMinutesByDate(state, date);
+  const totalFocusMinutes = normalizeFocusSessions(state.focusSessions).reduce((sum, session) => sum + (session.durationMinutes || 0), 0);
+  const focusStreak = getFocusStreak(state, date);
   const recentDates = getRecentDateKeys(date, 7);
   const flashcardsByDate = Object.values(state.flashcardStats || {}).reduce((acc, stat) => {
     if (!stat.lastReviewedAt) return acc;
@@ -2139,6 +2295,9 @@ function getStatsDashboard(state, planSummary, readiness, cancerSummary, date = 
     todayFlashcards,
     todayReviewQuestions,
     todayWrongNotes,
+    todayFocusMinutes,
+    totalFocusMinutes,
+    focusStreak,
     recentActivity,
     maxRecentAttempts,
     weakCancerRows,
@@ -2332,6 +2491,7 @@ function StatsDashboard({ stats }) {
     ['Review Queue', stats.todayReviewQuestions, 'review-mode questions'],
     ['Flashcards', stats.todayFlashcards, 'cards reviewed today'],
     ['錯題筆記', stats.todayWrongNotes, 'notes added today'],
+    ['專注時長', `${stats.todayFocusMinutes} 分`, `${stats.focusStreak} day focus streak`],
   ];
 
   return (
@@ -2348,7 +2508,7 @@ function StatsDashboard({ stats }) {
         <MetricCard label="累計 attempts" value={stats.attempts} sub={`${stats.reviewed} questions reviewed`} />
         <MetricCard label="Correct / Wrong" value={`${stats.correct}/${stats.wrong}`} sub={`${stats.accuracy}% accuracy`} />
         <MetricCard label="平均每日題數" value={stats.averageDailyQuestions} sub={`${stats.activeDays} active days`} />
-        <MetricCard label="Critical errors" value={stats.criticalErrorCount} sub="HC wrong / repeated wrong" />
+        <MetricCard label="專注總時長" value={`${Math.round(stats.totalFocusMinutes / 60)}h`} sub={`今日 ${stats.todayFocusMinutes} 分 · streak ${stats.focusStreak}`} />
       </section>
 
       <section className="stats-layout">
@@ -4756,10 +4916,18 @@ export default function App() {
   const [syncError, setSyncError] = useState('');
   const [isApplyingCloudState, setIsApplyingCloudState] = useState(false);
   const [practicePage, setPracticePage] = useState(0);
+  const [focusStartedAt, setFocusStartedAt] = useState(null);
+  const [focusTick, setFocusTick] = useState(() => Date.now());
+  const [leaderboardStartedAt] = useState(() => Date.now());
 
   useEffect(() => {
     saveState(state);
   }, [state]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setFocusTick(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -4851,6 +5019,39 @@ export default function App() {
   }, [state, user, isApplyingCloudState]);
 
   const updateState = (updater) => setState((prev) => normalizeState(typeof updater === 'function' ? updater(prev) : updater));
+
+  const startFocusSession = () => {
+    setFocusStartedAt(new Date().toISOString());
+    setFocusTick(Date.now());
+  };
+
+  const finishFocusSession = () => {
+    if (!focusStartedAt) return;
+    const endedAt = new Date().toISOString();
+    const durationSeconds = Math.max(1, Math.round((new Date(endedAt).getTime() - new Date(focusStartedAt).getTime()) / 1000));
+    const durationMinutes = Math.max(1, Math.round(durationSeconds / 60));
+    updateState((prev) => ({
+      ...prev,
+      focusSessions: [
+        {
+          id: `focus-${Date.now()}`,
+          date: TODAY,
+          startedAt: focusStartedAt,
+          endedAt,
+          durationSeconds,
+          durationMinutes,
+          planTaskId: questTask?.id || null,
+          planTopic: questTask?.topic || '',
+        },
+        ...(prev.focusSessions || []),
+      ],
+    }));
+    setFocusStartedAt(null);
+  };
+
+  const cancelFocusSession = () => {
+    setFocusStartedAt(null);
+  };
 
   const updateStat = (id, nextStat) => {
     updateState((prev) => {
@@ -5146,6 +5347,17 @@ export default function App() {
   const todayCompleted = todaySessionMatchesQuest && todayIds.length > 0 && todayIds.every((id) => todaySession?.practiceDrafts?.[id]?.rated);
   const questProgress = getDailyQuestProgress(state, TODAY, baseQuestTask, todayCompleted);
   const questTask = studyPlan100.find((task) => task.id === questProgress.planTaskId) || baseQuestTask;
+  const todayFocusMinutes = sumFocusMinutesByDate(state, TODAY);
+  const focusStreak = getFocusStreak(state, TODAY);
+  const focusElapsedSeconds = focusStartedAt
+    ? Math.max(0, Math.floor((focusTick - new Date(focusStartedAt).getTime()) / 1000))
+    : 0;
+  const leaderboardFocusMinutes = todayFocusMinutes + (focusStartedAt ? Math.ceil(focusElapsedSeconds / 60) : 0);
+  const leaderboardElapsedSeconds = Math.max(0, Math.floor((focusTick - leaderboardStartedAt) / 1000));
+  const focusLeaderboardRows = useMemo(
+    () => buildFocusLeaderboard(leaderboardFocusMinutes, leaderboardElapsedSeconds),
+    [leaderboardFocusMinutes, leaderboardElapsedSeconds]
+  );
   const selectedPracticeMode = state.settings?.practiceMode || 'standard';
   const selectedPracticeConfig = getPracticeModeConfig(selectedPracticeMode);
   const todayPracticeMode = todaySession?.practiceMode || selectedPracticeMode;
@@ -5822,6 +6034,7 @@ export default function App() {
         <MetricCard label="今日待複習" value={dueReview.length} sub="依 next review date" />
         <MetricCard label="≥80 機率" value={`${readiness.probability80}%`} sub={readiness.readinessLevel} />
         <MetricCard label="Level / XP" value={`Lv ${state.game?.level || 1}`} sub={`${state.game?.xp || 0} XP · streak ${state.game?.streak || 0}`} />
+        <MetricCard label="今日專注" value={`${todayFocusMinutes} 分`} sub={`focus streak ${focusStreak} 天`} />
         <MetricCard label="Flashcards" value={getFlashcardList(state).length} sub={`${dueFlashcards.length} due today`} />
         <MetricCard label="同步狀態" value={user ? 'Cloud' : 'Local'} sub={user ? user.email : '尚未登入'} />
       </section>
@@ -5849,6 +6062,25 @@ export default function App() {
           <span className="pill trial">Score dragger</span>
           <strong>{missionControl.primaryFocus}</strong>
         </div>
+        <section className="focus-timer" aria-label="Focus timer">
+          <div>
+            <span>專注計時</span>
+            <strong>{focusStartedAt ? formatFocusDuration(focusElapsedSeconds) : `${todayFocusMinutes} 分`}</strong>
+            <em>{focusStartedAt ? '正在記錄這段讀書時間' : `今日已記錄 · 連續 ${focusStreak} 天`}</em>
+          </div>
+          <div className="focus-timer-actions">
+            {focusStartedAt ? (
+              <>
+                <button className="good" type="button" onClick={finishFocusSession}>結束並記錄</button>
+                <button className="secondary" type="button" onClick={cancelFocusSession}>取消</button>
+              </>
+            ) : (
+              <button className="primary" type="button" onClick={startFocusSession}>開始專注</button>
+            )}
+          </div>
+        </section>
+        <FocusMarquee />
+        <StudyLeaderboard rows={focusLeaderboardRows} />
         <div className="mission-actions">
           {missionControl.actions.map((action) => (
             <button className="mission-action" type="button" key={action.title} onClick={() => setTab(action.tab)}>
