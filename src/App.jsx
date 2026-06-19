@@ -138,27 +138,71 @@ const XP_RULES = {
 };
 
 let feedbackAudioContext = null;
+let feedbackAudioUnlocked = false;
+const FEEDBACK_SOUND_PATHS = {
+  correct: '/sounds/correct.mp3',
+  wrong: '/sounds/wrong.mp3',
+  taskCompletion: '/sounds/task-completion.mp3',
+};
+const feedbackAudioElements = {};
 
 function triggerHapticFeedback(type = 'tap') {
   if (!navigator.vibrate) return;
   const patterns = {
-    tap: 8,
-    correct: [12, 35, 18],
-    wrong: [35, 40, 35],
+    tap: 20,
+    correct: [25, 40, 30],
+    wrong: [60, 45, 60],
   };
   navigator.vibrate(patterns[type] || patterns.tap);
 }
 
-function playTone(startFrequency, endFrequency, duration, delay = 0, volume = 0.08, waveType = 'sine') {
+function getFeedbackAudioContext() {
   const AudioContext = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContext) return;
+  if (!AudioContext) return null;
   feedbackAudioContext ||= new AudioContext();
-  const context = feedbackAudioContext;
+  return feedbackAudioContext;
+}
 
-  if (context.state === 'suspended') {
-    context.resume().catch(() => {});
+function unlockFeedbackAudio() {
+  const context = getFeedbackAudioContext();
+  Object.entries(FEEDBACK_SOUND_PATHS).forEach(([key, path]) => {
+    feedbackAudioElements[key] ||= new Audio(path);
+    feedbackAudioElements[key].preload = 'auto';
+    feedbackAudioElements[key].load();
+  });
+
+  if (!context) return;
+
+  const resume = context.state === 'suspended' ? context.resume() : Promise.resolve();
+  resume
+    .then(() => {
+      if (feedbackAudioUnlocked) return;
+      const source = context.createBufferSource();
+      const gain = context.createGain();
+      source.buffer = context.createBuffer(1, 1, context.sampleRate);
+      gain.gain.setValueAtTime(0.0001, context.currentTime);
+      source.connect(gain);
+      gain.connect(context.destination);
+      source.start(0);
+      feedbackAudioUnlocked = true;
+    })
+    .catch(() => {});
+}
+
+function playFeedbackSound(soundKey, fallback) {
+  unlockFeedbackAudio();
+  const path = FEEDBACK_SOUND_PATHS[soundKey];
+  const audio = new Audio(path);
+  audio.preload = 'auto';
+  audio.volume = soundKey === 'wrong' ? 0.9 : 0.85;
+
+  const playPromise = audio.play();
+  if (playPromise?.catch) {
+    playPromise.catch(() => fallback?.());
   }
+}
 
+function scheduleTone(context, startFrequency, endFrequency, duration, delay, volume, waveType) {
   const oscillator = context.createOscillator();
   const gain = context.createGain();
   const now = context.currentTime + delay;
@@ -173,19 +217,42 @@ function playTone(startFrequency, endFrequency, duration, delay = 0, volume = 0.
   oscillator.connect(gain);
   gain.connect(context.destination);
   oscillator.start(now);
-  oscillator.stop(now + duration + 0.03);
+  oscillator.stop(now + duration + 0.05);
+}
+
+function playTone(startFrequency, endFrequency, duration, delay = 0, volume = 0.16, waveType = 'sine') {
+  const context = getFeedbackAudioContext();
+  if (!context) return;
+
+  const play = () => scheduleTone(context, startFrequency, endFrequency, duration, delay, volume, waveType);
+  if (context.state === 'suspended') {
+    context.resume().then(play).catch(() => {});
+    return;
+  }
+
+  play();
 }
 
 function playResultFeedback(result) {
   triggerHapticFeedback(result === 'correct' ? 'correct' : 'wrong');
 
   if (result === 'correct') {
-    playTone(523.25, 659.25, 0.1, 0, 0.075, 'sine');
-    playTone(659.25, 880, 0.14, 0.08, 0.07, 'triangle');
+    playFeedbackSound('correct', () => {
+      playTone(587.33, 783.99, 0.12, 0, 0.18, 'triangle');
+      playTone(783.99, 1046.5, 0.16, 0.1, 0.16, 'sine');
+    });
     return;
   }
 
-  playTone(220, 146.83, 0.22, 0, 0.085, 'sawtooth');
+  playFeedbackSound('wrong', () => playTone(196, 110, 0.3, 0, 0.2, 'square'));
+}
+
+function playTaskCompletionFeedback() {
+  triggerHapticFeedback('correct');
+  playFeedbackSound('taskCompletion', () => {
+    playTone(523.25, 783.99, 0.12, 0, 0.16, 'triangle');
+    playTone(659.25, 1046.5, 0.18, 0.09, 0.14, 'sine');
+  });
 }
 
 const FOCUS_RIVALS = [
@@ -5018,6 +5085,7 @@ export default function App() {
       if (!(target instanceof Element)) return;
       const interactive = target.closest('button, input, select, textarea, label, a');
       if (!interactive || interactive.matches(':disabled')) return;
+      unlockFeedbackAudio();
       triggerHapticFeedback('tap');
     };
 
@@ -5637,6 +5705,7 @@ export default function App() {
   const claimDailyChest = () => {
     const currentChest = getDailyChest(state, todayCompleted);
     if (currentChest.progress < 100 || currentChest.claimed) return;
+    playTaskCompletionFeedback();
     updateState((prev) => {
       const nextGame = awardXp(prev.game || defaultState.game, 80, 'Daily Chest opened', { date: TODAY, reward: 'daily-chest' });
       return {
@@ -6664,6 +6733,14 @@ export default function App() {
               ))}
             </div>
             <button className="secondary" onClick={() => updateSettings({ preferredCancers: [] })}>清除癌別篩選</button>
+          </div>
+          <div className="subsection">
+            <h3>音效 / 震動測試</h3>
+            <div className="inline-actions">
+              <button className="good" type="button" onClick={() => playResultFeedback('correct')}>答對音效</button>
+              <button className="bad" type="button" onClick={() => playResultFeedback('wrong')}>答錯音效</button>
+              <button className="primary" type="button" onClick={playTaskCompletionFeedback}>寶箱音效</button>
+            </div>
           </div>
           <div className="subsection inline-actions">
             <button className="secondary" onClick={exportBackup}>匯出備份 JSON</button>
