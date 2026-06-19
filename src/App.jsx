@@ -5085,6 +5085,15 @@ export default function App() {
       if (!(target instanceof Element)) return;
       const interactive = target.closest('button, input, select, textarea, label, a');
       if (!interactive || interactive.matches(':disabled')) return;
+      const tapSurface = target.closest('button, .tap-surface, .option, .check-pill, .manager-question-row, .mission-action, .chip-check, .rating-button, .file-button');
+      if (tapSurface instanceof HTMLElement) {
+        const rect = tapSurface.getBoundingClientRect();
+        tapSurface.style.setProperty('--tap-x', `${event.clientX - rect.left}px`);
+        tapSurface.style.setProperty('--tap-y', `${event.clientY - rect.top}px`);
+        tapSurface.classList.remove('tap-animate');
+        window.requestAnimationFrame(() => tapSurface.classList.add('tap-animate'));
+        window.setTimeout(() => tapSurface.classList.remove('tap-animate'), 450);
+      }
       unlockFeedbackAudio();
       triggerHapticFeedback('tap');
     };
@@ -6696,57 +6705,71 @@ export default function App() {
       )}
 
       {tab === 'settings' && (
-        <main className="panel">
-          <h2>Settings / Backup</h2>
+        <main className="panel settings-panel">
+          <div className="settings-head">
+            <div>
+              <h2>Settings / Backup</h2>
+              <p className="muted">調整練習範圍、音效回饋與資料備份。</p>
+            </div>
+          </div>
           <div className="settings-grid">
-            <label>
-              Practice Mode
+            <section className="settings-card">
+              <div className="settings-card-title">Practice Mode</div>
               <PracticeModeSelector value={selectedPracticeMode} onChange={setPracticeMode} />
               <span className="muted">目前模式會產生 {selectedPracticeConfig.total} 題，完成後獎勵 {selectedPracticeConfig.xp} XP。</span>
-            </label>
-            <label>
-              年份篩選
+            </section>
+            <section className="settings-card">
+              <div className="settings-card-title">年份篩選</div>
               <div className="check-row">
                 {QUESTION_YEARS.map((year) => (
-                  <label key={year}><input type="checkbox" checked={state.settings.preferredYears.includes(year)} onChange={(e) => {
-                    const next = e.target.checked
-                      ? [...state.settings.preferredYears, year]
-                      : state.settings.preferredYears.filter((x) => x !== year);
-                    updateSettings({ preferredYears: next });
-                  }} /> {year}</label>
+                  <label className="check-pill" key={year}>
+                    <input type="checkbox" checked={state.settings.preferredYears.includes(year)} onChange={(e) => {
+                      const next = e.target.checked
+                        ? [...state.settings.preferredYears, year]
+                        : state.settings.preferredYears.filter((x) => x !== year);
+                      updateSettings({ preferredYears: next });
+                    }} />
+                    <span>{year}</span>
+                  </label>
                 ))}
               </div>
-            </label>
+            </section>
           </div>
-          <div className="subsection">
-            <h3>癌別練習篩選</h3>
+          <section className="settings-card subsection">
+            <div className="settings-card-title">癌別練習篩選</div>
             <div className="category-grid">
               {cancerCategories.map((c) => (
-                <label key={c}>
+                <label className="check-pill" key={c}>
                   <input type="checkbox" checked={state.settings.preferredCancers.includes(c)} onChange={(e) => {
                     const next = e.target.checked
                       ? [...state.settings.preferredCancers, c]
                       : state.settings.preferredCancers.filter((x) => x !== c);
                     updateSettings({ preferredCancers: next });
-                  }} /> {c}
+                  }} />
+                  <span>{c}</span>
                 </label>
               ))}
             </div>
-            <button className="secondary" onClick={() => updateSettings({ preferredCancers: [] })}>清除癌別篩選</button>
-          </div>
-          <div className="subsection">
-            <h3>音效 / 震動測試</h3>
-            <div className="inline-actions">
-              <button className="good" type="button" onClick={() => playResultFeedback('correct')}>答對音效</button>
-              <button className="bad" type="button" onClick={() => playResultFeedback('wrong')}>答錯音效</button>
-              <button className="primary" type="button" onClick={playTaskCompletionFeedback}>寶箱音效</button>
+            <div className="settings-actions">
+              <button className="secondary" onClick={() => updateSettings({ preferredCancers: [] })}>清除癌別篩選</button>
             </div>
-          </div>
-          <div className="subsection inline-actions">
+          </section>
+          <section className="settings-card subsection">
+            <div className="settings-card-title">音效 / 震動測試</div>
+            <div className="settings-actions">
+              <button className="sound-test-button sound-correct" type="button" onClick={() => playResultFeedback('correct')}>答對音效</button>
+              <button className="sound-test-button sound-wrong" type="button" onClick={() => playResultFeedback('wrong')}>答錯音效</button>
+              <button className="sound-test-button sound-chest" type="button" onClick={playTaskCompletionFeedback}>寶箱音效</button>
+            </div>
+          </section>
+          <section className="settings-card subsection">
+            <div className="settings-card-title">資料備份</div>
+            <div className="settings-actions">
             <button className="secondary" onClick={exportBackup}>匯出備份 JSON</button>
             <label className="file-button">匯入備份 JSON<input type="file" accept="application/json" onChange={(e) => e.target.files?.[0] && importBackup(e.target.files[0])} /></label>
             <button className="danger" onClick={resetAll}>清除所有資料</button>
-          </div>
+            </div>
+          </section>
         </main>
       )}
     </div>
