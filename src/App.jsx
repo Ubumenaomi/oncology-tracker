@@ -137,6 +137,57 @@ const XP_RULES = {
   wrongRetest90: 300,
 };
 
+let feedbackAudioContext = null;
+
+function triggerHapticFeedback(type = 'tap') {
+  if (!navigator.vibrate) return;
+  const patterns = {
+    tap: 8,
+    correct: [12, 35, 18],
+    wrong: [35, 40, 35],
+  };
+  navigator.vibrate(patterns[type] || patterns.tap);
+}
+
+function playTone(startFrequency, endFrequency, duration, delay = 0, volume = 0.08, waveType = 'sine') {
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) return;
+  feedbackAudioContext ||= new AudioContext();
+  const context = feedbackAudioContext;
+
+  if (context.state === 'suspended') {
+    context.resume().catch(() => {});
+  }
+
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  const now = context.currentTime + delay;
+
+  oscillator.type = waveType;
+  oscillator.frequency.setValueAtTime(startFrequency, now);
+  oscillator.frequency.exponentialRampToValueAtTime(endFrequency, now + duration);
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(volume, now + 0.015);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+  oscillator.connect(gain);
+  gain.connect(context.destination);
+  oscillator.start(now);
+  oscillator.stop(now + duration + 0.03);
+}
+
+function playResultFeedback(result) {
+  triggerHapticFeedback(result === 'correct' ? 'correct' : 'wrong');
+
+  if (result === 'correct') {
+    playTone(523.25, 659.25, 0.1, 0, 0.075, 'sine');
+    playTone(659.25, 880, 0.14, 0.08, 0.07, 'triangle');
+    return;
+  }
+
+  playTone(220, 146.83, 0.22, 0, 0.085, 'sawtooth');
+}
+
 const FOCUS_RIVALS = [
   { id: 'rival-lin', name: '林晨安', title: 'GI Trial Sprinter', initials: 'GI', startOffset: 24, minutesPerMinute: 0.45, focusMinutes: 12, restMinutes: 16 },
   { id: 'rival-chou', name: '周品妤', title: 'Toxicity Sentinel', initials: 'Tx', startOffset: -48, minutesPerMinute: 0.35, focusMinutes: 18, restMinutes: 14 },
@@ -2852,6 +2903,10 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
       return;
     }
 
+    if (!hideAnswerUntilSubmit) {
+      playResultFeedback(isCorrect ? 'correct' : 'wrong');
+    }
+
     const ratingScoreMap = { Again: 4, Hard: 3, Good: 2, Easy: 1 };
     const score = ratingScoreMap[rating] || 3;
     const prevDifficulty = previous.difficulty || 3;
@@ -2931,6 +2986,11 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
       return;
     }
     setRevealed(true);
+    if (answerIsSingleChoice) {
+      playResultFeedback(isCorrectSelection ? 'correct' : 'wrong');
+    } else {
+      triggerHapticFeedback('tap');
+    }
     // In practiceMode we reveal and wait for user rating (Again/Hard/Good/Easy)
     setFeedback(answerIsSingleChoice ? (isCorrectSelection ? '答對，請選擇評分 (Again/Hard/Good/Easy)。' : '答錯，請選擇評分 (Again/Hard/Good/Easy)。') : '請選擇評分 (Again/Hard/Good/Easy)。');
   };
@@ -4819,6 +4879,7 @@ function MockExamPanel({ state, onFinishMock }) {
       startedAt: new Date(startedAt || Date.now()).toISOString(),
       completedAt: new Date().toISOString(),
     };
+    playResultFeedback(score >= 60 ? 'correct' : 'wrong');
     onFinishMock(completedExam);
     setExam({ ...exam, completedExam });
     setShowResults(true);
@@ -4950,6 +5011,19 @@ export default function App() {
   useEffect(() => {
     saveState(state);
   }, [state]);
+
+  useEffect(() => {
+    const handlePointerDown = (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const interactive = target.closest('button, input, select, textarea, label, a');
+      if (!interactive || interactive.matches(':disabled')) return;
+      triggerHapticFeedback('tap');
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown, { passive: true });
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, []);
 
   useEffect(() => {
     const timer = window.setInterval(() => setFocusTick(Date.now()), 1000);
@@ -5112,6 +5186,7 @@ export default function App() {
   const reviewFlashcard = (cardId, rating) => {
     const rule = FLASHCARD_RATINGS[rating] || FLASHCARD_RATINGS.Good;
     const isWrong = rating === 'Again';
+    playResultFeedback(isWrong ? 'wrong' : 'correct');
     updateState((prev) => {
       const cards = normalizeFlashcards(prev.flashcards);
       const card = cards[cardId];
@@ -5582,6 +5657,7 @@ export default function App() {
     const cardId = typeof card === 'string' ? card : card.id;
     const isPersistentCard = typeof card !== 'string' && card.sourceType !== 'topic-recall' && normalizeFlashcards(state.flashcards)[card.id];
     const rule = FLASHCARD_RATINGS[rating] || FLASHCARD_RATINGS.Good;
+    playResultFeedback(rating === 'Again' ? 'wrong' : 'correct');
     updateState((prev) => {
       const next = updateDailyQuestMemoryProgress(prev, TODAY, questTask, todayCompleted, cardId, rating);
 
@@ -5635,6 +5711,7 @@ export default function App() {
   };
 
   const setQuestBossResult = (bossId, passed) => {
+    playResultFeedback(passed ? 'correct' : 'wrong');
     updateState((prev) => {
       const current = getDailyQuestProgress(prev, TODAY, questTask, todayCompleted);
       const nextResults = { ...(current.bossResults || {}), [bossId]: passed };
