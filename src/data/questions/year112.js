@@ -17,7 +17,33 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Head & Neck",
+      "cancerDomain": "Head & Neck",
+      "cancerType": "Radiation/CCRT",
+      "stage": "",
+      "clinicalSetting": "diagnosis/staging/risk",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "exception/wrong statement",
+      "subtopic": "Radiation/CCRT",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [],
+      "toxicity": [],
+      "guidelineConcept": "Radiation/CCRT",
+      "hashTags": [
+        "#RadiationCCRT",
+        "#diagnosisstagingrisk",
+        "#radiationtherapy",
+        "#Guidelineprinciple",
+        "#exceptionwrongstatement"
+      ],
+      "examWeight": 3,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -37,7 +63,39 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Head & Neck",
+      "cancerDomain": "Head & Neck",
+      "cancerType": "ALL",
+      "stage": "unresectable locally advanced",
+      "clinicalSetting": "neoadjuvant therapy",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [
+        "NTRK/RET"
+      ],
+      "evidenceType": "Guideline principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "Trial interpretation",
+      "trial": [],
+      "treatmentLine": "adjuvant",
+      "endpoint": [
+        "OS"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Trial interpretation",
+      "hashTags": [
+        "#ALL",
+        "#unresectablelocallyadvanced",
+        "#neoadjuvanttherapy",
+        "#radiationtherapy",
+        "#Guidelineprinciple",
+        "#endpointrecognition",
+        "#NTRKRET"
+      ],
+      "examWeight": 3,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -60,7 +118,39 @@ export const questions112 = [
     ],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Head & Neck",
+      "cancerDomain": "Head & Neck",
+      "cancerType": "ALL",
+      "stage": "metastatic",
+      "clinicalSetting": "metastatic first-line",
+      "treatmentModality": "chemotherapy",
+      "biomarker": [],
+      "evidenceType": "Recognized trial",
+      "questionType": "sequence",
+      "subtopic": "Metastatic",
+      "trial": [
+        "CHECKMATE-141",
+        "KEYNOTE-040"
+      ],
+      "treatmentLine": "first-line",
+      "endpoint": [],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#ALL",
+        "#metastatic",
+        "#metastaticfirstline",
+        "#chemotherapy",
+        "#Recognizedtrial",
+        "#sequence",
+        "#CHECKMATE141",
+        "#KEYNOTE040"
+      ],
+      "examWeight": 3,
+      "cardEligible": true,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -80,7 +170,34 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Head & Neck",
+      "cancerDomain": "Head & Neck",
+      "cancerType": "Nasopharyngeal carcinoma",
+      "stage": "metastatic",
+      "clinicalSetting": "metastatic first-line",
+      "treatmentModality": "chemotherapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "standard of care",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "first-line",
+      "endpoint": [],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#Nasopharyngealcarcinoma",
+        "#metastatic",
+        "#metastaticfirstline",
+        "#chemotherapy",
+        "#Guidelineprinciple",
+        "#standardofcare"
+      ],
+      "examWeight": 3,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -100,7 +217,39 @@ export const questions112 = [
     "trials": [],
     "answer": "A",
     "explanation": "(B)(C)根據GEM20110714，GC有顯著較長的PFS和OS，但有較多的grade 3 and 4 hematologic adverse events\n(D)根據JUPITER-02，toripalimab plus GC有顯著較長的PFS，median OS not reached\n(E)根據Keynote-048 subgroups analysis，pembrolizumab-chemotherapy在CPS<1 OS改善沒有顯著差異",
-    "tags": []
+    "tags": {
+      "domain": "Head & Neck",
+      "cancerDomain": "Head & Neck",
+      "cancerType": "Radiation/CCRT",
+      "stage": "",
+      "clinicalSetting": "neoadjuvant therapy",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [
+        "PD-L1"
+      ],
+      "evidenceType": "Golden trial",
+      "questionType": "toxicity",
+      "subtopic": "Radiation/CCRT",
+      "trial": [],
+      "treatmentLine": "adjuvant",
+      "endpoint": [
+        "OS",
+        "PFS"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Radiation/CCRT",
+      "hashTags": [
+        "#RadiationCCRT",
+        "#neoadjuvanttherapy",
+        "#radiationtherapy",
+        "#Goldentrial",
+        "#toxicity",
+        "#PDL1"
+      ],
+      "examWeight": 3,
+      "cardEligible": true,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -120,7 +269,32 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Head & Neck",
+      "cancerDomain": "Head & Neck",
+      "cancerType": "Salivary gland tumor",
+      "stage": "",
+      "clinicalSetting": "biomarker/companion diagnostic",
+      "treatmentModality": "",
+      "biomarker": [],
+      "evidenceType": "Biomarker principle",
+      "questionType": "biomarker",
+      "subtopic": "Biomarker",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [],
+      "toxicity": [],
+      "guidelineConcept": "Biomarker",
+      "hashTags": [
+        "#Salivaryglandtumor",
+        "#biomarkercompaniondiagnostic",
+        "#Biomarkerprinciple",
+        "#biomarker"
+      ],
+      "examWeight": 3,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -140,7 +314,36 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Head & Neck",
+      "cancerDomain": "Head & Neck",
+      "cancerType": "Head and neck cancer",
+      "stage": "unresectable locally advanced",
+      "clinicalSetting": "locally advanced unresectable",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "Radiation/CCRT",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Radiation/CCRT",
+      "hashTags": [
+        "#Headandneckcancer",
+        "#unresectablelocallyadvanced",
+        "#locallyadvancedunresectable",
+        "#radiationtherapy",
+        "#Guidelineprinciple",
+        "#endpointrecognition"
+      ],
+      "examWeight": 3,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -160,7 +363,36 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Other",
+      "cancerDomain": "Other",
+      "cancerType": "Precision oncology",
+      "stage": "metastatic",
+      "clinicalSetting": "diagnosis/staging/risk",
+      "treatmentModality": "chemotherapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "biomarker",
+      "subtopic": "Adjuvant",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Adjuvant",
+      "hashTags": [
+        "#Precisiononcology",
+        "#metastatic",
+        "#diagnosisstagingrisk",
+        "#chemotherapy",
+        "#Guidelineprinciple",
+        "#biomarker"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -180,7 +412,43 @@ export const questions112 = [
     "trials": [],
     "answer": "B",
     "explanation": "此題考轉移性荷爾蒙受體陽性乳癌的治療架構\nACDE選項考Ovary function suppression, ET及CDK4/6i的應用\nB選項考二線後的治療選項\n\n附上2024 ASCO education book 架構圖(https://ascopubs.org/doi/10.1200/EDBK_432442), 需注意圖中4L+未包含Dato-Dxd (TROPION Breast 01, PFS benefit+, OS benefit-, 於2025/01 FDA approved, 可能為今年考點)\n\n目前荷爾蒙受體陽性轉移性乳癌第一線治療\nEndocrine therapy（SERM or Aromatase inhibitor） + CDK4/6i\nCDK4/6i選擇可以是\n- Palbociclib（PALOMA-2)\n- Ribociclib（MONALEESA-2）\n- Abemaciclib（MONARCH-3）\nPALOMA-2, MONALEESA-2, MONARCH-3皆收錄停經後乳癌患者，而由MONALESSA-7（Ribociclib使用於Pre- or Peri-menopause）將CDK4/6i使用範圍拓展到停經前患者也可使用。\n\n依照題幹\nA: Postmenopause需要連續無月經達12個月，7個月前仍有月經來上尚無法判定已屬於Postmenopause，可檢測FSH/Estradiol判斷卵巢功能是否尚未符合停經後標準評估需不需要進行Ovary function suppression（OFS）。\nB: 錯誤, 二線標準治療為SERD為主幹(如Fulvestrant), 再依照PI3k-Akt pathway alteration有無選用PI3K inhibitor（如alpelisib in SOLAR-1 study and BYlieve study）或AKT inhibitor（capivasertib in capitello-291）, 目前PI3k-Akt pathway alteration相關的抑制劑皆是在二線（含）以後。\nC, D: 如果不驗FSH/E2, 只以連續無月經月份判斷病患仍不算進入Postmenopause故需要OFS，方式可以採手術（卵巢切除）或是藥物（GnRHa）。進行OFS後治療就同Postmenopausal，使用Endocrine therapy + CDK4/6i。\nE: 沒有Visceral crisis優先用ET+CDK4/6i，只是因為之前的研究沒有收Visceral crisis病患。有Visceral crisis也並非就需把化療拉到第一線, 此觀念已在RIGHTCHOICE study後被推翻（ET+Ribociclib vs Chemotherapy, ORR皆約6成, 且PFS與Adverse event表現都是CDK4/6i組更好, 故不管有無Visceral crisis, ET+CDK4/6i都可以作為第一線選項)",
-    "tags": [],
+    "tags": {
+      "domain": "Breast",
+      "cancerDomain": "Breast",
+      "cancerType": "TNBC",
+      "stage": "metastatic",
+      "clinicalSetting": "metastatic first-line",
+      "treatmentModality": "surgery",
+      "biomarker": [
+        "HER2",
+        "PD-L1"
+      ],
+      "evidenceType": "Guideline-only",
+      "questionType": "toxicity",
+      "subtopic": "Biomarker",
+      "trial": [],
+      "treatmentLine": "first-line",
+      "endpoint": [
+        "OS",
+        "PFS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Biomarker",
+      "hashTags": [
+        "#TNBC",
+        "#metastatic",
+        "#metastaticfirstline",
+        "#surgery",
+        "#Guidelineonly",
+        "#toxicity",
+        "#HER2",
+        "#PDL1"
+      ],
+      "examWeight": 4,
+      "cardEligible": true,
+      "raw": []
+    },
     "explanationFigures": [
       "/explanations/112/Q009/Treatment_of_HR+_Breast_cancer_algorithm.png"
     ]
@@ -203,7 +471,40 @@ export const questions112 = [
     "trials": [],
     "answer": "C",
     "explanation": "除NGS外四個選項皆可，HR+ HER2-早期乳癌, 可以下列四種基因檢測綜合判斷是否需要加上化療。\n\n檢測平台         LN          檢測參數及判定\nOncoType DX ->   -    | 21 gene及含量判定recurrence score\nMammaPrint  -> - or + | 70 gene 判斷風險(需合併clinical risk評估臨床風險)\nPAM50       ->   -    | 50 gene 判斷屬於哪種subtype(Luminal A, B, HER2, basal-like)及風險\nEndopredict -> - or + | 12 gene 判斷EPclin Score",
-    "tags": []
+    "tags": {
+      "domain": "Breast",
+      "cancerDomain": "Breast",
+      "cancerType": "Early breast cancer",
+      "stage": "resectable",
+      "clinicalSetting": "localized curative intent",
+      "treatmentModality": "surgery",
+      "biomarker": [
+        "HER2"
+      ],
+      "evidenceType": "Biomarker principle",
+      "questionType": "biomarker",
+      "subtopic": "Neoadjuvant",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "pCR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Neoadjuvant",
+      "hashTags": [
+        "#Earlybreastcancer",
+        "#resectable",
+        "#localizedcurativeintent",
+        "#surgery",
+        "#Biomarkerprinciple",
+        "#biomarker",
+        "#HER2"
+      ],
+      "examWeight": 4,
+      "cardEligible": true,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -223,7 +524,42 @@ export const questions112 = [
     "trials": [],
     "answer": "A or C",
     "explanation": "A可能有爭議但C明顯錯誤，故應選C\n\nA：大多數統計資料Uveal melanoma中Choroid佔85-90%，剩餘是iris及ciliary body合計佔剩餘10%。無法確定考題用的是哪份資料。需要知道最多的是Choroid即可。\n\nB: uveal melanoma\n腫瘤發展早期的突變跟G-protein α subunits相關, 佔85%(GNAQ and GNA11, mutually exclusive), 會活化下游MAPK pathway。\n腫瘤發展晚期的突變為BAP1, SF3B1(splicing factor 3B subunit 1), EIF1AX (eukaryotic translation initiation factor 1A X-linked)。有SF3B1, EIF1AX突變預後比較好。BAP1可以是germline(亦容易造成mesothelioma)。\nRef: Devita 12th p. 1605\n\nC錯誤：Immunotherapy在Cutaneous melanoma的成功沒有辦法複製在Uveal melanoma, 舉例以CheckMate-067為例（Ref C2），ORR分別為Ipi 19%, Nivo 44.9%, Ipi+Nivo 58.3%。而Uveal melanoma即便用Ipi+Nivo combined IO therapy ORR也只有13.7%（Meta-analysis, Ref C2）, 其於大多資料Nivo單用約5%, Ipi單用為0%。Devita亦有提出可能原因為Uveal melanoma TMB明顯不如Cutaneous melanoma。\n\nRef C1: https://ascopubs.org/doi/10.1200/JCO.2021.39.15_suppl.9506\nRef C2: https://ascopubs.org/doi/10.1200/JCO.2022.40.16_suppl.9534\n\nD: 最常見metastasis分為liver (>90%), Lung (24%), Bone (16%), 最少的是LN & Brain (<6%)\n\nE: \nMetastatic uveal melanoma的ICI治療效果明顯不如Cutaneous melanoma, 應依照IMCgp100-202 trial結果優先考慮於HLA-A*02:01 positive病人使用Tebentafusp(BiTE targeting gp100 & CD3), 於trial中使用Tebentafusp對比於physician choice therapy(Pembro, Ipi or DTIC)有OS benefit, 此藥物另一個特色是即使用Tebentafusp後best reponse是PD的病人存活也比使用physician choice therapy後best response是PD的病人來得長（表示此藥物的機轉特別, response即便連SD都無法達到也能延長存活）。\n\n若病患為HLA-A*02:01 negative則才考慮IO, 若病患為liver dominant disease則應該積極考慮local therapy。附上uptodate流程圖更利於理解。",
-    "tags": [],
+    "tags": {
+      "domain": "Lung",
+      "cancerDomain": "Lung",
+      "cancerType": "Mesothelioma",
+      "stage": "metastatic",
+      "clinicalSetting": "adjuvant therapy",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [
+        "HER2",
+        "PD-L1"
+      ],
+      "evidenceType": "Guideline-only",
+      "questionType": "biomarker",
+      "subtopic": "Adjuvant",
+      "trial": [],
+      "treatmentLine": "adjuvant",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Adjuvant",
+      "hashTags": [
+        "#Mesothelioma",
+        "#metastatic",
+        "#adjuvanttherapy",
+        "#radiationtherapy",
+        "#Guidelineonly",
+        "#biomarker",
+        "#HER2",
+        "#PDL1"
+      ],
+      "examWeight": 4,
+      "cardEligible": true,
+      "raw": []
+    },
     "explanationFigures": [
       "/explanations/112/Q011/Metastatic_uveal_melanoma_treatment.png"
     ]
@@ -246,7 +582,36 @@ export const questions112 = [
     "trials": [],
     "answer": "A",
     "explanation": "針對不適合手術或無法手術病患, curative RT為最建議方式。化療可考慮與RT並用作爲CCRT(with cisplatin, PF, TP, cetuximab等radiosensitizer)。僅在不適合手術或RT的病患使用immunotherapy（如Cemiplimab, Pembrolizumab）作為systemic treatment。\n\n附2025 Ver2 NCCN guideline for Squamous Cell Skin Cancer供參考",
-    "tags": [],
+    "tags": {
+      "domain": "GYN",
+      "cancerDomain": "GYN",
+      "cancerType": "Ovarian cancer",
+      "stage": "metastatic",
+      "clinicalSetting": "localized curative intent",
+      "treatmentModality": "surgery",
+      "biomarker": [],
+      "evidenceType": "Guideline-only",
+      "questionType": "exception/wrong statement",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#Ovariancancer",
+        "#metastatic",
+        "#localizedcurativeintent",
+        "#surgery",
+        "#Guidelineonly",
+        "#exceptionwrongstatement"
+      ],
+      "examWeight": 4,
+      "cardEligible": true,
+      "raw": []
+    },
     "explanationFigures": [
       "/explanations/112/Q012/NCCN_guideline.png",
       "/explanations/112/Q012/Agents_combined_with_RT.png"
@@ -270,7 +635,43 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Other",
+      "cancerDomain": "Other",
+      "cancerType": "Precision oncology",
+      "stage": "metastatic",
+      "clinicalSetting": "biomarker/companion diagnostic",
+      "treatmentModality": "targeted therapy",
+      "biomarker": [
+        "HER2",
+        "BRCA/HRD"
+      ],
+      "evidenceType": "Biomarker principle",
+      "questionType": "biomarker",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS"
+      ],
+      "toxicity": [
+        "ILD/pneumonitis"
+      ],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#Precisiononcology",
+        "#metastatic",
+        "#biomarkercompaniondiagnostic",
+        "#targetedtherapy",
+        "#Biomarkerprinciple",
+        "#biomarker",
+        "#HER2",
+        "#BRCAHRD"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -290,7 +691,34 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Breast",
+      "cancerDomain": "Breast",
+      "cancerType": "Metastatic",
+      "stage": "localized",
+      "clinicalSetting": "metastatic first-line",
+      "treatmentModality": "endocrine therapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "standard of care",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "first-line",
+      "endpoint": [],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#Metastatic",
+        "#localized",
+        "#metastaticfirstline",
+        "#endocrinetherapy",
+        "#Guidelineprinciple",
+        "#standardofcare"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -310,7 +738,40 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Breast",
+      "cancerDomain": "Breast",
+      "cancerType": "TNBC",
+      "stage": "metastatic",
+      "clinicalSetting": "neoadjuvant therapy",
+      "treatmentModality": "surgery",
+      "biomarker": [
+        "HER2"
+      ],
+      "evidenceType": "Biomarker principle",
+      "questionType": "biomarker",
+      "subtopic": "Neoadjuvant",
+      "trial": [],
+      "treatmentLine": "adjuvant",
+      "endpoint": [
+        "OS",
+        "pCR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Neoadjuvant",
+      "hashTags": [
+        "#TNBC",
+        "#metastatic",
+        "#neoadjuvanttherapy",
+        "#surgery",
+        "#Biomarkerprinciple",
+        "#biomarker",
+        "#HER2"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -334,7 +795,42 @@ export const questions112 = [
     ],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Melanoma/Sarcoma",
+      "cancerDomain": "Melanoma/Sarcoma",
+      "cancerType": "Melanoma",
+      "stage": "localized",
+      "clinicalSetting": "neoadjuvant therapy",
+      "treatmentModality": "immunotherapy",
+      "biomarker": [
+        "BRAF"
+      ],
+      "evidenceType": "Recognized trial",
+      "questionType": "biomarker",
+      "subtopic": "Neoadjuvant",
+      "trial": [
+        "COMBI-AD",
+        "CheckMate-238",
+        "KEYNOTE-054"
+      ],
+      "treatmentLine": "adjuvant",
+      "endpoint": [],
+      "toxicity": [],
+      "guidelineConcept": "Neoadjuvant",
+      "hashTags": [
+        "#Melanoma",
+        "#localized",
+        "#neoadjuvanttherapy",
+        "#immunotherapy",
+        "#Recognizedtrial",
+        "#biomarker",
+        "#COMBIAD",
+        "#CheckMate238"
+      ],
+      "examWeight": 2,
+      "cardEligible": true,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -354,7 +850,39 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Melanoma/Sarcoma",
+      "cancerDomain": "Melanoma/Sarcoma",
+      "cancerType": "Melanoma",
+      "stage": "metastatic",
+      "clinicalSetting": "Metastatic",
+      "treatmentModality": "immunotherapy",
+      "biomarker": [
+        "BRAF"
+      ],
+      "evidenceType": "Guideline-only",
+      "questionType": "endpoint recognition",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#Melanoma",
+        "#metastatic",
+        "#Metastatic",
+        "#immunotherapy",
+        "#Guidelineonly",
+        "#endpointrecognition",
+        "#BRAF"
+      ],
+      "examWeight": 2,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -374,7 +902,39 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Heme",
+      "cancerDomain": "Heme",
+      "cancerType": "ALL",
+      "stage": "metastatic",
+      "clinicalSetting": "toxicity/supportive care",
+      "treatmentModality": "immunotherapy",
+      "biomarker": [
+        "BRAF"
+      ],
+      "evidenceType": "Guideline principle",
+      "questionType": "toxicity",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#ALL",
+        "#metastatic",
+        "#toxicitysupportivecare",
+        "#immunotherapy",
+        "#Guidelineprinciple",
+        "#toxicity",
+        "#BRAF"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -396,7 +956,44 @@ export const questions112 = [
     ],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Heme",
+      "cancerDomain": "Heme",
+      "cancerType": "ALL",
+      "stage": "palliative/supportive",
+      "clinicalSetting": "toxicity/supportive care",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [
+        "NTRK/RET"
+      ],
+      "evidenceType": "Recognized trial",
+      "questionType": "endpoint recognition",
+      "subtopic": "Trial interpretation",
+      "trial": [
+        "PALETTE"
+      ],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS"
+      ],
+      "toxicity": [
+        "hypertension"
+      ],
+      "guidelineConcept": "Trial interpretation",
+      "hashTags": [
+        "#ALL",
+        "#palliativesupportive",
+        "#toxicitysupportivecare",
+        "#radiationtherapy",
+        "#Recognizedtrial",
+        "#endpointrecognition",
+        "#PALETTE",
+        "#NTRKRET"
+      ],
+      "examWeight": 4,
+      "cardEligible": true,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -418,7 +1015,43 @@ export const questions112 = [
     ],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Heme",
+      "cancerDomain": "Heme",
+      "cancerType": "ALL",
+      "stage": "resectable",
+      "clinicalSetting": "localized curative intent",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [
+        "NTRK/RET"
+      ],
+      "evidenceType": "Recognized trial",
+      "questionType": "toxicity",
+      "subtopic": "Neoadjuvant",
+      "trial": [
+        "KEYNOTE-629"
+      ],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Neoadjuvant",
+      "hashTags": [
+        "#ALL",
+        "#resectable",
+        "#localizedcurativeintent",
+        "#radiationtherapy",
+        "#Recognizedtrial",
+        "#toxicity",
+        "#KEYNOTE629",
+        "#NTRKRET"
+      ],
+      "examWeight": 5,
+      "cardEligible": true,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -438,7 +1071,42 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Lung",
+      "cancerDomain": "Lung",
+      "cancerType": "Metastatic",
+      "stage": "metastatic",
+      "clinicalSetting": "diagnosis/staging/risk",
+      "treatmentModality": "immunotherapy",
+      "biomarker": [
+        "MSI/dMMR",
+        "NTRK/RET",
+        "EBV"
+      ],
+      "evidenceType": "Guideline-only",
+      "questionType": "biomarker",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#Metastatic",
+        "#metastatic",
+        "#diagnosisstagingrisk",
+        "#immunotherapy",
+        "#Guidelineonly",
+        "#biomarker",
+        "#MSIdMMR",
+        "#NTRKRET"
+      ],
+      "examWeight": 5,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -458,7 +1126,35 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GI",
+      "cancerDomain": "GI",
+      "cancerType": "Pancreatic cancer",
+      "stage": "",
+      "clinicalSetting": "biomarker/companion diagnostic",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [],
+      "evidenceType": "Biomarker principle",
+      "questionType": "biomarker",
+      "subtopic": "Biomarker",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Biomarker",
+      "hashTags": [
+        "#Pancreaticcancer",
+        "#biomarkercompaniondiagnostic",
+        "#radiationtherapy",
+        "#Biomarkerprinciple",
+        "#biomarker"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -478,7 +1174,33 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "CNS",
+      "cancerDomain": "CNS",
+      "cancerType": "Glioma/GBM",
+      "stage": "",
+      "clinicalSetting": "adjuvant therapy",
+      "treatmentModality": "surgery",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "exception/wrong statement",
+      "subtopic": "Adjuvant",
+      "trial": [],
+      "treatmentLine": "adjuvant",
+      "endpoint": [],
+      "toxicity": [],
+      "guidelineConcept": "Adjuvant",
+      "hashTags": [
+        "#GliomaGBM",
+        "#adjuvanttherapy",
+        "#surgery",
+        "#Guidelineprinciple",
+        "#exceptionwrongstatement"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -498,7 +1220,39 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Breast",
+      "cancerDomain": "Breast",
+      "cancerType": "Brain metastasis",
+      "stage": "metastatic",
+      "clinicalSetting": "biomarker/companion diagnostic",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [
+        "EGFR"
+      ],
+      "evidenceType": "Biomarker principle",
+      "questionType": "biomarker",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#Brainmetastasis",
+        "#metastatic",
+        "#biomarkercompaniondiagnostic",
+        "#radiationtherapy",
+        "#Biomarkerprinciple",
+        "#biomarker",
+        "#EGFR"
+      ],
+      "examWeight": 5,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -518,7 +1272,34 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Heme",
+      "cancerDomain": "Heme",
+      "cancerType": "ALL",
+      "stage": "metastatic",
+      "clinicalSetting": "Metastatic",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "exception/wrong statement",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#ALL",
+        "#metastatic",
+        "#Metastatic",
+        "#radiationtherapy",
+        "#Guidelineprinciple",
+        "#exceptionwrongstatement"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -538,7 +1319,40 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GU",
+      "cancerDomain": "GU",
+      "cancerType": "Prostate cancer",
+      "stage": "metastatic",
+      "clinicalSetting": "biomarker/companion diagnostic",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [
+        "ALK"
+      ],
+      "evidenceType": "Golden trial",
+      "questionType": "biomarker",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#Prostatecancer",
+        "#metastatic",
+        "#biomarkercompaniondiagnostic",
+        "#radiationtherapy",
+        "#Goldentrial",
+        "#biomarker",
+        "#ALK"
+      ],
+      "examWeight": 5,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -558,7 +1372,37 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GU",
+      "cancerDomain": "GU",
+      "cancerType": "Urothelial cancer",
+      "stage": "metastatic",
+      "clinicalSetting": "Metastatic",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [
+        "Nectin-4"
+      ],
+      "evidenceType": "Guideline principle",
+      "questionType": "exception/wrong statement",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#Urothelialcancer",
+        "#metastatic",
+        "#Metastatic",
+        "#radiationtherapy",
+        "#Guidelineprinciple",
+        "#exceptionwrongstatement",
+        "#Nectin4"
+      ],
+      "examWeight": 3,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -578,7 +1422,40 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GYN",
+      "cancerDomain": "GYN",
+      "cancerType": "Trial interpretation",
+      "stage": "",
+      "clinicalSetting": "metastatic first-line",
+      "treatmentModality": "targeted therapy",
+      "biomarker": [
+        "BRCA/HRD",
+        "NTRK/RET"
+      ],
+      "evidenceType": "Biomarker principle",
+      "questionType": "exception/wrong statement",
+      "subtopic": "Trial interpretation",
+      "trial": [],
+      "treatmentLine": "first-line",
+      "endpoint": [
+        "OS"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Trial interpretation",
+      "hashTags": [
+        "#Trialinterpretation",
+        "#metastaticfirstline",
+        "#targetedtherapy",
+        "#Biomarkerprinciple",
+        "#exceptionwrongstatement",
+        "#BRCAHRD",
+        "#NTRKRET"
+      ],
+      "examWeight": 2,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -598,7 +1475,33 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GYN",
+      "cancerDomain": "GYN",
+      "cancerType": "Metastatic",
+      "stage": "metastatic",
+      "clinicalSetting": "diagnosis/staging/risk",
+      "treatmentModality": "",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "standard of care",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#Metastatic",
+        "#metastatic",
+        "#diagnosisstagingrisk",
+        "#Guidelineprinciple",
+        "#standardofcare"
+      ],
+      "examWeight": 2,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -620,7 +1523,43 @@ export const questions112 = [
     ],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GYN",
+      "cancerDomain": "GYN",
+      "cancerType": "Endometrial cancer",
+      "stage": "",
+      "clinicalSetting": "toxicity/supportive care",
+      "treatmentModality": "chemotherapy",
+      "biomarker": [
+        "MSI/dMMR"
+      ],
+      "evidenceType": "Golden trial",
+      "questionType": "toxicity",
+      "subtopic": "Toxicity",
+      "trial": [
+        "KEYNOTE-775"
+      ],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS"
+      ],
+      "toxicity": [
+        "ILD/pneumonitis"
+      ],
+      "guidelineConcept": "Toxicity",
+      "hashTags": [
+        "#Endometrialcancer",
+        "#toxicitysupportivecare",
+        "#chemotherapy",
+        "#Goldentrial",
+        "#toxicity",
+        "#KEYNOTE775",
+        "#MSIdMMR"
+      ],
+      "examWeight": 2,
+      "cardEligible": true,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -640,7 +1579,41 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Lung",
+      "cancerDomain": "Lung",
+      "cancerType": "NSCLC",
+      "stage": "localized",
+      "clinicalSetting": "localized curative intent",
+      "treatmentModality": "surgery",
+      "biomarker": [
+        "EGFR",
+        "ALK"
+      ],
+      "evidenceType": "Golden trial",
+      "questionType": "biomarker",
+      "subtopic": "Neoadjuvant",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "EFS"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Neoadjuvant",
+      "hashTags": [
+        "#NSCLC",
+        "#localized",
+        "#localizedcurativeintent",
+        "#surgery",
+        "#Goldentrial",
+        "#biomarker",
+        "#EGFR",
+        "#ALK"
+      ],
+      "examWeight": 5,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -660,7 +1633,44 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Lung",
+      "cancerDomain": "Lung",
+      "cancerType": "Adjuvant",
+      "stage": "localized",
+      "clinicalSetting": "localized curative intent",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [
+        "EGFR",
+        "ALK",
+        "PD-L1"
+      ],
+      "evidenceType": "Biomarker principle",
+      "questionType": "biomarker",
+      "subtopic": "Adjuvant",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS"
+      ],
+      "toxicity": [
+        "ILD/pneumonitis"
+      ],
+      "guidelineConcept": "Adjuvant",
+      "hashTags": [
+        "#Adjuvant",
+        "#localized",
+        "#localizedcurativeintent",
+        "#radiationtherapy",
+        "#Biomarkerprinciple",
+        "#biomarker",
+        "#EGFR",
+        "#ALK"
+      ],
+      "examWeight": 5,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -680,7 +1690,45 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Other",
+      "cancerDomain": "Other",
+      "cancerType": "Precision oncology",
+      "stage": "",
+      "clinicalSetting": "biomarker/companion diagnostic",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [
+        "EGFR",
+        "ALK",
+        "KRAS",
+        "NTRK/RET",
+        "BRAF"
+      ],
+      "evidenceType": "Biomarker principle",
+      "questionType": "biomarker",
+      "subtopic": "Biomarker",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "pCR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Biomarker",
+      "hashTags": [
+        "#Precisiononcology",
+        "#biomarkercompaniondiagnostic",
+        "#radiationtherapy",
+        "#Biomarkerprinciple",
+        "#biomarker",
+        "#EGFR",
+        "#ALK",
+        "#KRAS"
+      ],
+      "examWeight": 5,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -700,7 +1748,40 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Heme",
+      "cancerDomain": "Heme",
+      "cancerType": "ALL",
+      "stage": "metastatic",
+      "clinicalSetting": "metastatic first-line",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [
+        "EGFR"
+      ],
+      "evidenceType": "Golden trial",
+      "questionType": "biomarker",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "first-line",
+      "endpoint": [
+        "OS",
+        "PFS"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#ALL",
+        "#metastatic",
+        "#metastaticfirstline",
+        "#radiationtherapy",
+        "#Goldentrial",
+        "#biomarker",
+        "#EGFR"
+      ],
+      "examWeight": 5,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -719,7 +1800,43 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Lung",
+      "cancerDomain": "Lung",
+      "cancerType": "Biomarker",
+      "stage": "",
+      "clinicalSetting": "biomarker/companion diagnostic",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [
+        "EGFR",
+        "KRAS",
+        "HER2",
+        "NTRK/RET"
+      ],
+      "evidenceType": "Biomarker principle",
+      "questionType": "biomarker",
+      "subtopic": "Biomarker",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Biomarker",
+      "hashTags": [
+        "#Biomarker",
+        "#biomarkercompaniondiagnostic",
+        "#radiationtherapy",
+        "#Biomarkerprinciple",
+        "#biomarker",
+        "#EGFR",
+        "#KRAS",
+        "#HER2"
+      ],
+      "examWeight": 5,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -739,7 +1856,36 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Other",
+      "cancerDomain": "Other",
+      "cancerType": "Other",
+      "stage": "",
+      "clinicalSetting": "metastatic first-line",
+      "treatmentModality": "chemotherapy",
+      "biomarker": [
+        "PD-L1"
+      ],
+      "evidenceType": "Biomarker principle",
+      "questionType": "biomarker",
+      "subtopic": "Other",
+      "trial": [],
+      "treatmentLine": "first-line",
+      "endpoint": [],
+      "toxicity": [],
+      "guidelineConcept": "Other",
+      "hashTags": [
+        "#Other",
+        "#metastaticfirstline",
+        "#chemotherapy",
+        "#Biomarkerprinciple",
+        "#biomarker",
+        "#PDL1"
+      ],
+      "examWeight": 2,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -759,7 +1905,36 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Lung",
+      "cancerDomain": "Lung",
+      "cancerType": "SCLC",
+      "stage": "localized",
+      "clinicalSetting": "adjuvant therapy",
+      "treatmentModality": "surgery",
+      "biomarker": [],
+      "evidenceType": "Golden trial",
+      "questionType": "exception/wrong statement",
+      "subtopic": "Adjuvant",
+      "trial": [],
+      "treatmentLine": "adjuvant",
+      "endpoint": [
+        "OS"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Adjuvant",
+      "hashTags": [
+        "#SCLC",
+        "#localized",
+        "#adjuvanttherapy",
+        "#surgery",
+        "#Goldentrial",
+        "#exceptionwrongstatement"
+      ],
+      "examWeight": 5,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -779,7 +1954,36 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Lung",
+      "cancerDomain": "Lung",
+      "cancerType": "Lung",
+      "stage": "palliative/supportive",
+      "clinicalSetting": "Lung",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "Lung",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Lung",
+      "hashTags": [
+        "#Lung",
+        "#palliativesupportive",
+        "#radiationtherapy",
+        "#Guidelineprinciple",
+        "#endpointrecognition"
+      ],
+      "examWeight": 5,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -799,7 +2003,37 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GU",
+      "cancerDomain": "GU",
+      "cancerType": "NSCLC",
+      "stage": "relapsed/refractory",
+      "clinicalSetting": "diagnosis/staging/risk",
+      "treatmentModality": "supportive care",
+      "biomarker": [],
+      "evidenceType": "Toxicity/supportive principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "GU",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "GU",
+      "hashTags": [
+        "#NSCLC",
+        "#relapsedrefractory",
+        "#diagnosisstagingrisk",
+        "#supportivecare",
+        "#Toxicitysupportiveprinciple",
+        "#endpointrecognition"
+      ],
+      "examWeight": 3,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -819,7 +2053,37 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Heme",
+      "cancerDomain": "Heme",
+      "cancerType": "Lymphoma",
+      "stage": "localized",
+      "clinicalSetting": "later-line/refractory",
+      "treatmentModality": "immunotherapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "toxicity",
+      "subtopic": "Toxicity",
+      "trial": [],
+      "treatmentLine": "later-line",
+      "endpoint": [
+        "OS",
+        "PFS"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Toxicity",
+      "hashTags": [
+        "#Lymphoma",
+        "#localized",
+        "#laterlinerefractory",
+        "#immunotherapy",
+        "#Guidelineprinciple",
+        "#toxicity"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -839,7 +2103,36 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Heme",
+      "cancerDomain": "Heme",
+      "cancerType": "CLL",
+      "stage": "metastatic",
+      "clinicalSetting": "toxicity/supportive care",
+      "treatmentModality": "immunotherapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "toxicity",
+      "subtopic": "Toxicity",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Toxicity",
+      "hashTags": [
+        "#CLL",
+        "#metastatic",
+        "#toxicitysupportivecare",
+        "#immunotherapy",
+        "#Guidelineprinciple",
+        "#toxicity"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -859,7 +2152,34 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Heme",
+      "cancerDomain": "Heme",
+      "cancerType": "ALL",
+      "stage": "",
+      "clinicalSetting": "Heme",
+      "treatmentModality": "",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "Heme",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Heme",
+      "hashTags": [
+        "#ALL",
+        "#Heme",
+        "#Guidelineprinciple",
+        "#endpointrecognition"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -879,7 +2199,38 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Heme",
+      "cancerDomain": "Heme",
+      "cancerType": "AML",
+      "stage": "metastatic",
+      "clinicalSetting": "diagnosis/staging/risk",
+      "treatmentModality": "immunotherapy",
+      "biomarker": [],
+      "evidenceType": "Guideline-only",
+      "questionType": "toxicity",
+      "subtopic": "Toxicity",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS"
+      ],
+      "toxicity": [
+        "ILD/pneumonitis"
+      ],
+      "guidelineConcept": "Toxicity",
+      "hashTags": [
+        "#AML",
+        "#metastatic",
+        "#diagnosisstagingrisk",
+        "#immunotherapy",
+        "#Guidelineonly",
+        "#toxicity"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -898,7 +2249,37 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Heme",
+      "cancerDomain": "Heme",
+      "cancerType": "CML",
+      "stage": "",
+      "clinicalSetting": "metastatic first-line",
+      "treatmentModality": "",
+      "biomarker": [
+        "NTRK/RET"
+      ],
+      "evidenceType": "Guideline principle",
+      "questionType": "exception/wrong statement",
+      "subtopic": "Trial interpretation",
+      "trial": [],
+      "treatmentLine": "first-line",
+      "endpoint": [
+        "OS"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Trial interpretation",
+      "hashTags": [
+        "#CML",
+        "#metastaticfirstline",
+        "#Guidelineprinciple",
+        "#exceptionwrongstatement",
+        "#NTRKRET"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -918,7 +2299,33 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Heme",
+      "cancerDomain": "Heme",
+      "cancerType": "Multiple myeloma",
+      "stage": "",
+      "clinicalSetting": "metastatic first-line",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "exception/wrong statement",
+      "subtopic": "Heme",
+      "trial": [],
+      "treatmentLine": "first-line",
+      "endpoint": [],
+      "toxicity": [],
+      "guidelineConcept": "Heme",
+      "hashTags": [
+        "#Multiplemyeloma",
+        "#metastaticfirstline",
+        "#radiationtherapy",
+        "#Guidelineprinciple",
+        "#exceptionwrongstatement"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -938,7 +2345,41 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Breast",
+      "cancerDomain": "Breast",
+      "cancerType": "Metastatic",
+      "stage": "metastatic",
+      "clinicalSetting": "biomarker/companion diagnostic",
+      "treatmentModality": "immunotherapy",
+      "biomarker": [
+        "HER2",
+        "MSI/dMMR",
+        "PD-L1",
+        "FGFR"
+      ],
+      "evidenceType": "Biomarker principle",
+      "questionType": "biomarker",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#Metastatic",
+        "#metastatic",
+        "#biomarkercompaniondiagnostic",
+        "#immunotherapy",
+        "#Biomarkerprinciple",
+        "#biomarker",
+        "#HER2",
+        "#MSIdMMR"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -958,7 +2399,40 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GI",
+      "cancerDomain": "GI",
+      "cancerType": "Gastric/GEJ cancer",
+      "stage": "metastatic",
+      "clinicalSetting": "biomarker/companion diagnostic",
+      "treatmentModality": "immunotherapy",
+      "biomarker": [
+        "HER2"
+      ],
+      "evidenceType": "Biomarker principle",
+      "questionType": "biomarker",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#GastricGEJcancer",
+        "#metastatic",
+        "#biomarkercompaniondiagnostic",
+        "#immunotherapy",
+        "#Biomarkerprinciple",
+        "#biomarker",
+        "#HER2"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -980,7 +2454,43 @@ export const questions112 = [
     ],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Heme",
+      "cancerDomain": "Heme",
+      "cancerType": "ALL",
+      "stage": "metastatic",
+      "clinicalSetting": "toxicity/supportive care",
+      "treatmentModality": "immunotherapy",
+      "biomarker": [
+        "HER2",
+        "PD-L1"
+      ],
+      "evidenceType": "Recognized trial",
+      "questionType": "toxicity",
+      "subtopic": "Metastatic",
+      "trial": [
+        "SPOTLIGHT"
+      ],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#ALL",
+        "#metastatic",
+        "#toxicitysupportivecare",
+        "#immunotherapy",
+        "#Recognizedtrial",
+        "#toxicity",
+        "#SPOTLIGHT",
+        "#HER2"
+      ],
+      "examWeight": 4,
+      "cardEligible": true,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1000,7 +2510,36 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Heme",
+      "cancerDomain": "Heme",
+      "cancerType": "ALL",
+      "stage": "localized",
+      "clinicalSetting": "neoadjuvant therapy",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [],
+      "evidenceType": "Golden trial",
+      "questionType": "endpoint recognition",
+      "subtopic": "Neoadjuvant",
+      "trial": [],
+      "treatmentLine": "adjuvant",
+      "endpoint": [
+        "OS"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Neoadjuvant",
+      "hashTags": [
+        "#ALL",
+        "#localized",
+        "#neoadjuvanttherapy",
+        "#radiationtherapy",
+        "#Goldentrial",
+        "#endpointrecognition"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1020,7 +2559,34 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GI",
+      "cancerDomain": "GI",
+      "cancerType": "GIST",
+      "stage": "metastatic",
+      "clinicalSetting": "adjuvant therapy",
+      "treatmentModality": "surgery",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "biomarker",
+      "subtopic": "Adjuvant",
+      "trial": [],
+      "treatmentLine": "adjuvant",
+      "endpoint": [],
+      "toxicity": [],
+      "guidelineConcept": "Adjuvant",
+      "hashTags": [
+        "#GIST",
+        "#metastatic",
+        "#adjuvanttherapy",
+        "#surgery",
+        "#Guidelineprinciple",
+        "#biomarker"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1040,7 +2606,38 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GI",
+      "cancerDomain": "GI",
+      "cancerType": "HCC",
+      "stage": "",
+      "clinicalSetting": "metastatic first-line",
+      "treatmentModality": "immunotherapy",
+      "biomarker": [
+        "MSI/dMMR",
+        "PD-L1"
+      ],
+      "evidenceType": "Guideline-only",
+      "questionType": "biomarker",
+      "subtopic": "Biomarker",
+      "trial": [],
+      "treatmentLine": "first-line",
+      "endpoint": [],
+      "toxicity": [],
+      "guidelineConcept": "Biomarker",
+      "hashTags": [
+        "#HCC",
+        "#metastaticfirstline",
+        "#immunotherapy",
+        "#Guidelineonly",
+        "#biomarker",
+        "#MSIdMMR",
+        "#PDL1"
+      ],
+      "examWeight": 5,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1060,7 +2657,37 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GI",
+      "cancerDomain": "GI",
+      "cancerType": "NSCLC",
+      "stage": "resectable",
+      "clinicalSetting": "localized curative intent",
+      "treatmentModality": "chemotherapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "Neoadjuvant",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Neoadjuvant",
+      "hashTags": [
+        "#NSCLC",
+        "#resectable",
+        "#localizedcurativeintent",
+        "#chemotherapy",
+        "#Guidelineprinciple",
+        "#endpointrecognition"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1080,7 +2707,40 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Heme",
+      "cancerDomain": "Heme",
+      "cancerType": "ALL",
+      "stage": "localized",
+      "clinicalSetting": "adjuvant therapy",
+      "treatmentModality": "surgery",
+      "biomarker": [
+        "MSI/dMMR"
+      ],
+      "evidenceType": "Golden trial",
+      "questionType": "exception/wrong statement",
+      "subtopic": "Adjuvant",
+      "trial": [],
+      "treatmentLine": "adjuvant",
+      "endpoint": [
+        "OS",
+        "DFS"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Adjuvant",
+      "hashTags": [
+        "#ALL",
+        "#localized",
+        "#adjuvanttherapy",
+        "#surgery",
+        "#Goldentrial",
+        "#exceptionwrongstatement",
+        "#MSIdMMR"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1100,7 +2760,40 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GI",
+      "cancerDomain": "GI",
+      "cancerType": "Biomarker",
+      "stage": "",
+      "clinicalSetting": "biomarker/companion diagnostic",
+      "treatmentModality": "immunotherapy",
+      "biomarker": [
+        "MSI/dMMR",
+        "PD-L1",
+        "BRAF"
+      ],
+      "evidenceType": "Biomarker principle",
+      "questionType": "biomarker",
+      "subtopic": "Biomarker",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [],
+      "toxicity": [],
+      "guidelineConcept": "Biomarker",
+      "hashTags": [
+        "#Biomarker",
+        "#biomarkercompaniondiagnostic",
+        "#immunotherapy",
+        "#Biomarkerprinciple",
+        "#biomarker",
+        "#MSIdMMR",
+        "#PDL1",
+        "#BRAF"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1120,7 +2813,40 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Heme",
+      "cancerDomain": "Heme",
+      "cancerType": "NSCLC",
+      "stage": "metastatic",
+      "clinicalSetting": "metastatic first-line",
+      "treatmentModality": "chemotherapy",
+      "biomarker": [
+        "HER2",
+        "MSI/dMMR",
+        "PD-L1"
+      ],
+      "evidenceType": "Guideline-only",
+      "questionType": "biomarker",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "first-line",
+      "endpoint": [],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#NSCLC",
+        "#metastatic",
+        "#metastaticfirstline",
+        "#chemotherapy",
+        "#Guidelineonly",
+        "#biomarker",
+        "#HER2",
+        "#MSIdMMR"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1140,7 +2866,37 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GI",
+      "cancerDomain": "GI",
+      "cancerType": "NSCLC",
+      "stage": "localized",
+      "clinicalSetting": "localized curative intent",
+      "treatmentModality": "surgery",
+      "biomarker": [],
+      "evidenceType": "Guideline-only",
+      "questionType": "exception/wrong statement",
+      "subtopic": "Neoadjuvant",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "DFS"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Neoadjuvant",
+      "hashTags": [
+        "#NSCLC",
+        "#localized",
+        "#localizedcurativeintent",
+        "#surgery",
+        "#Guidelineonly",
+        "#exceptionwrongstatement"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1160,7 +2916,39 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GI",
+      "cancerDomain": "GI",
+      "cancerType": "Adjuvant",
+      "stage": "resectable",
+      "clinicalSetting": "localized curative intent",
+      "treatmentModality": "surgery",
+      "biomarker": [
+        "MSI/dMMR",
+        "BRAF"
+      ],
+      "evidenceType": "Golden trial",
+      "questionType": "biomarker",
+      "subtopic": "Adjuvant",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [],
+      "toxicity": [],
+      "guidelineConcept": "Adjuvant",
+      "hashTags": [
+        "#Adjuvant",
+        "#resectable",
+        "#localizedcurativeintent",
+        "#surgery",
+        "#Goldentrial",
+        "#biomarker",
+        "#MSIdMMR",
+        "#BRAF"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1180,7 +2968,34 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Other",
+      "cancerDomain": "Other",
+      "cancerType": "Other",
+      "stage": "",
+      "clinicalSetting": "Other",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "exception/wrong statement",
+      "subtopic": "Other",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Other",
+      "hashTags": [
+        "#Other",
+        "#radiationtherapy",
+        "#Guidelineprinciple",
+        "#exceptionwrongstatement"
+      ],
+      "examWeight": 2,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1200,7 +3015,34 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Breast",
+      "cancerDomain": "Breast",
+      "cancerType": "Breast",
+      "stage": "",
+      "clinicalSetting": "Breast",
+      "treatmentModality": "chemotherapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "exception/wrong statement",
+      "subtopic": "Breast",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Breast",
+      "hashTags": [
+        "#Breast",
+        "#chemotherapy",
+        "#Guidelineprinciple",
+        "#exceptionwrongstatement"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1220,7 +3062,32 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Other",
+      "cancerDomain": "Other",
+      "cancerType": "Other",
+      "stage": "",
+      "clinicalSetting": "Other",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "standard of care",
+      "subtopic": "Other",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [],
+      "toxicity": [],
+      "guidelineConcept": "Other",
+      "hashTags": [
+        "#Other",
+        "#radiationtherapy",
+        "#Guidelineprinciple",
+        "#standardofcare"
+      ],
+      "examWeight": 2,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1239,7 +3106,31 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Other",
+      "cancerDomain": "Other",
+      "cancerType": "Other",
+      "stage": "",
+      "clinicalSetting": "Other",
+      "treatmentModality": "",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "standard of care",
+      "subtopic": "Other",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [],
+      "toxicity": [],
+      "guidelineConcept": "Other",
+      "hashTags": [
+        "#Other",
+        "#Guidelineprinciple",
+        "#standardofcare"
+      ],
+      "examWeight": 2,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1259,7 +3150,34 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Other",
+      "cancerDomain": "Other",
+      "cancerType": "Neoadjuvant",
+      "stage": "metastatic",
+      "clinicalSetting": "neoadjuvant therapy",
+      "treatmentModality": "surgery",
+      "biomarker": [],
+      "evidenceType": "Guideline-only",
+      "questionType": "exception/wrong statement",
+      "subtopic": "Neoadjuvant",
+      "trial": [],
+      "treatmentLine": "adjuvant",
+      "endpoint": [],
+      "toxicity": [],
+      "guidelineConcept": "Neoadjuvant",
+      "hashTags": [
+        "#Neoadjuvant",
+        "#metastatic",
+        "#neoadjuvanttherapy",
+        "#surgery",
+        "#Guidelineonly",
+        "#exceptionwrongstatement"
+      ],
+      "examWeight": 2,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1279,7 +3197,34 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GI",
+      "cancerDomain": "GI",
+      "cancerType": "Colorectal cancer",
+      "stage": "unresectable locally advanced",
+      "clinicalSetting": "neoadjuvant therapy",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [],
+      "evidenceType": "Negative trial",
+      "questionType": "exception/wrong statement",
+      "subtopic": "Neoadjuvant",
+      "trial": [],
+      "treatmentLine": "adjuvant",
+      "endpoint": [],
+      "toxicity": [],
+      "guidelineConcept": "Neoadjuvant",
+      "hashTags": [
+        "#Colorectalcancer",
+        "#unresectablelocallyadvanced",
+        "#neoadjuvanttherapy",
+        "#radiationtherapy",
+        "#Negativetrial",
+        "#exceptionwrongstatement"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1299,7 +3244,36 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Heme",
+      "cancerDomain": "Heme",
+      "cancerType": "Multiple myeloma",
+      "stage": "relapsed/refractory",
+      "clinicalSetting": "diagnosis/staging/risk",
+      "treatmentModality": "",
+      "biomarker": [
+        "NTRK/RET"
+      ],
+      "evidenceType": "Guideline principle",
+      "questionType": "exception/wrong statement",
+      "subtopic": "Trial interpretation",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [],
+      "toxicity": [],
+      "guidelineConcept": "Trial interpretation",
+      "hashTags": [
+        "#Multiplemyeloma",
+        "#relapsedrefractory",
+        "#diagnosisstagingrisk",
+        "#Guidelineprinciple",
+        "#exceptionwrongstatement",
+        "#NTRKRET"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1319,7 +3293,35 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Heme",
+      "cancerDomain": "Heme",
+      "cancerType": "ALL",
+      "stage": "",
+      "clinicalSetting": "adjuvant therapy",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [],
+      "evidenceType": "Golden trial",
+      "questionType": "exception/wrong statement",
+      "subtopic": "Adjuvant",
+      "trial": [],
+      "treatmentLine": "adjuvant",
+      "endpoint": [
+        "OS"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Adjuvant",
+      "hashTags": [
+        "#ALL",
+        "#adjuvanttherapy",
+        "#radiationtherapy",
+        "#Goldentrial",
+        "#exceptionwrongstatement"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1339,7 +3341,35 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Other",
+      "cancerDomain": "Other",
+      "cancerType": "Precision oncology",
+      "stage": "",
+      "clinicalSetting": "Trial interpretation",
+      "treatmentModality": "",
+      "biomarker": [
+        "NTRK/RET"
+      ],
+      "evidenceType": "Guideline principle",
+      "questionType": "exception/wrong statement",
+      "subtopic": "Trial interpretation",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [],
+      "toxicity": [],
+      "guidelineConcept": "Trial interpretation",
+      "hashTags": [
+        "#Precisiononcology",
+        "#Trialinterpretation",
+        "#Guidelineprinciple",
+        "#exceptionwrongstatement",
+        "#NTRKRET"
+      ],
+      "examWeight": 5,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1359,7 +3389,41 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Other",
+      "cancerDomain": "Other",
+      "cancerType": "Precision oncology",
+      "stage": "",
+      "clinicalSetting": "biomarker/companion diagnostic",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [
+        "EGFR",
+        "ALK",
+        "HER2",
+        "BRAF"
+      ],
+      "evidenceType": "Guideline-only",
+      "questionType": "biomarker",
+      "subtopic": "Biomarker",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [],
+      "toxicity": [],
+      "guidelineConcept": "Biomarker",
+      "hashTags": [
+        "#Precisiononcology",
+        "#biomarkercompaniondiagnostic",
+        "#radiationtherapy",
+        "#Guidelineonly",
+        "#biomarker",
+        "#EGFR",
+        "#ALK",
+        "#HER2"
+      ],
+      "examWeight": 5,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1381,7 +3445,43 @@ export const questions112 = [
     ],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Breast",
+      "cancerDomain": "Breast",
+      "cancerType": "TNBC",
+      "stage": "metastatic",
+      "clinicalSetting": "adjuvant therapy",
+      "treatmentModality": "surgery",
+      "biomarker": [
+        "BRCA/HRD"
+      ],
+      "evidenceType": "Recognized trial",
+      "questionType": "biomarker",
+      "subtopic": "Adjuvant",
+      "trial": [
+        "OlympiA"
+      ],
+      "treatmentLine": "adjuvant",
+      "endpoint": [
+        "OS",
+        "EFS"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Adjuvant",
+      "hashTags": [
+        "#TNBC",
+        "#metastatic",
+        "#adjuvanttherapy",
+        "#surgery",
+        "#Recognizedtrial",
+        "#biomarker",
+        "#OlympiA",
+        "#BRCAHRD"
+      ],
+      "examWeight": 4,
+      "cardEligible": true,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1401,7 +3501,34 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GU",
+      "cancerDomain": "GU",
+      "cancerType": "Renal cell carcinoma",
+      "stage": "",
+      "clinicalSetting": "GU",
+      "treatmentModality": "",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "exception/wrong statement",
+      "subtopic": "GU",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "GU",
+      "hashTags": [
+        "#Renalcellcarcinoma",
+        "#GU",
+        "#Guidelineprinciple",
+        "#exceptionwrongstatement"
+      ],
+      "examWeight": 3,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1421,7 +3548,37 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Breast",
+      "cancerDomain": "Breast",
+      "cancerType": "HR+/HER2- breast cancer",
+      "stage": "metastatic",
+      "clinicalSetting": "later-line/refractory",
+      "treatmentModality": "chemotherapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "later-line",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#HRHER2breastcancer",
+        "#metastatic",
+        "#laterlinerefractory",
+        "#chemotherapy",
+        "#Guidelineprinciple",
+        "#endpointrecognition"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1443,7 +3600,44 @@ export const questions112 = [
     ],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GU",
+      "cancerDomain": "GU",
+      "cancerType": "Prostate cancer",
+      "stage": "palliative/supportive",
+      "clinicalSetting": "Trial interpretation",
+      "treatmentModality": "endocrine therapy",
+      "biomarker": [
+        "NTRK/RET",
+        "PSMA"
+      ],
+      "evidenceType": "Golden trial",
+      "questionType": "endpoint recognition",
+      "subtopic": "Trial interpretation",
+      "trial": [
+        "vision"
+      ],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Trial interpretation",
+      "hashTags": [
+        "#Prostatecancer",
+        "#palliativesupportive",
+        "#Trialinterpretation",
+        "#endocrinetherapy",
+        "#Goldentrial",
+        "#endpointrecognition",
+        "#vision",
+        "#NTRKRET"
+      ],
+      "examWeight": 3,
+      "cardEligible": true,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1463,7 +3657,37 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Head & Neck",
+      "cancerDomain": "Head & Neck",
+      "cancerType": "Nasopharyngeal carcinoma",
+      "stage": "unresectable locally advanced",
+      "clinicalSetting": "adjuvant therapy",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "Adjuvant",
+      "trial": [],
+      "treatmentLine": "adjuvant",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Adjuvant",
+      "hashTags": [
+        "#Nasopharyngealcarcinoma",
+        "#unresectablelocallyadvanced",
+        "#adjuvanttherapy",
+        "#radiationtherapy",
+        "#Guidelineprinciple",
+        "#endpointrecognition"
+      ],
+      "examWeight": 3,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1483,7 +3707,40 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Head & Neck",
+      "cancerDomain": "Head & Neck",
+      "cancerType": "ALL",
+      "stage": "metastatic",
+      "clinicalSetting": "metastatic first-line",
+      "treatmentModality": "immunotherapy",
+      "biomarker": [
+        "PD-L1"
+      ],
+      "evidenceType": "Biomarker principle",
+      "questionType": "biomarker",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "first-line",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#ALL",
+        "#metastatic",
+        "#metastaticfirstline",
+        "#immunotherapy",
+        "#Biomarkerprinciple",
+        "#biomarker",
+        "#PDL1"
+      ],
+      "examWeight": 3,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1503,7 +3760,40 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Breast",
+      "cancerDomain": "Breast",
+      "cancerType": "Metastatic",
+      "stage": "metastatic",
+      "clinicalSetting": "metastatic first-line",
+      "treatmentModality": "targeted therapy",
+      "biomarker": [
+        "BRCA/HRD"
+      ],
+      "evidenceType": "Biomarker principle",
+      "questionType": "biomarker",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "first-line",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#Metastatic",
+        "#metastatic",
+        "#metastaticfirstline",
+        "#targetedtherapy",
+        "#Biomarkerprinciple",
+        "#biomarker",
+        "#BRCAHRD"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1523,7 +3813,37 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Breast",
+      "cancerDomain": "Breast",
+      "cancerType": "Adjuvant",
+      "stage": "metastatic",
+      "clinicalSetting": "adjuvant therapy",
+      "treatmentModality": "surgery",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "Adjuvant",
+      "trial": [],
+      "treatmentLine": "adjuvant",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Adjuvant",
+      "hashTags": [
+        "#Adjuvant",
+        "#metastatic",
+        "#adjuvanttherapy",
+        "#surgery",
+        "#Guidelineprinciple",
+        "#endpointrecognition"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1543,7 +3863,41 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Supportive/Stats",
+      "cancerDomain": "Supportive/Stats",
+      "cancerType": "Supportive care",
+      "stage": "palliative/supportive",
+      "clinicalSetting": "toxicity/supportive care",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [
+        "NTRK/RET"
+      ],
+      "evidenceType": "Guideline-only",
+      "questionType": "toxicity",
+      "subtopic": "Toxicity",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "PFS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Toxicity",
+      "hashTags": [
+        "#Supportivecare",
+        "#palliativesupportive",
+        "#toxicitysupportivecare",
+        "#radiationtherapy",
+        "#Guidelineonly",
+        "#toxicity",
+        "#NTRKRET"
+      ],
+      "examWeight": 5,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1563,7 +3917,37 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Melanoma/Sarcoma",
+      "cancerDomain": "Melanoma/Sarcoma",
+      "cancerType": "Melanoma",
+      "stage": "metastatic",
+      "clinicalSetting": "Metastatic",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#Melanoma",
+        "#metastatic",
+        "#Metastatic",
+        "#radiationtherapy",
+        "#Guidelineprinciple",
+        "#endpointrecognition"
+      ],
+      "examWeight": 2,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1583,7 +3967,37 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Lung",
+      "cancerDomain": "Lung",
+      "cancerType": "Mesothelioma",
+      "stage": "metastatic",
+      "clinicalSetting": "Metastatic",
+      "treatmentModality": "endocrine therapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#Mesothelioma",
+        "#metastatic",
+        "#Metastatic",
+        "#endocrinetherapy",
+        "#Guidelineprinciple",
+        "#endpointrecognition"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1606,7 +4020,42 @@ export const questions112 = [
     ],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GU",
+      "cancerDomain": "GU",
+      "cancerType": "Renal cell carcinoma",
+      "stage": "unresectable locally advanced",
+      "clinicalSetting": "adjuvant therapy",
+      "treatmentModality": "immunotherapy",
+      "biomarker": [],
+      "evidenceType": "Golden trial",
+      "questionType": "endpoint recognition",
+      "subtopic": "Adjuvant",
+      "trial": [
+        "CheckMate-914",
+        "Keynote-564"
+      ],
+      "treatmentLine": "adjuvant",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Adjuvant",
+      "hashTags": [
+        "#Renalcellcarcinoma",
+        "#unresectablelocallyadvanced",
+        "#adjuvanttherapy",
+        "#immunotherapy",
+        "#Goldentrial",
+        "#endpointrecognition",
+        "#CheckMate914",
+        "#Keynote564"
+      ],
+      "examWeight": 3,
+      "cardEligible": true,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1630,7 +4079,45 @@ export const questions112 = [
     ],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GU",
+      "cancerDomain": "GU",
+      "cancerType": "Urothelial cancer",
+      "stage": "metastatic",
+      "clinicalSetting": "biomarker/companion diagnostic",
+      "treatmentModality": "chemotherapy",
+      "biomarker": [
+        "PD-L1"
+      ],
+      "evidenceType": "Golden trial",
+      "questionType": "biomarker",
+      "subtopic": "Metastatic",
+      "trial": [
+        "CheckMate-274",
+        "CheckMate-901",
+        "Javelin"
+      ],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#Urothelialcancer",
+        "#metastatic",
+        "#biomarkercompaniondiagnostic",
+        "#chemotherapy",
+        "#Goldentrial",
+        "#biomarker",
+        "#CheckMate274",
+        "#CheckMate901"
+      ],
+      "examWeight": 3,
+      "cardEligible": true,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1650,7 +4137,37 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GU",
+      "cancerDomain": "GU",
+      "cancerType": "Renal cell carcinoma",
+      "stage": "metastatic",
+      "clinicalSetting": "Metastatic",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#Renalcellcarcinoma",
+        "#metastatic",
+        "#Metastatic",
+        "#radiationtherapy",
+        "#Guidelineprinciple",
+        "#endpointrecognition"
+      ],
+      "examWeight": 3,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1670,7 +4187,37 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GU",
+      "cancerDomain": "GU",
+      "cancerType": "Prostate cancer",
+      "stage": "metastatic",
+      "clinicalSetting": "Metastatic",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#Prostatecancer",
+        "#metastatic",
+        "#Metastatic",
+        "#radiationtherapy",
+        "#Guidelineprinciple",
+        "#endpointrecognition"
+      ],
+      "examWeight": 3,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1690,7 +4237,37 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GU",
+      "cancerDomain": "GU",
+      "cancerType": "Prostate cancer",
+      "stage": "metastatic",
+      "clinicalSetting": "biomarker/companion diagnostic",
+      "treatmentModality": "targeted therapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "biomarker",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#Prostatecancer",
+        "#metastatic",
+        "#biomarkercompaniondiagnostic",
+        "#targetedtherapy",
+        "#Guidelineprinciple",
+        "#biomarker"
+      ],
+      "examWeight": 3,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1710,7 +4287,35 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Heme",
+      "cancerDomain": "Heme",
+      "cancerType": "ALL",
+      "stage": "",
+      "clinicalSetting": "biomarker/companion diagnostic",
+      "treatmentModality": "",
+      "biomarker": [],
+      "evidenceType": "Biomarker principle",
+      "questionType": "biomarker",
+      "subtopic": "Biomarker",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Biomarker",
+      "hashTags": [
+        "#ALL",
+        "#biomarkercompaniondiagnostic",
+        "#Biomarkerprinciple",
+        "#biomarker"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1730,7 +4335,39 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Lung",
+      "cancerDomain": "Lung",
+      "cancerType": "NSCLC",
+      "stage": "",
+      "clinicalSetting": "toxicity/supportive care",
+      "treatmentModality": "immunotherapy",
+      "biomarker": [
+        "ALK"
+      ],
+      "evidenceType": "Biomarker principle",
+      "questionType": "toxicity",
+      "subtopic": "Toxicity",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Toxicity",
+      "hashTags": [
+        "#NSCLC",
+        "#toxicitysupportivecare",
+        "#immunotherapy",
+        "#Biomarkerprinciple",
+        "#toxicity",
+        "#ALK"
+      ],
+      "examWeight": 5,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1750,7 +4387,40 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Lung",
+      "cancerDomain": "Lung",
+      "cancerType": "Mesothelioma",
+      "stage": "resectable",
+      "clinicalSetting": "localized curative intent",
+      "treatmentModality": "chemotherapy",
+      "biomarker": [
+        "NTRK/RET"
+      ],
+      "evidenceType": "Guideline principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "Trial interpretation",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Trial interpretation",
+      "hashTags": [
+        "#Mesothelioma",
+        "#resectable",
+        "#localizedcurativeintent",
+        "#chemotherapy",
+        "#Guidelineprinciple",
+        "#endpointrecognition",
+        "#NTRKRET"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1770,7 +4440,37 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Lung",
+      "cancerDomain": "Lung",
+      "cancerType": "Thymic malignancy",
+      "stage": "resectable",
+      "clinicalSetting": "localized curative intent",
+      "treatmentModality": "surgery",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "toxicity",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#Thymicmalignancy",
+        "#resectable",
+        "#localizedcurativeintent",
+        "#surgery",
+        "#Guidelineprinciple",
+        "#toxicity"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1790,7 +4490,36 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Heme",
+      "cancerDomain": "Heme",
+      "cancerType": "ALL",
+      "stage": "",
+      "clinicalSetting": "toxicity/supportive care",
+      "treatmentModality": "immunotherapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "toxicity",
+      "subtopic": "Toxicity",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Toxicity",
+      "hashTags": [
+        "#ALL",
+        "#toxicitysupportivecare",
+        "#immunotherapy",
+        "#Guidelineprinciple",
+        "#toxicity"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1810,7 +4539,37 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GYN",
+      "cancerDomain": "GYN",
+      "cancerType": "Ovarian cancer",
+      "stage": "localized",
+      "clinicalSetting": "diagnosis/staging/risk",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "GYN",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "GYN",
+      "hashTags": [
+        "#Ovariancancer",
+        "#localized",
+        "#diagnosisstagingrisk",
+        "#radiationtherapy",
+        "#Guidelineprinciple",
+        "#endpointrecognition"
+      ],
+      "examWeight": 2,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1830,7 +4589,36 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Lung",
+      "cancerDomain": "Lung",
+      "cancerType": "ALL",
+      "stage": "",
+      "clinicalSetting": "Lung",
+      "treatmentModality": "immunotherapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "Lung",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Lung",
+      "hashTags": [
+        "#ALL",
+        "#Lung",
+        "#immunotherapy",
+        "#Guidelineprinciple",
+        "#endpointrecognition"
+      ],
+      "examWeight": 5,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1853,7 +4641,44 @@ export const questions112 = [
     ],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Heme",
+      "cancerDomain": "Heme",
+      "cancerType": "ALL",
+      "stage": "metastatic",
+      "clinicalSetting": "later-line/refractory",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [
+        "PD-L1"
+      ],
+      "evidenceType": "Recognized trial",
+      "questionType": "biomarker",
+      "subtopic": "Heme",
+      "trial": [
+        "CheckMate-205",
+        "KEYNOTE-087"
+      ],
+      "treatmentLine": "later-line",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Heme",
+      "hashTags": [
+        "#ALL",
+        "#metastatic",
+        "#laterlinerefractory",
+        "#radiationtherapy",
+        "#Recognizedtrial",
+        "#biomarker",
+        "#CheckMate205",
+        "#KEYNOTE087"
+      ],
+      "examWeight": 4,
+      "cardEligible": true,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1873,7 +4698,37 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Heme",
+      "cancerDomain": "Heme",
+      "cancerType": "ALL",
+      "stage": "",
+      "clinicalSetting": "toxicity/supportive care",
+      "treatmentModality": "chemotherapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "toxicity",
+      "subtopic": "Toxicity",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "PFS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Toxicity",
+      "hashTags": [
+        "#ALL",
+        "#toxicitysupportivecare",
+        "#chemotherapy",
+        "#Guidelineprinciple",
+        "#toxicity"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1893,7 +4748,35 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GI",
+      "cancerDomain": "GI",
+      "cancerType": "Gastric/GEJ cancer",
+      "stage": "",
+      "clinicalSetting": "biomarker/companion diagnostic",
+      "treatmentModality": "",
+      "biomarker": [],
+      "evidenceType": "Biomarker principle",
+      "questionType": "biomarker",
+      "subtopic": "Biomarker",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Biomarker",
+      "hashTags": [
+        "#GastricGEJcancer",
+        "#biomarkercompaniondiagnostic",
+        "#Biomarkerprinciple",
+        "#biomarker"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1917,7 +4800,45 @@ export const questions112 = [
     ],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Heme",
+      "cancerDomain": "Heme",
+      "cancerType": "ALL",
+      "stage": "",
+      "clinicalSetting": "neoadjuvant therapy",
+      "treatmentModality": "surgery",
+      "biomarker": [
+        "PD-L1"
+      ],
+      "evidenceType": "Golden trial",
+      "questionType": "endpoint recognition",
+      "subtopic": "Neoadjuvant",
+      "trial": [
+        "CheckMate-577",
+        "CheckMate-648",
+        "KEYNOTE-590"
+      ],
+      "treatmentLine": "adjuvant",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Neoadjuvant",
+      "hashTags": [
+        "#ALL",
+        "#neoadjuvanttherapy",
+        "#surgery",
+        "#Goldentrial",
+        "#endpointrecognition",
+        "#CheckMate577",
+        "#CheckMate648",
+        "#KEYNOTE590"
+      ],
+      "examWeight": 4,
+      "cardEligible": true,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1937,7 +4858,37 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GI",
+      "cancerDomain": "GI",
+      "cancerType": "Esophageal cancer",
+      "stage": "metastatic",
+      "clinicalSetting": "diagnosis/staging/risk",
+      "treatmentModality": "surgery",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "Neoadjuvant",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Neoadjuvant",
+      "hashTags": [
+        "#Esophagealcancer",
+        "#metastatic",
+        "#diagnosisstagingrisk",
+        "#surgery",
+        "#Guidelineprinciple",
+        "#endpointrecognition"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1957,7 +4908,36 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GI",
+      "cancerDomain": "GI",
+      "cancerType": "GI",
+      "stage": "",
+      "clinicalSetting": "metastatic first-line",
+      "treatmentModality": "endocrine therapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "GI",
+      "trial": [],
+      "treatmentLine": "first-line",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "GI",
+      "hashTags": [
+        "#GI",
+        "#metastaticfirstline",
+        "#endocrinetherapy",
+        "#Guidelineprinciple",
+        "#endpointrecognition"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1977,7 +4957,38 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GI",
+      "cancerDomain": "GI",
+      "cancerType": "GIST",
+      "stage": "metastatic",
+      "clinicalSetting": "biomarker/companion diagnostic",
+      "treatmentModality": "",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "biomarker",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [
+        "ILD/pneumonitis"
+      ],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#GIST",
+        "#metastatic",
+        "#biomarkercompaniondiagnostic",
+        "#Guidelineprinciple",
+        "#biomarker"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -1997,7 +5008,40 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GI",
+      "cancerDomain": "GI",
+      "cancerType": "Biliary tract cancer",
+      "stage": "metastatic",
+      "clinicalSetting": "neoadjuvant therapy",
+      "treatmentModality": "surgery",
+      "biomarker": [
+        "NTRK/RET"
+      ],
+      "evidenceType": "Guideline principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "Neoadjuvant",
+      "trial": [],
+      "treatmentLine": "adjuvant",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Neoadjuvant",
+      "hashTags": [
+        "#Biliarytractcancer",
+        "#metastatic",
+        "#neoadjuvanttherapy",
+        "#surgery",
+        "#Guidelineprinciple",
+        "#endpointrecognition",
+        "#NTRKRET"
+      ],
+      "examWeight": 5,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -2017,7 +5061,42 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Other",
+      "cancerDomain": "Other",
+      "cancerType": "Precision oncology",
+      "stage": "metastatic",
+      "clinicalSetting": "metastatic first-line",
+      "treatmentModality": "chemotherapy",
+      "biomarker": [
+        "KRAS",
+        "BRCA/HRD"
+      ],
+      "evidenceType": "Biomarker principle",
+      "questionType": "biomarker",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "first-line",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#Precisiononcology",
+        "#metastatic",
+        "#metastaticfirstline",
+        "#chemotherapy",
+        "#Biomarkerprinciple",
+        "#biomarker",
+        "#KRAS",
+        "#BRCAHRD"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -2037,7 +5116,40 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Heme",
+      "cancerDomain": "Heme",
+      "cancerType": "ALL",
+      "stage": "metastatic",
+      "clinicalSetting": "neoadjuvant therapy",
+      "treatmentModality": "surgery",
+      "biomarker": [
+        "FGFR"
+      ],
+      "evidenceType": "Guideline principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "Neoadjuvant",
+      "trial": [],
+      "treatmentLine": "adjuvant",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Neoadjuvant",
+      "hashTags": [
+        "#ALL",
+        "#metastatic",
+        "#neoadjuvanttherapy",
+        "#surgery",
+        "#Guidelineprinciple",
+        "#endpointrecognition",
+        "#FGFR"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -2057,7 +5169,37 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Heme",
+      "cancerDomain": "Heme",
+      "cancerType": "ALL",
+      "stage": "metastatic",
+      "clinicalSetting": "metastatic first-line",
+      "treatmentModality": "chemotherapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "first-line",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#ALL",
+        "#metastatic",
+        "#metastaticfirstline",
+        "#chemotherapy",
+        "#Guidelineprinciple",
+        "#endpointrecognition"
+      ],
+      "examWeight": 5,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -2077,7 +5219,41 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GI",
+      "cancerDomain": "GI",
+      "cancerType": "Metastatic",
+      "stage": "metastatic",
+      "clinicalSetting": "later-line/refractory",
+      "treatmentModality": "targeted therapy",
+      "biomarker": [
+        "FGFR"
+      ],
+      "evidenceType": "Guideline-only",
+      "questionType": "toxicity",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "later-line",
+      "endpoint": [
+        "OS",
+        "PFS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#Metastatic",
+        "#metastatic",
+        "#laterlinerefractory",
+        "#targetedtherapy",
+        "#Guidelineonly",
+        "#toxicity",
+        "#FGFR"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -2097,7 +5273,40 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GI",
+      "cancerDomain": "GI",
+      "cancerType": "Neoadjuvant",
+      "stage": "resectable",
+      "clinicalSetting": "localized curative intent",
+      "treatmentModality": "surgery",
+      "biomarker": [
+        "BRAF"
+      ],
+      "evidenceType": "Guideline principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "Neoadjuvant",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Neoadjuvant",
+      "hashTags": [
+        "#Neoadjuvant",
+        "#resectable",
+        "#localizedcurativeintent",
+        "#surgery",
+        "#Guidelineprinciple",
+        "#endpointrecognition",
+        "#BRAF"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -2117,7 +5326,43 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Breast",
+      "cancerDomain": "Breast",
+      "cancerType": "NSCLC",
+      "stage": "resectable",
+      "clinicalSetting": "localized curative intent",
+      "treatmentModality": "surgery",
+      "biomarker": [
+        "KRAS",
+        "HER2",
+        "BRAF"
+      ],
+      "evidenceType": "Guideline-only",
+      "questionType": "biomarker",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#NSCLC",
+        "#resectable",
+        "#localizedcurativeintent",
+        "#surgery",
+        "#Guidelineonly",
+        "#biomarker",
+        "#KRAS",
+        "#HER2"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -2137,7 +5382,40 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GI",
+      "cancerDomain": "GI",
+      "cancerType": "NSCLC",
+      "stage": "localized",
+      "clinicalSetting": "localized curative intent",
+      "treatmentModality": "surgery",
+      "biomarker": [
+        "BRAF"
+      ],
+      "evidenceType": "Guideline principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#NSCLC",
+        "#localized",
+        "#localizedcurativeintent",
+        "#surgery",
+        "#Guidelineprinciple",
+        "#endpointrecognition",
+        "#BRAF"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -2157,7 +5435,35 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GI",
+      "cancerDomain": "GI",
+      "cancerType": "GI",
+      "stage": "",
+      "clinicalSetting": "GI",
+      "treatmentModality": "immunotherapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "GI",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "GI",
+      "hashTags": [
+        "#GI",
+        "#immunotherapy",
+        "#Guidelineprinciple",
+        "#endpointrecognition"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -2177,7 +5483,37 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Supportive/Stats",
+      "cancerDomain": "Supportive/Stats",
+      "cancerType": "Supportive care",
+      "stage": "palliative/supportive",
+      "clinicalSetting": "toxicity/supportive care",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [],
+      "evidenceType": "Guideline-only",
+      "questionType": "endpoint recognition",
+      "subtopic": "Other",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Other",
+      "hashTags": [
+        "#Supportivecare",
+        "#palliativesupportive",
+        "#toxicitysupportivecare",
+        "#radiationtherapy",
+        "#Guidelineonly",
+        "#endpointrecognition"
+      ],
+      "examWeight": 2,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -2197,7 +5533,37 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Other",
+      "cancerDomain": "Other",
+      "cancerType": "Other",
+      "stage": "",
+      "clinicalSetting": "Other",
+      "treatmentModality": "chemotherapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "Other",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [
+        "cytopenia"
+      ],
+      "guidelineConcept": "Other",
+      "hashTags": [
+        "#Other",
+        "#chemotherapy",
+        "#Guidelineprinciple",
+        "#endpointrecognition"
+      ],
+      "examWeight": 2,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -2217,7 +5583,37 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Lung",
+      "cancerDomain": "Lung",
+      "cancerType": "Adjuvant",
+      "stage": "metastatic",
+      "clinicalSetting": "adjuvant therapy",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "Adjuvant",
+      "trial": [],
+      "treatmentLine": "adjuvant",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Adjuvant",
+      "hashTags": [
+        "#Adjuvant",
+        "#metastatic",
+        "#adjuvanttherapy",
+        "#radiationtherapy",
+        "#Guidelineprinciple",
+        "#endpointrecognition"
+      ],
+      "examWeight": 5,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -2237,7 +5633,37 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Heme",
+      "cancerDomain": "Heme",
+      "cancerType": "Lymphoma",
+      "stage": "localized",
+      "clinicalSetting": "localized curative intent",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "Radiation/CCRT",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Radiation/CCRT",
+      "hashTags": [
+        "#Lymphoma",
+        "#localized",
+        "#localizedcurativeintent",
+        "#radiationtherapy",
+        "#Guidelineprinciple",
+        "#endpointrecognition"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -2257,7 +5683,35 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GI",
+      "cancerDomain": "GI",
+      "cancerType": "Radiation/CCRT",
+      "stage": "",
+      "clinicalSetting": "Radiation/CCRT",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "Radiation/CCRT",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Radiation/CCRT",
+      "hashTags": [
+        "#RadiationCCRT",
+        "#radiationtherapy",
+        "#Guidelineprinciple",
+        "#endpointrecognition"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -2277,7 +5731,37 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Supportive/Stats",
+      "cancerDomain": "Supportive/Stats",
+      "cancerType": "Biomarker",
+      "stage": "palliative/supportive",
+      "clinicalSetting": "biomarker/companion diagnostic",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [],
+      "evidenceType": "Biomarker principle",
+      "questionType": "biomarker",
+      "subtopic": "Biomarker",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Biomarker",
+      "hashTags": [
+        "#Biomarker",
+        "#palliativesupportive",
+        "#biomarkercompaniondiagnostic",
+        "#radiationtherapy",
+        "#Biomarkerprinciple",
+        "#biomarker"
+      ],
+      "examWeight": 2,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -2297,7 +5781,40 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Breast",
+      "cancerDomain": "Breast",
+      "cancerType": "Metastatic breast cancer",
+      "stage": "metastatic",
+      "clinicalSetting": "biomarker/companion diagnostic",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [
+        "HER2"
+      ],
+      "evidenceType": "Biomarker principle",
+      "questionType": "biomarker",
+      "subtopic": "Metastatic",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Metastatic",
+      "hashTags": [
+        "#Metastaticbreastcancer",
+        "#metastatic",
+        "#biomarkercompaniondiagnostic",
+        "#radiationtherapy",
+        "#Biomarkerprinciple",
+        "#biomarker",
+        "#HER2"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -2317,7 +5834,43 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Lung",
+      "cancerDomain": "Lung",
+      "cancerType": "NSCLC",
+      "stage": "",
+      "clinicalSetting": "biomarker/companion diagnostic",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [
+        "EGFR",
+        "KRAS",
+        "NTRK/RET"
+      ],
+      "evidenceType": "Biomarker principle",
+      "questionType": "biomarker",
+      "subtopic": "Biomarker",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Biomarker",
+      "hashTags": [
+        "#NSCLC",
+        "#biomarkercompaniondiagnostic",
+        "#radiationtherapy",
+        "#Biomarkerprinciple",
+        "#biomarker",
+        "#EGFR",
+        "#KRAS",
+        "#NTRKRET"
+      ],
+      "examWeight": 5,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -2337,7 +5890,42 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Breast",
+      "cancerDomain": "Breast",
+      "cancerType": "Toxicity",
+      "stage": "metastatic",
+      "clinicalSetting": "toxicity/supportive care",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [
+        "HER2",
+        "Nectin-4"
+      ],
+      "evidenceType": "Biomarker principle",
+      "questionType": "toxicity",
+      "subtopic": "Toxicity",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Toxicity",
+      "hashTags": [
+        "#Toxicity",
+        "#metastatic",
+        "#toxicitysupportivecare",
+        "#radiationtherapy",
+        "#Biomarkerprinciple",
+        "#toxicity",
+        "#HER2",
+        "#Nectin4"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -2357,7 +5945,41 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Heme",
+      "cancerDomain": "Heme",
+      "cancerType": "ALL",
+      "stage": "",
+      "clinicalSetting": "toxicity/supportive care",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [
+        "PD-L1"
+      ],
+      "evidenceType": "Biomarker principle",
+      "questionType": "toxicity",
+      "subtopic": "Biomarker",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [
+        "ILD/pneumonitis"
+      ],
+      "guidelineConcept": "Biomarker",
+      "hashTags": [
+        "#ALL",
+        "#toxicitysupportivecare",
+        "#radiationtherapy",
+        "#Biomarkerprinciple",
+        "#toxicity",
+        "#PDL1"
+      ],
+      "examWeight": 4,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -2377,7 +5999,37 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Supportive/Stats",
+      "cancerDomain": "Supportive/Stats",
+      "cancerType": "Toxicity",
+      "stage": "palliative/supportive",
+      "clinicalSetting": "toxicity/supportive care",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "toxicity",
+      "subtopic": "Toxicity",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Toxicity",
+      "hashTags": [
+        "#Toxicity",
+        "#palliativesupportive",
+        "#toxicitysupportivecare",
+        "#radiationtherapy",
+        "#Guidelineprinciple",
+        "#toxicity"
+      ],
+      "examWeight": 2,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -2397,7 +6049,41 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GI",
+      "cancerDomain": "GI",
+      "cancerType": "NSCLC",
+      "stage": "",
+      "clinicalSetting": "biomarker/companion diagnostic",
+      "treatmentModality": "radiation therapy",
+      "biomarker": [
+        "EGFR",
+        "KRAS"
+      ],
+      "evidenceType": "Biomarker principle",
+      "questionType": "biomarker",
+      "subtopic": "Biomarker",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Biomarker",
+      "hashTags": [
+        "#NSCLC",
+        "#biomarkercompaniondiagnostic",
+        "#radiationtherapy",
+        "#Biomarkerprinciple",
+        "#biomarker",
+        "#EGFR",
+        "#KRAS"
+      ],
+      "examWeight": 5,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -2417,7 +6103,40 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "GYN",
+      "cancerDomain": "GYN",
+      "cancerType": "Ovarian cancer",
+      "stage": "",
+      "clinicalSetting": "biomarker/companion diagnostic",
+      "treatmentModality": "",
+      "biomarker": [
+        "BRCA/HRD",
+        "NTRK/RET"
+      ],
+      "evidenceType": "Biomarker principle",
+      "questionType": "biomarker",
+      "subtopic": "Biomarker",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Biomarker",
+      "hashTags": [
+        "#Ovariancancer",
+        "#biomarkercompaniondiagnostic",
+        "#Biomarkerprinciple",
+        "#biomarker",
+        "#BRCAHRD",
+        "#NTRKRET"
+      ],
+      "examWeight": 5,
+      "cardEligible": false,
+      "raw": []
+    }
   },
   {
     "year": 112,
@@ -2437,6 +6156,34 @@ export const questions112 = [
     "trials": [],
     "answer": null,
     "explanation": "",
-    "tags": []
+    "tags": {
+      "domain": "Other",
+      "cancerDomain": "Other",
+      "cancerType": "Other",
+      "stage": "",
+      "clinicalSetting": "diagnosis/staging/risk",
+      "treatmentModality": "",
+      "biomarker": [],
+      "evidenceType": "Guideline principle",
+      "questionType": "endpoint recognition",
+      "subtopic": "Other",
+      "trial": [],
+      "treatmentLine": "",
+      "endpoint": [
+        "OS",
+        "ORR"
+      ],
+      "toxicity": [],
+      "guidelineConcept": "Other",
+      "hashTags": [
+        "#Other",
+        "#diagnosisstagingrisk",
+        "#Guidelineprinciple",
+        "#endpointrecognition"
+      ],
+      "examWeight": 2,
+      "cardEligible": false,
+      "raw": []
+    }
   }
 ];

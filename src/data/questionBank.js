@@ -12,6 +12,7 @@ export const questionBank = [
 
 export const cancerCategories = [
   "Breast",
+  "CNS",
   "GI",
   "GU",
   "GYN",
@@ -20,5 +21,7 @@ export const cancerCategories = [
   "Lung",
   "Melanoma/Sarcoma",
   "Other",
+  "Precision oncology",
+  "Radiation/Surgery",
   "Supportive/Stats"
 ];

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import './App.css';
 import { questionBank, cancerCategories } from './data/questionBank.js';
+import { buildFlashcardTags } from './data/taxonomy.js';
 import {
   auth,
   db,
@@ -1040,13 +1041,21 @@ function normalizeFlashcardErrorType(errorType) {
 }
 
 function normalizeFlashcard(card) {
-  return {
+  const normalizedTags = [...new Set(normalizeTextList(card.tags))];
+  const normalizedTrial = [...new Set(normalizeTextList(card.trial))];
+  const baseCard = {
     ...card,
+    tags: normalizedTags,
+    trial: normalizedTrial,
+  };
+  const taxonomyTags = buildFlashcardTags(baseCard);
+  return {
+    ...baseCard,
     front: String(card.front || ''),
     back: String(card.back || ''),
     type: normalizeFlashcardType(card.type, card.sourceType),
-    tags: [...new Set(normalizeTextList(card.tags))],
-    trial: [...new Set(normalizeTextList(card.trial))],
+    tags: [...new Set([...normalizedTags, ...(taxonomyTags.hashTags || [])])],
+    taxonomyTags,
     examValue: normalizeExamValue(card.examValue),
     errorType: normalizeFlashcardErrorType(card.errorType),
   };
@@ -2344,7 +2353,7 @@ function getCancerSummary(state) {
   return cancerCategories.map((cancer) => {
     const ids = getQuestionPool(state)
       .map((q) => getQuestionWithOverride(q.id, state))
-      .filter((q) => q?.cancer === cancer)
+      .filter((q) => (q?.tags?.cancerDomain || q?.cancer) === cancer)
       .map((q) => q.id);
     const attempts = ids.reduce((sum, id) => sum + getStat(state, id).attempts, 0);
     const wrong = ids.reduce((sum, id) => sum + getStat(state, id).wrong, 0);
@@ -2697,6 +2706,55 @@ function getTopicMasteryRows(state) {
     const status = coverage >= 80 && accuracy >= 80 && avgMastery >= 4 ? 'Green' : (coverage < 60 || accuracy < 70 || row.highConfidenceWrong > 0 ? 'Red' : 'Yellow');
     return { ...row, coverage, accuracy, avgMastery, isCore, status };
   }).sort((a, b) => (a.status === 'Red' ? -1 : 1) - (b.status === 'Red' ? -1 : 1) || a.accuracy - b.accuracy || b.highConfidenceWrong - a.highConfidenceWrong);
+}
+
+function summarizeTaxonomyGroups(state, groupName, getLabels) {
+  const groupMap = new Map();
+  getQuestionPool(state)
+    .map((q) => getQuestionWithOverride(q.id, state))
+    .filter(Boolean)
+    .forEach((q) => {
+      const labels = getLabels(q).filter(Boolean);
+      labels.forEach((label) => {
+        const key = `${groupName}::${label}`;
+        const stat = getStat(state, q.id);
+        const row = groupMap.get(key) || {
+          key,
+          groupName,
+          label,
+          total: 0,
+          attempted: 0,
+          attempts: 0,
+          correct: 0,
+          wrong: 0,
+          highConfidenceWrong: 0,
+        };
+        row.total += 1;
+        row.attempts += stat.attempts || 0;
+        row.correct += stat.correct || 0;
+        row.wrong += stat.wrong || 0;
+        row.highConfidenceWrong += stat.highConfidenceWrong || 0;
+        if ((stat.attempts || 0) > 0) row.attempted += 1;
+        groupMap.set(key, row);
+      });
+    });
+
+  return [...groupMap.values()].map((row) => {
+    const coverage = row.total ? Math.round((row.attempted / row.total) * 100) : 0;
+    const accuracy = row.attempts ? Math.round((row.correct / row.attempts) * 100) : 0;
+    const wrongRateValue = row.attempts ? Math.round((row.wrong / row.attempts) * 100) : 0;
+    const status = coverage >= 80 && accuracy >= 80 ? 'Green' : (coverage < 60 || accuracy < 70 || row.highConfidenceWrong > 0 ? 'Red' : 'Yellow');
+    return { ...row, coverage, accuracy, wrongRate: wrongRateValue, status };
+  }).sort((a, b) => (a.status === 'Red' ? -1 : 1) - (b.status === 'Red' ? -1 : 1) || b.wrongRate - a.wrongRate || b.attempts - a.attempts);
+}
+
+function getTaxonomyAnalytics(state) {
+  return {
+    clinicalSetting: summarizeTaxonomyGroups(state, 'Clinical setting', (q) => [q.tags?.clinicalSetting || q.topic || 'General']),
+    evidenceType: summarizeTaxonomyGroups(state, 'Evidence type', (q) => [q.tags?.evidenceType || 'Guideline principle']),
+    biomarker: summarizeTaxonomyGroups(state, 'Biomarker', (q) => q.tags?.biomarker?.length ? q.tags.biomarker : ['No biomarker']),
+    treatmentModality: summarizeTaxonomyGroups(state, 'Treatment modality', (q) => [q.tags?.treatmentModality || 'Unspecified modality']),
+  };
 }
 
 function getCriticalErrorItems(state) {
@@ -6185,6 +6243,7 @@ export default function App() {
   }, [state]);
 
   const cancerSummary = useMemo(() => getCancerSummary(state), [state]);
+  const taxonomyAnalytics = useMemo(() => getTaxonomyAnalytics(state), [state]);
   const readiness = useMemo(() => getReadinessMetrics(state), [state]);
   const bossRows = useMemo(() => getBossRows(state, readiness), [state, readiness]);
   const dailyChest = getDailyChest(state, todayCompleted);
@@ -6411,7 +6470,7 @@ export default function App() {
     .filter((q) => {
       const text = `${questionSearchText(q)} ${tagSearchText(q.tags)}`;
       const searchOk = !search || text.includes(search.toLowerCase());
-      const cancerOk = bankCancer === 'All' || q.cancer === bankCancer;
+      const cancerOk = bankCancer === 'All' || (q.tags?.cancerDomain || q.cancer) === bankCancer;
       const yearOk = bankYear === 'All' || String(q.year) === String(bankYear);
       return searchOk && cancerOk && yearOk;
     }), [search, bankCancer, bankYear, state]);
@@ -6820,10 +6879,36 @@ export default function App() {
             <MetricCard label="Topic mastery" value={`${readiness.topicMasteryScore}%`} sub="core topics mastered" />
           </section>
           <div className="subsection">
+            <h3>Taxonomy weakness map</h3>
+            {[
+              ['Clinical setting', taxonomyAnalytics.clinicalSetting],
+              ['Evidence type', taxonomyAnalytics.evidenceType],
+              ['Biomarker', taxonomyAnalytics.biomarker],
+              ['Treatment modality', taxonomyAnalytics.treatmentModality],
+            ].map(([title, rows]) => (
+              <section className="taxonomy-analytics-block" key={title}>
+                <h4>{title}</h4>
+                <div className="analytics-table">
+                  <div className="table-row readiness-table header"><span>Tag</span><span>Coverage</span><span>Accuracy</span><span>Wrong rate</span><span>HC wrong</span><span>Status</span></div>
+                  {rows.slice(0, 8).map((row) => (
+                    <div className="table-row readiness-table" key={row.key}>
+                      <span>{row.label}</span>
+                      <span>{row.coverage}% ({row.attempted}/{row.total})</span>
+                      <span>{row.accuracy}%</span>
+                      <span>{row.wrongRate}%</span>
+                      <span>{row.highConfidenceWrong}</span>
+                      <span><strong>{row.status}</strong></span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+          <div className="subsection">
             <h3>Top weak questions</h3>
             {weakQuestions.slice(0, 12).map(({ q, stat }) => (
               <div className="weak-row" key={q.id}>
-                <strong>{q.id}</strong> · {q.cancer} · {q.topic} · wrong rate {wrongRate(stat)}% · {q.stem.slice(0, 120)}...
+                <strong>{q.id}</strong> · {q.cancer} · {q.tags?.clinicalSetting || q.topic} · {q.tags?.evidenceType || 'evidence'} · wrong rate {wrongRate(stat)}% · {q.stem.slice(0, 120)}...
               </div>
             ))}
           </div>
