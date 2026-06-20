@@ -1,6 +1,10 @@
 import { initializeApp } from "firebase/app";
 import {
+  initializeAuth,
   getAuth,
+  indexedDBLocalPersistence,
+  browserLocalPersistence,
+  inMemoryPersistence,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -51,7 +55,21 @@ export const firebaseConfigStatus = {
 
 const app = initializeApp(firebaseConfig);
 
-export const auth = getAuth(app);
+let authInstance;
+try {
+  authInstance = initializeAuth(app, {
+    persistence: [
+      indexedDBLocalPersistence,
+      browserLocalPersistence,
+      inMemoryPersistence,
+    ],
+  });
+} catch (error) {
+  authInstance = error?.code === 'auth/already-initialized' ? getAuth(app) : null;
+  if (!authInstance) throw error;
+}
+
+export const auth = authInstance;
 export const db = getFirestore(app);
 export default app;
 
