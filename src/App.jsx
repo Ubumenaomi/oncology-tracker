@@ -994,16 +994,23 @@ function getCloudDocRef(uid) {
   return doc(db, 'oncologyTrackerUsers', uid, 'appState', 'main');
 }
 
-function makeCloudPayload(state) {
+function makeCloudPayload(state, syncedAt = new Date().toISOString()) {
   return {
     ...state,
     cloudMeta: {
       ...(state.cloudMeta || {}),
-      updatedAt: new Date().toISOString(),
+      updatedAt: syncedAt,
       device: navigator.userAgent,
     },
     serverUpdatedAt: serverTimestamp(),
   };
+}
+
+function getCloudSyncSignature(state) {
+  const syncableState = { ...normalizeState(state) };
+  delete syncableState.cloudMeta;
+  delete syncableState.serverUpdatedAt;
+  return JSON.stringify(syncableState);
 }
 
 function addDays(dateString, days) {
@@ -5573,6 +5580,8 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState('尚未登入，資料目前只存在這台裝置。');
   const [syncError, setSyncError] = useState('');
   const [isApplyingCloudState, setIsApplyingCloudState] = useState(false);
+  const isApplyingCloudStateRef = useRef(false);
+  const lastSyncedSignatureRef = useRef(getCloudSyncSignature(loadState()));
   const [practicePage, setPracticePage] = useState(0);
   const [practicePageMessage, setPracticePageMessage] = useState('');
   const [focusStartedAt, setFocusStartedAt] = useState(null);
@@ -5582,6 +5591,10 @@ export default function App() {
   useEffect(() => {
     saveState(state);
   }, [state]);
+
+  useEffect(() => {
+    isApplyingCloudStateRef.current = isApplyingCloudState;
+  }, [isApplyingCloudState]);
 
   useEffect(() => {
     const handlePointerDown = (event) => {
@@ -5622,6 +5635,7 @@ export default function App() {
       setSyncError('');
 
       if (!firebaseUser) {
+        lastSyncedSignatureRef.current = getCloudSyncSignature(loadState());
         setSyncStatus('尚未登入，資料目前只存在這台裝置。');
         return;
       }
@@ -5633,13 +5647,30 @@ export default function App() {
 
         if (snap.exists()) {
           const merged = mergeCloudState(loadState(), snap.data());
+          lastSyncedSignatureRef.current = getCloudSyncSignature(merged);
+          isApplyingCloudStateRef.current = true;
           setIsApplyingCloudState(true);
           setState(merged);
           saveState(merged);
-          setTimeout(() => setIsApplyingCloudState(false), 500);
+          setTimeout(() => {
+            isApplyingCloudStateRef.current = false;
+            setIsApplyingCloudState(false);
+          }, 500);
           setSyncStatus('已從雲端載入資料，之後會即時同步。');
         } else {
-          await setDoc(ref, makeCloudPayload(loadState()), { merge: true });
+          const localState = loadState();
+          const syncedAt = new Date().toISOString();
+          const nextState = normalizeState({
+            ...localState,
+            cloudMeta: {
+              ...(localState.cloudMeta || {}),
+              updatedAt: syncedAt,
+              device: navigator.userAgent,
+            },
+          });
+          saveState(nextState);
+          lastSyncedSignatureRef.current = getCloudSyncSignature(nextState);
+          await setDoc(ref, makeCloudPayload(nextState, syncedAt), { merge: true });
           setSyncStatus('已建立雲端資料，之後會即時同步。');
         }
       } catch (error) {
@@ -5657,7 +5688,7 @@ export default function App() {
     const ref = getCloudDocRef(user.uid);
     const unsubscribeSnapshot = onSnapshot(ref, (snapshot) => {
       if (!snapshot.exists()) return;
-      if (isApplyingCloudState) return;
+      if (isApplyingCloudStateRef.current) return;
 
       const cloudState = snapshot.data();
       const localState = loadState();
@@ -5666,10 +5697,15 @@ export default function App() {
 
       if (cloudUpdatedAt && cloudUpdatedAt !== localUpdatedAt) {
         const merged = mergeCloudState(localState, cloudState);
+        lastSyncedSignatureRef.current = getCloudSyncSignature(merged);
+        isApplyingCloudStateRef.current = true;
         setIsApplyingCloudState(true);
         setState(merged);
         saveState(merged);
-        setTimeout(() => setIsApplyingCloudState(false), 500);
+        setTimeout(() => {
+          isApplyingCloudStateRef.current = false;
+          setIsApplyingCloudState(false);
+        }, 500);
         setSyncStatus('已接收其他裝置的更新。');
       }
     }, (error) => {
@@ -5678,25 +5714,30 @@ export default function App() {
     });
 
     return () => unsubscribeSnapshot();
-  }, [user, isApplyingCloudState]);
+  }, [user]);
 
   useEffect(() => {
     if (!user || isApplyingCloudState) return;
+    const stateSignature = getCloudSyncSignature(state);
+    if (stateSignature === lastSyncedSignatureRef.current) return;
 
     const timeout = setTimeout(async () => {
+      const syncedAt = new Date().toISOString();
       try {
         const nextState = {
           ...state,
           cloudMeta: {
             ...(state.cloudMeta || {}),
-            updatedAt: new Date().toISOString(),
+            updatedAt: syncedAt,
             device: navigator.userAgent,
           },
         };
         saveState(nextState);
-        await setDoc(getCloudDocRef(user.uid), makeCloudPayload(nextState), { merge: true });
+        lastSyncedSignatureRef.current = stateSignature;
+        await setDoc(getCloudDocRef(user.uid), makeCloudPayload(nextState, syncedAt), { merge: true });
         setSyncStatus(`已同步到雲端：${new Date().toLocaleString()}`);
       } catch (error) {
+        lastSyncedSignatureRef.current = '';
         setSyncError(getFirebaseErrorMessage(error));
         setSyncStatus('同步到雲端失敗，資料仍已保存在本機。');
       }
@@ -5990,7 +6031,18 @@ export default function App() {
     setSyncError('');
     try {
       const localState = loadState();
-      await setDoc(getCloudDocRef(user.uid), makeCloudPayload(localState), { merge: true });
+      const syncedAt = new Date().toISOString();
+      const nextState = normalizeState({
+        ...localState,
+        cloudMeta: {
+          ...(localState.cloudMeta || {}),
+          updatedAt: syncedAt,
+          device: navigator.userAgent,
+        },
+      });
+      saveState(nextState);
+      lastSyncedSignatureRef.current = getCloudSyncSignature(nextState);
+      await setDoc(getCloudDocRef(user.uid), makeCloudPayload(nextState, syncedAt), { merge: true });
       setSyncStatus('已把本機資料上傳到雲端。');
     } catch (error) {
       setSyncError(getFirebaseErrorMessage(error));
@@ -6008,10 +6060,15 @@ export default function App() {
         return;
       }
       const merged = mergeCloudState(defaultState, snap.data());
+      lastSyncedSignatureRef.current = getCloudSyncSignature(merged);
+      isApplyingCloudStateRef.current = true;
       setIsApplyingCloudState(true);
       setState(merged);
       saveState(merged);
-      setTimeout(() => setIsApplyingCloudState(false), 500);
+      setTimeout(() => {
+        isApplyingCloudStateRef.current = false;
+        setIsApplyingCloudState(false);
+      }, 500);
       setSyncStatus('已從雲端覆蓋本機資料。');
     } catch (error) {
       setSyncError(getFirebaseErrorMessage(error));
@@ -6669,9 +6726,11 @@ export default function App() {
     }
 
     try {
-      await setDoc(getCloudDocRef(user.uid), makeCloudPayload(nextState));
+      lastSyncedSignatureRef.current = getCloudSyncSignature(nextState);
+      await setDoc(getCloudDocRef(user.uid), makeCloudPayload(nextState, updatedAt));
       setSyncStatus('已重新開始 100-Day Plan，並重設完成度與 XP。');
     } catch (error) {
+      lastSyncedSignatureRef.current = '';
       setSyncError(error.message);
       setSyncStatus('已重設本機完成度；雲端同步失敗，請稍後再試。');
     }
