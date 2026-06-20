@@ -1986,6 +1986,38 @@ function generateDailyQuestionIds(state, task = getTodayPlanTask(state), exclude
   return result.slice(0, modeConfig.total);
 }
 
+function fillDailyQuestionIds(state, task, existingIds = [], targetCount = PRACTICE_PAGE_SIZE) {
+  const baseIds = Array.isArray(existingIds) ? existingIds : [];
+  const generatedIds = generateDailyQuestionIds(state, task, baseIds);
+  const questionIds = [...baseIds, ...generatedIds]
+    .filter((id, index, ids) => ids.indexOf(id) === index)
+    .slice(0, targetCount);
+
+  if (questionIds.length >= targetCount) return questionIds;
+
+  const used = new Set(questionIds);
+  const { preferredYears, preferredCancers } = state.settings || {};
+  const fallbackIds = getQuestionPool(state)
+    .map((q) => getQuestionWithOverride(q.id, state))
+    .filter(Boolean)
+    .filter((q) => !used.has(q.id))
+    .filter((q) => {
+      const yearOk = !preferredYears || preferredYears.length === 0 || preferredYears.includes(Number(q.year));
+      const cancerOk = !preferredCancers || preferredCancers.length === 0 || preferredCancers.includes(q.cancer);
+      return yearOk && cancerOk;
+    })
+    .sort((a, b) => {
+      const aStat = getStat(state, a.id);
+      const bStat = getStat(state, b.id);
+      return (aStat.attempts || 0) - (bStat.attempts || 0)
+        || wrongRate(bStat) - wrongRate(aStat)
+        || String(a.id).localeCompare(String(b.id));
+    })
+    .map((q) => q.id);
+
+  return [...questionIds, ...fallbackIds].slice(0, targetCount);
+}
+
 const BOSS_DEFINITIONS = [
   { id: 'lung', name: 'Lung Boss', module: 'Lung', cancer: 'Lung', unlockPercent: 80, passScore: 80 },
   { id: 'breast', name: 'Breast Boss', module: 'Breast', cancer: 'Breast', unlockPercent: 80, passScore: 80 },
@@ -5542,6 +5574,7 @@ export default function App() {
   const [syncError, setSyncError] = useState('');
   const [isApplyingCloudState, setIsApplyingCloudState] = useState(false);
   const [practicePage, setPracticePage] = useState(0);
+  const [practicePageMessage, setPracticePageMessage] = useState('');
   const [focusStartedAt, setFocusStartedAt] = useState(null);
   const [focusTick, setFocusTick] = useState(() => Date.now());
   const [leaderboardStartedAt, setLeaderboardStartedAt] = useState(() => Date.now());
@@ -6097,11 +6130,8 @@ export default function App() {
       const existing = prev.sessions?.[TODAY];
       const existingMatchesQuest = Number(existing?.planTaskId) === Number(questTask.id);
       const existingQuestionIds = existingMatchesQuest ? (existing?.questionIds || []) : [];
-      const generatedIds = generateDailyQuestionIds(prev, questTask, force ? [] : existingQuestionIds);
       const targetCount = force ? modeConfig.total : Math.min(modeConfig.total, Math.max(PRACTICE_PAGE_SIZE, existingQuestionIds.length));
-      const questionIds = force
-        ? generatedIds
-        : [...existingQuestionIds, ...generatedIds].filter((id, index, ids) => ids.indexOf(id) === index).slice(0, targetCount);
+      const questionIds = fillDailyQuestionIds(prev, questTask, force ? [] : existingQuestionIds, targetCount);
       if (!force && existingQuestionIds.length >= targetCount && existingMatchesQuest) return prev;
       return {
         ...prev,
@@ -6137,25 +6167,28 @@ export default function App() {
   };
 
   const loadNextPracticePage = () => {
+    setPracticePageMessage('');
     const nextPage = currentPracticePage + 1;
     const requiredCount = Math.min(todayPracticeConfig.total, (nextPage + 1) * PRACTICE_PAGE_SIZE);
     if (todayQuestions.length >= requiredCount) {
       setPracticePage(nextPage);
       return;
     }
-    if (todayQuestions.length >= todayPracticeConfig.total) return;
+    if (todayQuestions.length >= todayPracticeConfig.total) {
+      setPracticePageMessage('已經載入目前模式的全部題目。');
+      return;
+    }
 
+    let loadedMore = false;
     updateState((prev) => {
       const existing = prev.sessions?.[TODAY];
       const existingMatchesQuest = Number(existing?.planTaskId) === Number(questTask.id);
       if (!existingMatchesQuest) return prev;
       const existingQuestionIds = existing?.questionIds || [];
       const targetCount = Math.min(todayPracticeConfig.total, (nextPage + 1) * PRACTICE_PAGE_SIZE);
-      const generatedIds = generateDailyQuestionIds(prev, questTask, existingQuestionIds);
-      const questionIds = [...existingQuestionIds, ...generatedIds]
-        .filter((id, index, ids) => ids.indexOf(id) === index)
-        .slice(0, targetCount);
+      const questionIds = fillDailyQuestionIds(prev, questTask, existingQuestionIds, targetCount);
       if (questionIds.length <= existingQuestionIds.length) return prev;
+      loadedMore = true;
 
       return {
         ...prev,
@@ -6170,7 +6203,11 @@ export default function App() {
         },
       };
     });
-    setPracticePage(nextPage);
+    if (loadedMore) {
+      setPracticePage(nextPage);
+    } else {
+      setPracticePageMessage('目前篩選條件下沒有更多題目可載入。可到 Settings 清除癌別/年份篩選，或按重新抽題。');
+    }
   };
 
   const claimDailyCompletion = () => {
@@ -6977,6 +7014,7 @@ export default function App() {
                   {todayQuestions.length < Math.min(todayPracticeConfig.total, (currentPracticePage + 2) * PRACTICE_PAGE_SIZE) ? '下一頁並補題' : '下一頁'}
                 </button>
               </div>
+              {practicePageMessage && <p className="save-message">{practicePageMessage}</p>}
             </>
           )}
         </main>
