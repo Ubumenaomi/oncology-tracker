@@ -867,21 +867,6 @@ function saveState(state) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
-function scheduleStateSave(state, onDone) {
-  const run = () => {
-    saveState(state);
-    onDone?.();
-  };
-
-  if ('requestIdleCallback' in window) {
-    const id = window.requestIdleCallback(run, { timeout: 1000 });
-    return () => window.cancelIdleCallback(id);
-  }
-
-  const id = window.setTimeout(run, 200);
-  return () => window.clearTimeout(id);
-}
-
 function normalizeFocusSessions(focusSessions = []) {
   if (!Array.isArray(focusSessions)) return [];
   return focusSessions
@@ -5492,7 +5477,6 @@ function MockExamPanel({ state, onFinishMock }) {
 
 export default function App() {
   const [state, setState] = useState(loadState);
-  const stateRef = useRef(state);
   const [tab, setTab] = useState('quest');
   const [search, setSearch] = useState('');
   const [bankCancer, setBankCancer] = useState('All');
@@ -5509,15 +5493,8 @@ export default function App() {
   const [leaderboardStartedAt, setLeaderboardStartedAt] = useState(() => Date.now());
 
   useEffect(() => {
-    stateRef.current = state;
-    return scheduleStateSave(state);
+    saveState(state);
   }, [state]);
-
-  useEffect(() => {
-    const flushState = () => saveState(stateRef.current);
-    window.addEventListener('pagehide', flushState);
-    return () => window.removeEventListener('pagehide', flushState);
-  }, []);
 
   useEffect(() => {
     const handlePointerDown = (event) => {
