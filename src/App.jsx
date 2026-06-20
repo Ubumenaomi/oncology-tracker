@@ -3304,22 +3304,22 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
     ...(question.tags?.biomarker || []),
   ].filter(Boolean);
 
-  const recordRating = (rating) => {
-    if (practiceMode && practiceDraft?.rated) {
+  const recordRating = (rating, { countAttempt = true, allowMissingErrorType = false } = {}) => {
+    if (practiceMode && practiceDraft?.rated && countAttempt) {
       setFeedback('此題已評分，跳過重複紀錄。');
-      return;
+      return false;
     }
 
     const previous = stat;
-    const newAttempts = (previous.attempts || 0) + 1;
+    const newAttempts = (previous.attempts || 0) + (countAttempt ? 1 : 0);
     // Determine correctness by comparing selected option to correctAnswer
     const isCorrect = answerIsSingleChoice && selected === String(correctAnswer).trim().toUpperCase();
-    const newCorrect = previous.correct + (isCorrect ? 1 : 0);
-    const newWrong = previous.wrong + (isCorrect ? 0 : 1);
+    const newCorrect = previous.correct + (countAttempt && isCorrect ? 1 : 0);
+    const newWrong = previous.wrong + (countAttempt && !isCorrect ? 1 : 0);
 
-    if (!isCorrect && !errorType) {
+    if (!isCorrect && !errorType && !allowMissingErrorType) {
       setFeedback('答錯題必須先選擇 Error type，才能送出評分並排入補救任務。');
-      return;
+      return false;
     }
 
     if (!hideAnswerUntilSubmit) {
@@ -3357,7 +3357,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
       isCorrect,
       confidence: normalizedConfidence,
       rating,
-      errorType: isCorrect ? '' : errorType,
+      errorType: isCorrect ? '' : errorType || 'pending',
       remediationTask: remediation?.task || '',
       remediationCardType: remediation?.cardType || '',
     };
@@ -3380,23 +3380,26 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
       lastRating: rating,
       lastConfidence: normalizedConfidence,
       lastErrorType: isCorrect ? '' : errorType,
-      confidenceHistory: [...(previous.confidenceHistory || []), normalizedConfidence].slice(-50),
-      answerHistory: [...(previous.answerHistory || []), answerEvent].slice(-50),
-      highConfidenceWrong: (previous.highConfidenceWrong || 0) + (!isCorrect && normalizedConfidence >= 4 ? 1 : 0),
-      repeatedWrong: isCorrect ? 0 : (previous.repeatedWrong || 0) + 1,
-      wrongRetestAttempts: (previous.wrongRetestAttempts || 0) + (wasPreviouslyWrong ? 1 : 0),
-      wrongRetestCorrect: (previous.wrongRetestCorrect || 0) + (wasPreviouslyWrong && isCorrect ? 1 : 0),
-      errorTypes: isCorrect || !errorType ? (previous.errorTypes || []) : [...(previous.errorTypes || []), errorType].slice(-20),
+      confidenceHistory: countAttempt ? [...(previous.confidenceHistory || []), normalizedConfidence].slice(-50) : (previous.confidenceHistory || []),
+      answerHistory: countAttempt ? [...(previous.answerHistory || []), answerEvent].slice(-50) : (previous.answerHistory || []),
+      highConfidenceWrong: (previous.highConfidenceWrong || 0) + (countAttempt && !isCorrect && normalizedConfidence >= 4 ? 1 : 0),
+      repeatedWrong: countAttempt ? (isCorrect ? 0 : (previous.repeatedWrong || 0) + 1) : (previous.repeatedWrong || 0),
+      wrongRetestAttempts: (previous.wrongRetestAttempts || 0) + (countAttempt && wasPreviouslyWrong ? 1 : 0),
+      wrongRetestCorrect: (previous.wrongRetestCorrect || 0) + (countAttempt && wasPreviouslyWrong && isCorrect ? 1 : 0),
+      errorTypes: isCorrect || !errorType || (previous.errorTypes || []).at(-1) === errorType ? (previous.errorTypes || []) : [...(previous.errorTypes || []), errorType].slice(-20),
       lastRemediationTask: remediationEvent || previous.lastRemediationTask || null,
       remediationTasks: remediationEvent ? [remediationEvent, ...(previous.remediationTasks || [])].slice(0, 20) : (previous.remediationTasks || []),
     });
 
-    setFeedback(`紀錄：${rating}，下次複習 ${interval} 天後${remediation ? `。補救任務：${remediation.task}` : ''}`);
+    setFeedback(!isCorrect && !errorType
+      ? `已記錄錯誤 1 次，請選擇 Error type 完成補救任務。預設下次複習 ${interval} 天後。`
+      : `紀錄：${rating}，下次複習 ${interval} 天後${remediation ? `。補救任務：${remediation.task}` : ''}`);
 
     // Mark practiceDraft as rated so UI/logic won't double-record
     if (practiceMode && onPracticeChange) {
       onPracticeChange({ rated: true, rating });
     }
+    return true;
   };
 
   const submitAnswer = () => {
@@ -3410,8 +3413,11 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
     } else {
       triggerHapticFeedback('tap');
     }
-    // In practiceMode we reveal and wait for user rating (Again/Hard/Good/Easy)
-    setFeedback(answerIsSingleChoice ? (isCorrectSelection ? '答對，請選擇評分 (Again/Hard/Good/Easy)。' : '答錯，請選擇評分 (Again/Hard/Good/Easy)。') : '請選擇評分 (Again/Hard/Good/Easy)。');
+    const defaultRating = isCorrectSelection ? 'Good' : 'Again';
+    const recorded = recordRating(defaultRating, { allowMissingErrorType: true });
+    if (!recorded) {
+      setFeedback(answerIsSingleChoice ? (isCorrectSelection ? '答對。' : '答錯。') : '已顯示詳解。');
+    }
   };
 
   const saveNote = () => {
@@ -3427,6 +3433,31 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
 
   const toggleBookmark = () => {
     onUpdateStat(question.id, { ...stat, bookmarked: !stat.bookmarked });
+  };
+
+  const updateRecordedErrorType = (nextErrorType) => {
+    setErrorType(nextErrorType);
+    if (!practiceDraft?.rated || !nextErrorType || isCorrectSelection) return;
+
+    const remediation = getRemediationForErrorType(nextErrorType);
+    const remediationEvent = {
+      date: TODAY,
+      questionId: question.id,
+      errorType: nextErrorType,
+      task: remediation.task,
+      cardType: remediation.cardType,
+      action: remediation.action,
+    };
+
+    onUpdateStat(question.id, {
+      ...stat,
+      lastErrorType: nextErrorType,
+      errorTypes: (stat.errorTypes || []).at(-1) === nextErrorType ? (stat.errorTypes || []) : [...(stat.errorTypes || []), nextErrorType].slice(-20),
+      lastRemediationTask: remediationEvent,
+      remediationTasks: [remediationEvent, ...(stat.remediationTasks || [])].slice(0, 20),
+    });
+    onPracticeChange?.({ errorType: nextErrorType });
+    setFeedback(`已補上錯因：${nextErrorType}。補救任務：${remediation.task}`);
   };
 
   return (
@@ -3537,7 +3568,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                 {!isCorrectSelection && (
                   <label>
                     Error type
-                    <select value={errorType} onChange={(e) => setErrorType(e.target.value)}>
+                    <select value={errorType} onChange={(e) => updateRecordedErrorType(e.target.value)}>
                       <option value="">選擇錯因</option>
                       {ERROR_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{type}</option>)}
                     </select>
@@ -3559,7 +3590,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                   <button
                     className="rating-button again"
                     title="Again（重複）：重新學習，建議 1 天後複習"
-                    onClick={() => recordRating('Again')}
+                    onClick={() => recordRating('Again', { countAttempt: !practiceDraft?.rated })}
                   >
                     🔁 Again
                     <div className="rating-sub">重複 · 1 天</div>
@@ -3567,7 +3598,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                   <button
                     className="rating-button hard"
                     title="Hard（難）：答對但不穩，建議 3 天後複習"
-                    onClick={() => recordRating('Hard')}
+                    onClick={() => recordRating('Hard', { countAttempt: !practiceDraft?.rated })}
                   >
                     🟠 Hard
                     <div className="rating-sub">困難 · 約 3 天</div>
@@ -3575,7 +3606,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                   <button
                     className="rating-button good"
                     title="Good（好）：正常答對，建議 7–14 天後複習"
-                    onClick={() => recordRating('Good')}
+                    onClick={() => recordRating('Good', { countAttempt: !practiceDraft?.rated })}
                   >
                     ✅ Good
                     <div className="rating-sub">良好 · 7–14 天</div>
@@ -3583,7 +3614,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                   <button
                     className="rating-button easy"
                     title="Easy（非常熟）：秒答且熟悉，建議 21–30 天後複習"
-                    onClick={() => recordRating('Easy')}
+                    onClick={() => recordRating('Easy', { countAttempt: !practiceDraft?.rated })}
                   >
                     ✨ Easy
                     <div className="rating-sub">非常熟 · 21–30 天</div>
@@ -5469,9 +5500,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!focusStartedAt) return undefined;
     const timer = window.setInterval(() => setFocusTick(Date.now()), 1000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [focusStartedAt]);
 
   useEffect(() => {
     setLeaderboardStartedAt(Date.now());
@@ -5912,7 +5944,7 @@ export default function App() {
     ? Math.max(0, Math.floor((focusTick - new Date(focusStartedAt).getTime()) / 1000))
     : 0;
   const leaderboardFocusMinutes = todayFocusMinutes + (focusStartedAt ? Math.ceil(focusElapsedSeconds / 60) : 0);
-  const leaderboardElapsedSeconds = Math.max(0, Math.floor((focusTick - leaderboardStartedAt) / 1000));
+  const leaderboardElapsedSeconds = focusStartedAt ? Math.max(0, Math.floor((focusTick - leaderboardStartedAt) / 1000)) : 0;
   const focusLeaderboardRows = useMemo(
     () => buildFocusLeaderboard(leaderboardFocusMinutes, leaderboardElapsedSeconds),
     [leaderboardFocusMinutes, leaderboardElapsedSeconds]
