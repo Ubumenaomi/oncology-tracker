@@ -470,6 +470,7 @@ const QUESTION_YEAR_KEY = QUESTION_YEARS.join(',');
 const QUESTION_YEAR_LABEL = QUESTION_YEARS.length
   ? `${QUESTION_YEARS[0]}–${QUESTION_YEARS[QUESTION_YEARS.length - 1]}`
   : '題庫';
+const BANK_QUESTION_BY_ID = new Map(questionBank.map((question) => [question.id, question]));
 
 const defaultState = {
   sessions: {},
@@ -863,6 +864,21 @@ function loadState() {
 
 function saveState(state) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function scheduleStateSave(state, onDone) {
+  const run = () => {
+    saveState(state);
+    onDone?.();
+  };
+
+  if ('requestIdleCallback' in window) {
+    const id = window.requestIdleCallback(run, { timeout: 1000 });
+    return () => window.cancelIdleCallback(id);
+  }
+
+  const id = window.setTimeout(run, 200);
+  return () => window.clearTimeout(id);
 }
 
 function normalizeFocusSessions(focusSessions = []) {
@@ -1591,7 +1607,10 @@ function getQuestionPool(state = {}) {
 }
 
 function findQuestionById(id, state = {}) {
-  return getQuestionPool(state).find((q) => q.id === id) || null;
+  if (!id || state?.deletedQuestionIds?.[id]) return null;
+  const customQuestion = state?.customQuestions?.[id];
+  if (customQuestion) return normalizeQuestion({ ...customQuestion, sourceType: 'custom' });
+  return BANK_QUESTION_BY_ID.get(id) || null;
 }
 
 function applyQuestionOverride(question, overrides = {}) {
@@ -3264,8 +3283,12 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
       current.errorType === patch.errorType;
 
     if (!same) {
-      onPracticeChangeRef.current(patch);
+      const timeout = window.setTimeout(() => {
+        onPracticeChangeRef.current?.(patch);
+      }, 250);
+      return () => window.clearTimeout(timeout);
     }
+    return undefined;
   }, [selected, revealed, correctAnswer, explanation, wrongNotes, confidence, errorType, practiceMode, practiceDraft]);
 
   const answerIsSingleChoice = /^[A-E]$/.test(String(correctAnswer || '').trim().toUpperCase());
@@ -5395,6 +5418,7 @@ function MockExamPanel({ state, onFinishMock }) {
 
 export default function App() {
   const [state, setState] = useState(loadState);
+  const stateRef = useRef(state);
   const [tab, setTab] = useState('quest');
   const [search, setSearch] = useState('');
   const [bankCancer, setBankCancer] = useState('All');
@@ -5411,8 +5435,15 @@ export default function App() {
   const [leaderboardStartedAt, setLeaderboardStartedAt] = useState(() => Date.now());
 
   useEffect(() => {
-    saveState(state);
+    stateRef.current = state;
+    return scheduleStateSave(state);
   }, [state]);
+
+  useEffect(() => {
+    const flushState = () => saveState(stateRef.current);
+    window.addEventListener('pagehide', flushState);
+    return () => window.removeEventListener('pagehide', flushState);
+  }, []);
 
   useEffect(() => {
     const handlePointerDown = (event) => {
