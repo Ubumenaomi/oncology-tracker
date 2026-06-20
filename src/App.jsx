@@ -5,6 +5,7 @@ import { buildFlashcardTags } from './data/taxonomy.js';
 import {
   auth,
   db,
+  firebaseConfigStatus,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -3864,6 +3865,7 @@ function SyncPanel({
   user,
   syncStatus,
   syncError,
+  configStatus,
   onLogin,
   onRegister,
   onLogout,
@@ -3899,6 +3901,12 @@ function SyncPanel({
         <strong>同步狀態</strong>
         <p>{syncStatus}</p>
         {syncError && <p className="error-text">{syncError}</p>}
+        {!configStatus?.configured && (
+          <p className="error-text">Firebase 設定不完整：請確認 Vercel Environment Variables 已設定 VITE_FIREBASE_API_KEY、AUTH_DOMAIN、PROJECT_ID、APP_ID。</p>
+        )}
+        {configStatus?.usingFallback && (
+          <p className="muted">目前使用內建 Firebase production 設定。若仍無法登入，請到 Firebase Console → Authentication → Settings → Authorized domains 加入 oncology-tracker.vercel.app。</p>
+        )}
       </div>
 
       {!user ? (
@@ -3942,6 +3950,41 @@ function SyncPanel({
       </div>
     </main>
   );
+}
+
+function getFirebaseErrorMessage(error) {
+  const code = error?.code || '';
+  const message = error?.message || '未知錯誤';
+
+  if (code === 'auth/network-request-failed') {
+    return [
+      'Firebase 登入請求沒有成功送出。',
+      '請確認目前網路沒有封鎖 identitytoolkit.googleapis.com，並到 Firebase Console → Authentication → Settings → Authorized domains 加入 oncology-tracker.vercel.app。',
+      firebaseConfigStatus.usingFallback ? '目前 app 已使用內建 Firebase production 設定。' : '也請確認 Vercel 已設定 VITE_FIREBASE_* 環境變數。',
+    ].join(' ');
+  }
+
+  if (code === 'auth/unauthorized-domain') {
+    return '這個網域尚未允許使用 Firebase Auth。請到 Firebase Console → Authentication → Settings → Authorized domains 加入 oncology-tracker.vercel.app。';
+  }
+
+  if (code === 'auth/invalid-api-key' || code === 'auth/api-key-not-valid.-please-pass-a-valid-api-key.') {
+    return 'Firebase API key 無效或 production 沒有讀到 Vercel 環境變數。請確認 VITE_FIREBASE_API_KEY。';
+  }
+
+  if (code === 'auth/user-not-found' || code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
+    return '帳號或密碼不正確；第一次使用請按「建立帳號」。';
+  }
+
+  if (code === 'auth/email-already-in-use') {
+    return '這個 email 已建立過帳號，請直接按「登入同步」。';
+  }
+
+  if (code === 'auth/weak-password') {
+    return '密碼至少需要 6 個字元。';
+  }
+
+  return message;
 }
 
 // Legacy standalone panel kept for data-migration safety; replaced by QuestionManagerPanel.
@@ -5536,7 +5579,7 @@ export default function App() {
           setSyncStatus('已建立雲端資料，之後會即時同步。');
         }
       } catch (error) {
-        setSyncError(error.message);
+        setSyncError(getFirebaseErrorMessage(error));
         setSyncStatus('雲端讀取失敗，暫時使用本機資料。');
       }
     });
@@ -5566,7 +5609,7 @@ export default function App() {
         setSyncStatus('已接收其他裝置的更新。');
       }
     }, (error) => {
-      setSyncError(error.message);
+      setSyncError(getFirebaseErrorMessage(error));
       setSyncStatus('即時同步監聽失敗。');
     });
 
@@ -5590,7 +5633,7 @@ export default function App() {
         await setDoc(getCloudDocRef(user.uid), makeCloudPayload(nextState), { merge: true });
         setSyncStatus(`已同步到雲端：${new Date().toLocaleString()}`);
       } catch (error) {
-        setSyncError(error.message);
+        setSyncError(getFirebaseErrorMessage(error));
         setSyncStatus('同步到雲端失敗，資料仍已保存在本機。');
       }
     }, 900);
@@ -5856,7 +5899,7 @@ export default function App() {
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (error) {
-      setSyncError(error.message);
+      setSyncError(getFirebaseErrorMessage(error));
       setSyncStatus('登入失敗。');
     }
   };
@@ -5867,7 +5910,7 @@ export default function App() {
     try {
       await createUserWithEmailAndPassword(auth, email, password);
     } catch (error) {
-      setSyncError(error.message);
+      setSyncError(getFirebaseErrorMessage(error));
       setSyncStatus('建立帳號失敗。');
     }
   };
@@ -5886,7 +5929,7 @@ export default function App() {
       await setDoc(getCloudDocRef(user.uid), makeCloudPayload(localState), { merge: true });
       setSyncStatus('已把本機資料上傳到雲端。');
     } catch (error) {
-      setSyncError(error.message);
+      setSyncError(getFirebaseErrorMessage(error));
       setSyncStatus('上傳雲端失敗。');
     }
   };
@@ -5907,7 +5950,7 @@ export default function App() {
       setTimeout(() => setIsApplyingCloudState(false), 500);
       setSyncStatus('已從雲端覆蓋本機資料。');
     } catch (error) {
-      setSyncError(error.message);
+      setSyncError(getFirebaseErrorMessage(error));
       setSyncStatus('下載雲端資料失敗。');
     }
   };
@@ -7142,6 +7185,7 @@ export default function App() {
           user={user}
           syncStatus={syncStatus}
           syncError={syncError}
+          configStatus={firebaseConfigStatus}
           onLogin={loginWithEmail}
           onRegister={registerWithEmail}
           onLogout={logoutCloud}
