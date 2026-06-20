@@ -2849,6 +2849,60 @@ function getReadinessMetrics(state) {
   };
 }
 
+function getQuickReadinessMetrics(state) {
+  const mockExams = state.mockExams || [];
+  const recentCompleted = [...mockExams]
+    .filter((exam) => exam?.completedAt && Number.isFinite(exam.score))
+    .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt));
+  const recentMockScores = recentCompleted.slice(0, 5).map((exam) => exam.score);
+  const recentMockAverage = recentMockScores.length ? clampPercent(recentMockScores.slice(0, 3).reduce((sum, score) => sum + score, 0) / Math.min(3, recentMockScores.length)) : 0;
+  const recentMixedMockAccuracy = weightedRecentMockAccuracy(mockExams);
+  const stats = Object.values(state.stats || {});
+  const wrongRetestAttempts = stats.reduce((sum, stat) => sum + (stat.wrongRetestAttempts || 0), 0);
+  const wrongRetestCorrect = stats.reduce((sum, stat) => sum + (stat.wrongRetestCorrect || 0), 0);
+  const wrongRetestConversion = wrongRetestAttempts ? clampPercent((wrongRetestCorrect / wrongRetestAttempts) * 100) : 0;
+  const highConfidenceWrong = stats.reduce((sum, stat) => sum + (stat.highConfidenceWrong || 0), 0);
+  const confidenceAttempts = stats.reduce((sum, stat) => sum + (stat.confidenceHistory || []).filter(Boolean).length, 0);
+  const highConfidenceWrongRate = confidenceAttempts ? clampPercent((highConfidenceWrong / confidenceAttempts) * 100) : 0;
+  const confidenceCalibrationScore = clampPercent(100 - highConfidenceWrongRate);
+  const attemptedQuestions = stats.filter((stat) => (stat.attempts || 0) > 0).length;
+  const coverageScore = clampPercent((attemptedQuestions / Math.max(1, questionBank.length)) * 100);
+  const readinessScore = clampPercent(
+    0.45 * recentMixedMockAccuracy +
+    0.25 * wrongRetestConversion +
+    0.20 * confidenceCalibrationScore +
+    0.10 * coverageScore
+  );
+  const scoreVolatility = standardDeviation(recentMockScores);
+  const probability80 = recentMockAverage >= 80
+    ? clampPercent(65 + (recentMockAverage - 80) * 2 - scoreVolatility)
+    : clampPercent((readinessScore - 55) * 2);
+  const readinessLevel = probability80 >= 75 ? 'High probability >=80' : probability80 >= 45 ? 'Borderline' : 'Not ready';
+
+  return {
+    recentMockScores,
+    recentMockAverage,
+    recentMixedMockAccuracy,
+    minRecentMock: recentMockScores.length ? Math.min(...recentMockScores.slice(0, 3)) : 0,
+    scoreVolatility,
+    cancerCoverageScore: coverageScore,
+    wrongRetestConversion,
+    highConfidenceWrongRate,
+    confidenceCalibrationScore,
+    topicMasteryScore: 0,
+    readinessScore,
+    predictedScore: readinessScore,
+    probability80,
+    readinessLevel,
+    safeExamZone: probability80 >= 75,
+    gates: EMPTY_ARRAY,
+    cancerRows: EMPTY_ARRAY,
+    topicRows: EMPTY_ARRAY,
+    redTopics: EMPTY_ARRAY,
+    criticalErrors: EMPTY_ARRAY,
+  };
+}
+
 function buildAiPrompt(state) {
   const weak = getQuestionPool(state)
     .map((q) => ({ q: getQuestionWithOverride(q.id, state), stat: getStat(state, q.id) }))
@@ -6294,17 +6348,38 @@ export default function App() {
     createTodaySession({ force: true });
   };
 
-  const dueReview = useMemo(() => getQuestionPool(state)
+  const needsDueReview = tab === 'review';
+  const needsWeakQuestions = ['review', 'analytics', 'flashcards'].includes(tab);
+  const needsFullReadiness = ['stats', 'readiness', 'analytics', 'critical', 'plan'].includes(tab);
+  const needsCancerSummary = ['stats', 'readiness', 'analytics'].includes(tab);
+  const needsTaxonomyAnalytics = tab === 'analytics';
+  const needsBankQuestions = tab === 'questions';
+  const needsFlashcardLists = ['stats', 'flashcards', 'flashcard-review'].includes(tab);
+
+  const dueCount = useMemo(() => Object.values(state.stats || {})
+    .filter((stat) => stat.nextReviewDate && stat.nextReviewDate <= TODAY).length, [state.stats]);
+
+  const questionTotal = useMemo(() => {
+    const customCount = Object.keys(state.customQuestions || {}).length;
+    const deletedCount = Object.entries(state.deletedQuestionIds || {}).filter(([, deleted]) => deleted).length;
+    return questionBank.length + customCount - deletedCount;
+  }, [state.customQuestions, state.deletedQuestionIds]);
+
+  const flashcardTotal = useMemo(() => Object.keys(normalizeFlashcards(state.flashcards)).length, [state.flashcards]);
+  const dueFlashcardCount = useMemo(() => Object.values(state.flashcardStats || {})
+    .filter((stat) => !stat.nextReviewDate || stat.nextReviewDate <= TODAY).length, [state.flashcardStats]);
+
+  const dueReview = useMemo(() => needsDueReview ? getQuestionPool(state)
     .map((q) => ({ q: getQuestionWithOverride(q.id, state), stat: getStat(state, q.id) }))
     .filter(({ q, stat }) => q && stat.nextReviewDate && stat.nextReviewDate <= TODAY)
-    .sort((a, b) => wrongRate(b.stat) - wrongRate(a.stat)), [state]);
+    .sort((a, b) => wrongRate(b.stat) - wrongRate(a.stat)) : EMPTY_ARRAY, [needsDueReview, state]);
 
-  const weakQuestions = useMemo(() => getQuestionPool(state)
+  const weakQuestions = useMemo(() => needsWeakQuestions ? getQuestionPool(state)
     .map((q) => ({ q: getQuestionWithOverride(q.id, state), stat: getStat(state, q.id) }))
     .filter(({ q, stat }) => q && (stat.wrong > 0 || stat.bookmarked))
-    .sort((a, b) => wrongRate(b.stat) - wrongRate(a.stat) || b.stat.wrong - a.stat.wrong), [state]);
+    .sort((a, b) => wrongRate(b.stat) - wrongRate(a.stat) || b.stat.wrong - a.stat.wrong) : EMPTY_ARRAY, [needsWeakQuestions, state]);
 
-  const remediationQueue = useMemo(() => weakQuestions
+  const remediationQueue = useMemo(() => needsDueReview ? weakQuestions
     .map(({ q, stat }) => {
       const errorType = stat.lastErrorType || stat.errorTypes?.[stat.errorTypes.length - 1] || '';
       const remediation = stat.lastRemediationTask || (errorType ? {
@@ -6314,7 +6389,7 @@ export default function App() {
       return remediation ? { q, stat, remediation } : null;
     })
     .filter(Boolean)
-    .sort((a, b) => wrongRate(b.stat) - wrongRate(a.stat) || b.stat.wrong - a.stat.wrong), [weakQuestions]);
+    .sort((a, b) => wrongRate(b.stat) - wrongRate(a.stat) || b.stat.wrong - a.stat.wrong) : EMPTY_ARRAY, [needsDueReview, weakQuestions]);
 
   const summary = useMemo(() => {
     const stats = Object.values(state.stats);
@@ -6325,13 +6400,18 @@ export default function App() {
     return { attempts, correct, wrong, reviewed, accuracy: attempts ? Math.round((correct / attempts) * 100) : 0 };
   }, [state]);
 
-  const cancerSummary = useMemo(() => getCancerSummary(state), [state]);
-  const taxonomyAnalytics = useMemo(() => getTaxonomyAnalytics(state), [state]);
-  const readiness = useMemo(() => getReadinessMetrics(state), [state]);
-  const bossRows = useMemo(() => getBossRows(state, readiness), [state, readiness]);
+  const cancerSummary = useMemo(() => needsCancerSummary ? getCancerSummary(state) : EMPTY_ARRAY, [needsCancerSummary, state]);
+  const taxonomyAnalytics = useMemo(() => needsTaxonomyAnalytics ? getTaxonomyAnalytics(state) : {
+    clinicalSetting: EMPTY_ARRAY,
+    evidenceType: EMPTY_ARRAY,
+    biomarker: EMPTY_ARRAY,
+    treatmentModality: EMPTY_ARRAY,
+  }, [needsTaxonomyAnalytics, state]);
+  const readiness = useMemo(() => needsFullReadiness ? getReadinessMetrics(state) : getQuickReadinessMetrics(state), [needsFullReadiness, state]);
+  const bossRows = useMemo(() => needsFullReadiness ? getBossRows(state, readiness) : EMPTY_ARRAY, [needsFullReadiness, state, readiness]);
   const dailyChest = getDailyChest(state, todayCompleted);
-  const allFlashcards = useMemo(() => getFlashcardList(state), [state]);
-  const dueFlashcards = useMemo(() => getDueFlashcards(state), [state]);
+  const allFlashcards = useMemo(() => needsFlashcardLists ? getFlashcardList(state) : EMPTY_ARRAY, [needsFlashcardLists, state]);
+  const dueFlashcards = useMemo(() => needsFlashcardLists ? getDueFlashcards(state) : EMPTY_ARRAY, [needsFlashcardLists, state]);
 
   const finishMockExam = (completedExam) => {
     updateState((prev) => {
@@ -6404,15 +6484,14 @@ export default function App() {
   }, [planProgress]);
 
   const statsDashboard = useMemo(
-    () => getStatsDashboard(state, planSummary, readiness, cancerSummary),
-    [state, planSummary, readiness, cancerSummary]
+    () => (tab === 'stats' ? getStatsDashboard(state, planSummary, readiness, cancerSummary) : null),
+    [tab, state, planSummary, readiness, cancerSummary]
   );
 
 
   const nextPlanTask = studyPlan100.find((task) => !planProgress[task.id]) || studyPlan100[studyPlan100.length - 1];
   const topWeakCancer = cancerSummary.find((row) => row.status === 'Red') || cancerSummary[0];
   const topRedTopic = readiness.redTopics?.[0];
-  const dueCount = dueReview.length;
   const mockNeeded = readiness.recentMockScores.length < 3 || readiness.recentMockAverage < 80;
   const primaryFocus = topRedTopic
     ? `${topRedTopic.cancer}｜${topRedTopic.topic}`
@@ -6562,7 +6641,7 @@ export default function App() {
   };
 
 
-  const bankQuestions = useMemo(() => getQuestionPool(state)
+  const bankQuestions = useMemo(() => needsBankQuestions ? getQuestionPool(state)
     .map((q) => getQuestionWithOverride(q.id, state))
     .filter(Boolean)
     .filter((q) => {
@@ -6571,7 +6650,7 @@ export default function App() {
       const cancerOk = bankCancer === 'All' || (q.tags?.cancerDomain || q.cancer) === bankCancer;
       const yearOk = bankYear === 'All' || String(q.year) === String(bankYear);
       return searchOk && cancerOk && yearOk;
-    }), [search, bankCancer, bankYear, state]);
+    }) : EMPTY_ARRAY, [needsBankQuestions, search, bankCancer, bankYear, state]);
 
   const updateSettings = (patch) => {
     updateState((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } }));
@@ -6654,14 +6733,14 @@ export default function App() {
       </header>
 
       <section className="metrics-grid">
-        <MetricCard label="題庫總數" value={getQuestionPool(state).length} sub={`${QUESTION_YEAR_LABEL} 年`} />
+        <MetricCard label="題庫總數" value={questionTotal} sub={`${QUESTION_YEAR_LABEL} 年`} />
         <MetricCard label="已練題目" value={summary.reviewed} sub={`${summary.attempts} total attempts`} />
         <MetricCard label="正確率" value={`${summary.accuracy}%`} sub={`${summary.correct} correct / ${summary.wrong} wrong`} />
-        <MetricCard label="今日待複習" value={dueReview.length} sub="依 next review date" />
+        <MetricCard label="今日待複習" value={dueCount} sub="依 next review date" />
         <MetricCard label="≥80 機率" value={`${readiness.probability80}%`} sub={readiness.readinessLevel} />
         <MetricCard label="Level / XP" value={`Lv ${state.game?.level || 1}`} sub={`${state.game?.xp || 0} XP · streak ${state.game?.streak || 0}`} />
         <MetricCard label="今日專注" value={`${todayFocusMinutes} 分`} sub={`focus streak ${focusStreak} 天`} />
-        <MetricCard label="Flashcards" value={getFlashcardList(state).length} sub={`${dueFlashcards.length} due today`} />
+        <MetricCard label="Flashcards" value={flashcardTotal} sub={`${dueFlashcardCount} due today`} />
         <MetricCard label="同步狀態" value={user ? 'Cloud' : 'Local'} sub={user ? user.email : '尚未登入'} />
       </section>
 
