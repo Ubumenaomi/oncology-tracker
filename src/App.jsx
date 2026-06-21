@@ -18,7 +18,17 @@ import {
 } from './firebase.js';
 
 const STORAGE_KEY = 'oncologyTracker.aiReview.v1';
+const STORAGE_VERSION = 2;
+const STORAGE_SLICE_KEYS = {
+  core: `${STORAGE_KEY}.core.v2`,
+  questionRecords: `${STORAGE_KEY}.questionRecords.v2`,
+  questionEdits: `${STORAGE_KEY}.questionEdits.v2`,
+  flashcards: `${STORAGE_KEY}.flashcards.v2`,
+  flashcardStats: `${STORAGE_KEY}.flashcardStats.v2`,
+};
 const EMPTY_ARRAY = Object.freeze([]);
+const QUESTION_MANAGER_PAGE_SIZE = 50;
+const FLASHCARD_PAGE_SIZE = 24;
 const ERROR_TYPE_OPTIONS = [
   'Knowledge gap',
   'Misread question',
@@ -860,17 +870,98 @@ function buildStudyPlan100() {
 
 const studyPlan100 = buildStudyPlan100();
 
+let lastSavedStorageSlices = {};
+
+function readStorageJSON(key, fallback = null) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function buildStorageSlices(state) {
+  const {
+    stats,
+    questionOverrides,
+    customQuestions,
+    deletedQuestionIds,
+    flashcards,
+    flashcardStats,
+    deletedFlashcardIds,
+    ...core
+  } = state;
+
+  return {
+    core: {
+      ...core,
+      storageVersion: STORAGE_VERSION,
+    },
+    questionRecords: {
+      stats: stats || {},
+    },
+    questionEdits: {
+      questionOverrides: questionOverrides || {},
+      customQuestions: customQuestions || {},
+      deletedQuestionIds: deletedQuestionIds || {},
+    },
+    flashcards: {
+      flashcards: flashcards || {},
+      deletedFlashcardIds: deletedFlashcardIds || {},
+    },
+    flashcardStats: {
+      flashcardStats: flashcardStats || {},
+      deletedFlashcardIds: deletedFlashcardIds || {},
+    },
+  };
+}
+
+function hydrateStateFromStorage() {
+  const legacyRaw = readStorageJSON(STORAGE_KEY, null);
+  const legacyState = legacyRaw?.storageVersion === STORAGE_VERSION ? {} : (legacyRaw || {});
+  const core = readStorageJSON(STORAGE_SLICE_KEYS.core, null);
+  const questionRecords = readStorageJSON(STORAGE_SLICE_KEYS.questionRecords, null);
+  const questionEdits = readStorageJSON(STORAGE_SLICE_KEYS.questionEdits, null);
+  const flashcardSlice = readStorageJSON(STORAGE_SLICE_KEYS.flashcards, null);
+  const flashcardStatsSlice = readStorageJSON(STORAGE_SLICE_KEYS.flashcardStats, null);
+
+  return normalizeState({
+    ...defaultState,
+    ...legacyState,
+    ...(core || {}),
+    stats: questionRecords?.stats ?? legacyState.stats ?? defaultState.stats,
+    questionOverrides: questionEdits?.questionOverrides ?? legacyState.questionOverrides ?? defaultState.questionOverrides,
+    customQuestions: questionEdits?.customQuestions ?? legacyState.customQuestions ?? defaultState.customQuestions,
+    deletedQuestionIds: questionEdits?.deletedQuestionIds ?? legacyState.deletedQuestionIds ?? defaultState.deletedQuestionIds,
+    flashcards: flashcardSlice?.flashcards ?? legacyState.flashcards ?? defaultState.flashcards,
+    flashcardStats: flashcardStatsSlice?.flashcardStats ?? flashcardSlice?.flashcardStats ?? legacyState.flashcardStats ?? defaultState.flashcardStats,
+    deletedFlashcardIds: flashcardStatsSlice?.deletedFlashcardIds ?? flashcardSlice?.deletedFlashcardIds ?? legacyState.deletedFlashcardIds ?? defaultState.deletedFlashcardIds,
+  });
+}
+
 function loadState() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return normalizeState(raw ? { ...defaultState, ...JSON.parse(raw) } : defaultState);
+    return hydrateStateFromStorage();
   } catch {
     return defaultState;
   }
 }
 
 function saveState(state) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  const normalized = normalizeState(state);
+  const slices = buildStorageSlices(normalized);
+  Object.entries(slices).forEach(([sliceName, value]) => {
+    const serialized = JSON.stringify(value);
+    if (lastSavedStorageSlices[sliceName] === serialized) return;
+    localStorage.setItem(STORAGE_SLICE_KEYS[sliceName], serialized);
+    lastSavedStorageSlices[sliceName] = serialized;
+  });
+  const marker = JSON.stringify({ storageVersion: STORAGE_VERSION });
+  if (lastSavedStorageSlices.marker !== marker) {
+    localStorage.setItem(STORAGE_KEY, marker);
+    lastSavedStorageSlices.marker = marker;
+  }
 }
 
 function normalizeFocusSessions(focusSessions = []) {
@@ -4397,7 +4488,18 @@ function QuestionManagerPanel({
   onUpdateStat,
 }) {
   const [mode, setMode] = useState('browse');
+  const [questionPage, setQuestionPage] = useState(0);
   const selectedQuestion = editingQuestionId ? getQuestionWithOverride(editingQuestionId, state) : null;
+  const questionPageCount = Math.max(1, Math.ceil(questions.length / QUESTION_MANAGER_PAGE_SIZE));
+  const currentQuestionPage = Math.min(questionPage, questionPageCount - 1);
+  const visibleQuestions = questions.slice(
+    currentQuestionPage * QUESTION_MANAGER_PAGE_SIZE,
+    (currentQuestionPage + 1) * QUESTION_MANAGER_PAGE_SIZE
+  );
+
+  useEffect(() => {
+    setQuestionPage(0);
+  }, [search, bankYear, bankCancer]);
 
   const startNewQuestion = () => {
     const id = `custom-${Date.now()}`;
@@ -4476,9 +4578,9 @@ function QuestionManagerPanel({
         <section className="question-manager-list" aria-label="Question list">
           <div className="list-summary">
             <strong>{questions.length}</strong>
-            <span className="muted">符合條件，顯示前 80 題</span>
+            <span className="muted">符合條件，第 {currentQuestionPage + 1}/{questionPageCount} 頁</span>
           </div>
-          {questions.slice(0, 80).map((q) => (
+          {visibleQuestions.map((q) => (
             <button
               type="button"
               key={q.id}
@@ -4490,6 +4592,11 @@ function QuestionManagerPanel({
               <span>{q.cancer} · {q.tags?.cancerType || q.topic} · {q.tags?.clinicalSetting || q.topic}</span>
             </button>
           ))}
+          <div className="pagination-row">
+            <button className="secondary" type="button" disabled={currentQuestionPage === 0} onClick={() => setQuestionPage((page) => Math.max(0, page - 1))}>上一頁</button>
+            <span>{currentQuestionPage + 1} / {questionPageCount}</span>
+            <button className="secondary" type="button" disabled={currentQuestionPage + 1 >= questionPageCount} onClick={() => setQuestionPage((page) => Math.min(questionPageCount - 1, page + 1))}>下一頁</button>
+          </div>
         </section>
 
         <section className="question-manager-detail" aria-label="Question detail">
@@ -4847,6 +4954,7 @@ function QuestPanel({
 
 function FlashcardsPanel({
   state,
+  allFlashcards,
   dueFlashcards,
   weakQuestions,
   onReviewCard,
@@ -4861,9 +4969,30 @@ function FlashcardsPanel({
   const [cardPrompt, setCardPrompt] = useState('');
   const [cardPromptMessage, setCardPromptMessage] = useState('');
   const [editingCardId, setEditingCardId] = useState(null);
-  const allFlashcards = getFlashcardList(state);
+  const [duePage, setDuePage] = useState(0);
+  const [trialPage, setTrialPage] = useState(0);
   const trialCards = allFlashcards.filter((card) => card.sourceType === 'trial' || card.type === 'Trial Card');
   const weakCards = allFlashcards.filter((card) => (card.mastery || 0) <= 2);
+  const duePageCount = Math.max(1, Math.ceil(dueFlashcards.length / FLASHCARD_PAGE_SIZE));
+  const trialPageCount = Math.max(1, Math.ceil(trialCards.length / FLASHCARD_PAGE_SIZE));
+  const currentDuePage = Math.min(duePage, duePageCount - 1);
+  const currentTrialPage = Math.min(trialPage, trialPageCount - 1);
+  const visibleDueFlashcards = dueFlashcards.slice(
+    currentDuePage * FLASHCARD_PAGE_SIZE,
+    (currentDuePage + 1) * FLASHCARD_PAGE_SIZE
+  );
+  const visibleTrialCards = trialCards.slice(
+    currentTrialPage * FLASHCARD_PAGE_SIZE,
+    (currentTrialPage + 1) * FLASHCARD_PAGE_SIZE
+  );
+
+  useEffect(() => {
+    setDuePage(0);
+  }, [dueFlashcards.length]);
+
+  useEffect(() => {
+    setTrialPage(0);
+  }, [trialCards.length]);
 
   const submitTrialCard = () => {
     onCreateTrialCard(trialName);
@@ -5100,43 +5229,63 @@ ${trialText || '目前沒有符合條件的 trial 來源。'}
       </div>
 
       <div className="subsection">
-        <h3>Due Cards</h3>
+        <div className="section-mini-head">
+          <h3>Due Cards</h3>
+          <span className="muted">{dueFlashcards.length} cards · page {currentDuePage + 1}/{duePageCount}</span>
+        </div>
         {!dueFlashcards.length ? <p className="muted">今天沒有到期卡片。</p> : (
-          <div className="flashcard-grid">
-            {dueFlashcards.slice(0, 40).map((card) => (
-              <FlashcardCard
-                key={card.id}
-                card={card}
-                onReviewCard={onReviewCard}
-                onUpdateCard={onUpdateFlashcard}
-                onDeleteCard={onDeleteFlashcard}
-                editing={editingCardId === card.id}
-                onStartEdit={() => setEditingCardId(card.id)}
-                onCancelEdit={() => setEditingCardId(null)}
-              />
-            ))}
-          </div>
+          <>
+            <div className="flashcard-grid">
+              {visibleDueFlashcards.map((card) => (
+                <FlashcardCard
+                  key={card.id}
+                  card={card}
+                  onReviewCard={onReviewCard}
+                  onUpdateCard={onUpdateFlashcard}
+                  onDeleteCard={onDeleteFlashcard}
+                  editing={editingCardId === card.id}
+                  onStartEdit={() => setEditingCardId(card.id)}
+                  onCancelEdit={() => setEditingCardId(null)}
+                />
+              ))}
+            </div>
+            <div className="pagination-row">
+              <button className="secondary" type="button" disabled={currentDuePage === 0} onClick={() => setDuePage((page) => Math.max(0, page - 1))}>上一頁</button>
+              <span>{currentDuePage + 1} / {duePageCount}</span>
+              <button className="secondary" type="button" disabled={currentDuePage + 1 >= duePageCount} onClick={() => setDuePage((page) => Math.min(duePageCount - 1, page + 1))}>下一頁</button>
+            </div>
+          </>
         )}
       </div>
 
       <div className="subsection">
-        <h3>Trial Cards</h3>
+        <div className="section-mini-head">
+          <h3>Trial Cards</h3>
+          <span className="muted">{trialCards.length} cards · page {currentTrialPage + 1}/{trialPageCount}</span>
+        </div>
         {!trialCards.length ? <p className="muted">尚未建立 Trial Card。</p> : (
-          <div className="flashcard-grid">
-            {trialCards.slice(0, 20).map((card) => (
-              <FlashcardCard
-                key={card.id}
-                card={card}
-                onReviewCard={onReviewCard}
-                onUpdateCard={onUpdateFlashcard}
-                onDeleteCard={onDeleteFlashcard}
-                compact
-                editing={editingCardId === card.id}
-                onStartEdit={() => setEditingCardId(card.id)}
-                onCancelEdit={() => setEditingCardId(null)}
-              />
-            ))}
-          </div>
+          <>
+            <div className="flashcard-grid">
+              {visibleTrialCards.map((card) => (
+                <FlashcardCard
+                  key={card.id}
+                  card={card}
+                  onReviewCard={onReviewCard}
+                  onUpdateCard={onUpdateFlashcard}
+                  onDeleteCard={onDeleteFlashcard}
+                  compact
+                  editing={editingCardId === card.id}
+                  onStartEdit={() => setEditingCardId(card.id)}
+                  onCancelEdit={() => setEditingCardId(null)}
+                />
+              ))}
+            </div>
+            <div className="pagination-row">
+              <button className="secondary" type="button" disabled={currentTrialPage === 0} onClick={() => setTrialPage((page) => Math.max(0, page - 1))}>上一頁</button>
+              <span>{currentTrialPage + 1} / {trialPageCount}</span>
+              <button className="secondary" type="button" disabled={currentTrialPage + 1 >= trialPageCount} onClick={() => setTrialPage((page) => Math.min(trialPageCount - 1, page + 1))}>下一頁</button>
+            </div>
+          </>
         )}
       </div>
     </main>
@@ -6108,6 +6257,18 @@ export default function App() {
   };
 
   const todaySession = state.sessions[TODAY];
+  const questionDataState = useMemo(() => ({
+    stats: state.stats,
+    sessions: state.sessions,
+    questionOverrides: state.questionOverrides,
+    customQuestions: state.customQuestions,
+    deletedQuestionIds: state.deletedQuestionIds,
+  }), [state.stats, state.sessions, state.questionOverrides, state.customQuestions, state.deletedQuestionIds]);
+  const flashcardDataState = useMemo(() => ({
+    flashcards: state.flashcards,
+    flashcardStats: state.flashcardStats,
+    deletedFlashcardIds: state.deletedFlashcardIds,
+  }), [state.flashcards, state.flashcardStats, state.deletedFlashcardIds]);
   const baseQuestTask = getTodayPlanTask(state);
   const rawTodayIds = todaySession?.questionIds || EMPTY_ARRAY;
   const todaySessionPlanTaskId = todaySession?.planTaskId || null;
@@ -6117,8 +6278,8 @@ export default function App() {
     [todaySessionMatchesQuest, rawTodayIds]
   );
   const todayQuestions = useMemo(
-    () => todayIds.map((id) => getQuestionWithOverride(id, state)).filter(Boolean),
-    [todayIds, state]
+    () => todayIds.map((id) => getQuestionWithOverride(id, questionDataState)).filter(Boolean),
+    [todayIds, questionDataState]
   );
   const selectedPracticeMode = state.settings?.practiceMode || 'standard';
   const selectedPracticeConfig = getPracticeModeConfig(selectedPracticeMode);
@@ -6147,11 +6308,15 @@ export default function App() {
   const currentPracticePage = Math.min(practicePage, Math.max(0, Math.ceil(todayQuestions.length / PRACTICE_PAGE_SIZE) - 1));
   const visibleTodayQuestions = todayQuestions.slice(currentPracticePage * PRACTICE_PAGE_SIZE, (currentPracticePage + 1) * PRACTICE_PAGE_SIZE);
   const totalPracticePages = Math.ceil(todayPracticeConfig.total / PRACTICE_PAGE_SIZE);
-  const questRecallCards = getQuestMemoryCards(state, questTask);
-  const questBossChallenges = buildBossChallenges(questTask, state);
-  const highYieldTopics = getRankedHighYieldTopics(state, questTask);
-  const todayHighValueCards = getHighValueCardsCreatedToday(state);
-  const todayErrorTypeStatus = getDailyWrongErrorTypeStatus(state, todayIds);
+  const questRecallCards = tab === 'quest' ? getQuestMemoryCards(flashcardDataState, questTask) : EMPTY_ARRAY;
+  const questBossChallenges = tab === 'quest' ? buildBossChallenges(questTask, questionDataState) : EMPTY_ARRAY;
+  const highYieldTopics = tab === 'quest' || tab === 'today' ? getRankedHighYieldTopics(questionDataState, questTask) : EMPTY_ARRAY;
+  const todayHighValueCards = tab === 'quest' ? getHighValueCardsCreatedToday(flashcardDataState) : EMPTY_ARRAY;
+  const todayErrorTypeStatus = tab === 'quest' ? getDailyWrongErrorTypeStatus(questionDataState, todayIds) : {
+    wrongRatedCount: 0,
+    classifiedCount: 0,
+    complete: true,
+  };
   const completionStatus = [
     {
       label: 'Daily Practice completed',
@@ -6315,8 +6480,7 @@ export default function App() {
   };
 
   const claimDailyChest = () => {
-    const currentChest = getDailyChest(state, todayCompleted);
-    if (currentChest.progress < 100 || currentChest.claimed) return;
+    if (dailyChest.progress < 100 || dailyChest.claimed) return;
     playTaskCompletionFeedback();
     updateState((prev) => {
       const nextGame = awardXp(prev.game || defaultState.game, 80, 'Daily Chest opened', { date: TODAY, reward: 'daily-chest' });
@@ -6479,7 +6643,21 @@ export default function App() {
   const needsCancerSummary = ['stats', 'readiness', 'analytics'].includes(tab);
   const needsTaxonomyAnalytics = tab === 'analytics';
   const needsBankQuestions = tab === 'questions';
-  const needsFlashcardLists = ['stats', 'flashcards', 'flashcard-review'].includes(tab);
+  const needsFlashcardLists = ['stats', 'flashcards', 'flashcard-review', 'plan'].includes(tab);
+  const readinessDataState = useMemo(() => ({
+    ...questionDataState,
+    mockExams: state.mockExams,
+  }), [questionDataState, state.mockExams]);
+  const bossDataState = useMemo(() => ({
+    ...flashcardDataState,
+    planProgress: state.planProgress,
+    mockExams: state.mockExams,
+  }), [flashcardDataState, state.planProgress, state.mockExams]);
+  const chestDataState = useMemo(() => ({
+    stats: state.stats,
+    flashcardStats: state.flashcardStats,
+    game: state.game,
+  }), [state.stats, state.flashcardStats, state.game]);
 
   const dueCount = useMemo(() => Object.values(state.stats || {})
     .filter((stat) => stat.nextReviewDate && stat.nextReviewDate <= TODAY).length, [state.stats]);
@@ -6494,15 +6672,15 @@ export default function App() {
   const dueFlashcardCount = useMemo(() => Object.values(state.flashcardStats || {})
     .filter((stat) => !stat.nextReviewDate || stat.nextReviewDate <= TODAY).length, [state.flashcardStats]);
 
-  const dueReview = useMemo(() => needsDueReview ? getQuestionPool(state)
-    .map((q) => ({ q: getQuestionWithOverride(q.id, state), stat: getStat(state, q.id) }))
+  const dueReview = useMemo(() => needsDueReview ? getQuestionPool(questionDataState)
+    .map((q) => ({ q: getQuestionWithOverride(q.id, questionDataState), stat: getStat(questionDataState, q.id) }))
     .filter(({ q, stat }) => q && stat.nextReviewDate && stat.nextReviewDate <= TODAY)
-    .sort((a, b) => wrongRate(b.stat) - wrongRate(a.stat)) : EMPTY_ARRAY, [needsDueReview, state]);
+    .sort((a, b) => wrongRate(b.stat) - wrongRate(a.stat)) : EMPTY_ARRAY, [needsDueReview, questionDataState]);
 
-  const weakQuestions = useMemo(() => needsWeakQuestions ? getQuestionPool(state)
-    .map((q) => ({ q: getQuestionWithOverride(q.id, state), stat: getStat(state, q.id) }))
+  const weakQuestions = useMemo(() => needsWeakQuestions ? getQuestionPool(questionDataState)
+    .map((q) => ({ q: getQuestionWithOverride(q.id, questionDataState), stat: getStat(questionDataState, q.id) }))
     .filter(({ q, stat }) => q && (stat.wrong > 0 || stat.bookmarked))
-    .sort((a, b) => wrongRate(b.stat) - wrongRate(a.stat) || b.stat.wrong - a.stat.wrong) : EMPTY_ARRAY, [needsWeakQuestions, state]);
+    .sort((a, b) => wrongRate(b.stat) - wrongRate(a.stat) || b.stat.wrong - a.stat.wrong) : EMPTY_ARRAY, [needsWeakQuestions, questionDataState]);
 
   const remediationQueue = useMemo(() => needsDueReview ? weakQuestions
     .map(({ q, stat }) => {
@@ -6523,20 +6701,28 @@ export default function App() {
     const wrong = stats.reduce((s, x) => s + (x.wrong || 0), 0);
     const reviewed = Object.keys(state.stats).filter((id) => state.stats[id]?.attempts > 0).length;
     return { attempts, correct, wrong, reviewed, accuracy: attempts ? Math.round((correct / attempts) * 100) : 0 };
-  }, [state]);
+  }, [state.stats]);
 
-  const cancerSummary = useMemo(() => needsCancerSummary ? getCancerSummary(state) : EMPTY_ARRAY, [needsCancerSummary, state]);
-  const taxonomyAnalytics = useMemo(() => needsTaxonomyAnalytics ? getTaxonomyAnalytics(state) : {
+  const cancerSummary = useMemo(() => needsCancerSummary ? getCancerSummary(questionDataState) : EMPTY_ARRAY, [needsCancerSummary, questionDataState]);
+  const taxonomyAnalytics = useMemo(() => needsTaxonomyAnalytics ? getTaxonomyAnalytics(questionDataState) : {
     clinicalSetting: EMPTY_ARRAY,
     evidenceType: EMPTY_ARRAY,
     biomarker: EMPTY_ARRAY,
     treatmentModality: EMPTY_ARRAY,
-  }, [needsTaxonomyAnalytics, state]);
-  const readiness = useMemo(() => needsFullReadiness ? getReadinessMetrics(state) : getQuickReadinessMetrics(state), [needsFullReadiness, state]);
-  const bossRows = useMemo(() => needsFullReadiness ? getBossRows(state, readiness) : EMPTY_ARRAY, [needsFullReadiness, state, readiness]);
-  const dailyChest = getDailyChest(state, todayCompleted);
-  const allFlashcards = useMemo(() => needsFlashcardLists ? getFlashcardList(state) : EMPTY_ARRAY, [needsFlashcardLists, state]);
-  const dueFlashcards = useMemo(() => needsFlashcardLists ? getDueFlashcards(state) : EMPTY_ARRAY, [needsFlashcardLists, state]);
+  }, [needsTaxonomyAnalytics, questionDataState]);
+  const readiness = useMemo(() => needsFullReadiness ? getReadinessMetrics(readinessDataState) : getQuickReadinessMetrics(readinessDataState), [needsFullReadiness, readinessDataState]);
+  const bossRows = useMemo(() => needsFullReadiness ? getBossRows(bossDataState, readiness) : EMPTY_ARRAY, [needsFullReadiness, bossDataState, readiness]);
+  const dailyChest = getDailyChest(chestDataState, todayCompleted);
+  const flashcardListState = useMemo(() => ({
+    flashcards: state.flashcards,
+    flashcardStats: state.flashcardStats,
+  }), [state.flashcards, state.flashcardStats]);
+  const allFlashcards = useMemo(() => needsFlashcardLists ? getFlashcardList(flashcardListState) : EMPTY_ARRAY, [needsFlashcardLists, flashcardListState]);
+  const dueFlashcards = useMemo(() => needsFlashcardLists ? getDueFlashcards(flashcardListState) : EMPTY_ARRAY, [needsFlashcardLists, flashcardListState]);
+  const trialCardTotal = useMemo(
+    () => allFlashcards.filter((card) => card.sourceType === 'trial' || card.type === 'Trial Card').length,
+    [allFlashcards]
+  );
 
   const finishMockExam = (completedExam) => {
     updateState((prev) => {
@@ -6608,10 +6794,26 @@ export default function App() {
     };
   }, [planProgress]);
 
-  const statsDashboard = useMemo(
-    () => (tab === 'stats' ? getStatsDashboard(state, planSummary, readiness, cancerSummary) : null),
-    [tab, state, planSummary, readiness, cancerSummary]
-  );
+  const statsDashboardState = useMemo(() => ({
+    ...defaultState,
+    stats: state.stats,
+    sessions: state.sessions,
+    flashcards: state.flashcards,
+    flashcardStats: state.flashcardStats,
+    focusSessions: state.focusSessions,
+    dailyQuestProgress: state.dailyQuestProgress,
+  }), [state.stats, state.sessions, state.flashcards, state.flashcardStats, state.focusSessions, state.dailyQuestProgress]);
+
+  const statsDashboard = useMemo(() => {
+    if (tab !== 'stats') return null;
+    return getStatsDashboard(statsDashboardState, planSummary, readiness, cancerSummary);
+  }, [
+    tab,
+    statsDashboardState,
+    planSummary,
+    readiness,
+    cancerSummary,
+  ]);
 
 
   const nextPlanTask = studyPlan100.find((task) => !planProgress[task.id]) || studyPlan100[studyPlan100.length - 1];
@@ -6768,8 +6970,8 @@ export default function App() {
   };
 
 
-  const bankQuestions = useMemo(() => needsBankQuestions ? getQuestionPool(state)
-    .map((q) => getQuestionWithOverride(q.id, state))
+  const bankQuestions = useMemo(() => needsBankQuestions ? getQuestionPool(questionDataState)
+    .map((q) => getQuestionWithOverride(q.id, questionDataState))
     .filter(Boolean)
     .filter((q) => {
       const text = `${questionSearchText(q)} ${tagSearchText(q.tags)}`;
@@ -6777,7 +6979,7 @@ export default function App() {
       const cancerOk = bankCancer === 'All' || (q.tags?.cancerDomain || q.cancer) === bankCancer;
       const yearOk = bankYear === 'All' || String(q.year) === String(bankYear);
       return searchOk && cancerOk && yearOk;
-    }) : EMPTY_ARRAY, [needsBankQuestions, search, bankCancer, bankYear, state]);
+    }) : EMPTY_ARRAY, [needsBankQuestions, search, bankCancer, bankYear, questionDataState]);
 
   const updateSettings = (patch) => {
     updateState((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } }));
@@ -7009,6 +7211,7 @@ export default function App() {
       {tab === 'flashcards' && (
         <FlashcardsPanel
           state={state}
+          allFlashcards={allFlashcards}
           dueFlashcards={dueFlashcards}
           weakQuestions={weakQuestions}
           onReviewCard={reviewFlashcard}
@@ -7243,7 +7446,7 @@ export default function App() {
             <MetricCard label="今日建議" value={`Day ${Math.min(planSummary.completed + 1, 100)}`} sub="照順序推進，錯題用 Review Queue 補強" />
             <MetricCard label="Game level" value={`Lv ${state.game?.level || 1}`} sub={`${state.game?.xp || 0} XP`} />
             <MetricCard label="Boss defeated" value={(state.game?.defeatedBosses || []).length} sub={`${(state.game?.unlockedBosses || []).length} unlocked`} />
-            <MetricCard label="Trial cards" value={getFlashcardList(state).filter((card) => card.sourceType === 'trial' || card.type === 'Trial Card').length} sub="Trial Boss target 50" />
+            <MetricCard label="Trial cards" value={trialCardTotal} sub="Trial Boss target 50" />
           </section>
 
           <section className="plan-progress-panel" aria-label="100-Day Plan completion progress">
