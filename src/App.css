@@ -83,6 +83,33 @@ button.tap-animate::after,
   }
 }
 
+@media (hover: none) and (pointer: coarse) {
+  button,
+  .tap-surface,
+  .option,
+  .check-pill,
+  .manager-question-row,
+  .mission-action,
+  .chip-check,
+  .rating-button,
+  .file-button {
+    -webkit-tap-highlight-color: rgba(37, 99, 235, 0.14);
+  }
+
+  button::after,
+  .tap-surface::after,
+  .option::after,
+  .check-pill::after,
+  .manager-question-row::after,
+  .mission-action::after,
+  .chip-check::after,
+  .rating-button::after,
+  .file-button::after {
+    content: none;
+    animation: none;
+  }
+}
+
 .app-shell {
   max-width: 1280px;
   margin: 0 auto;

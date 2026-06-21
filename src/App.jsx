@@ -141,6 +141,7 @@ const XP_RULES = {
 
 let feedbackAudioContext = null;
 let feedbackAudioUnlocked = false;
+let feedbackAudioPreloaded = false;
 const FEEDBACK_SOUND_PATHS = {
   correct: '/sounds/correct.mp3',
   wrong: '/sounds/wrong.mp3',
@@ -167,11 +168,14 @@ function getFeedbackAudioContext() {
 
 function unlockFeedbackAudio() {
   const context = getFeedbackAudioContext();
-  Object.entries(FEEDBACK_SOUND_PATHS).forEach(([key, path]) => {
-    feedbackAudioElements[key] ||= new Audio(path);
-    feedbackAudioElements[key].preload = 'auto';
-    feedbackAudioElements[key].load();
-  });
+  if (!feedbackAudioPreloaded) {
+    Object.entries(FEEDBACK_SOUND_PATHS).forEach(([key, path]) => {
+      feedbackAudioElements[key] ||= new Audio(path);
+      feedbackAudioElements[key].preload = 'auto';
+      feedbackAudioElements[key].load();
+    });
+    feedbackAudioPreloaded = true;
+  }
 
   if (!context) return;
 
@@ -194,9 +198,11 @@ function unlockFeedbackAudio() {
 function playFeedbackSound(soundKey, fallback) {
   unlockFeedbackAudio();
   const path = FEEDBACK_SOUND_PATHS[soundKey];
-  const audio = new Audio(path);
+  const audio = feedbackAudioElements[soundKey] || new Audio(path);
+  feedbackAudioElements[soundKey] = audio;
   audio.preload = 'auto';
   audio.volume = soundKey === 'wrong' ? 0.9 : 0.85;
+  audio.currentTime = 0;
 
   const playPromise = audio.play();
   if (playPromise?.catch) {
@@ -5570,6 +5576,7 @@ function MockExamPanel({ state, onFinishMock }) {
 
 export default function App() {
   const [state, setState] = useState(loadState);
+  const latestStateRef = useRef(state);
   const [tab, setTab] = useState('quest');
   const [search, setSearch] = useState('');
   const [bankCancer, setBankCancer] = useState('All');
@@ -5589,8 +5596,33 @@ export default function App() {
   const [leaderboardStartedAt, setLeaderboardStartedAt] = useState(() => Date.now());
 
   useEffect(() => {
-    saveState(state);
+    latestStateRef.current = state;
+    let idleId = null;
+    const saveLatestState = () => saveState(latestStateRef.current);
+    const timeoutId = window.setTimeout(() => {
+      if ('requestIdleCallback' in window) {
+        idleId = window.requestIdleCallback(saveLatestState, { timeout: 1200 });
+        return;
+      }
+      saveLatestState();
+    }, 180);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      if (idleId !== null && 'cancelIdleCallback' in window) {
+        window.cancelIdleCallback(idleId);
+      }
+    };
   }, [state]);
+
+  useEffect(() => {
+    const saveBeforeLeaving = () => saveState(latestStateRef.current);
+    window.addEventListener('pagehide', saveBeforeLeaving);
+    return () => {
+      saveBeforeLeaving();
+      window.removeEventListener('pagehide', saveBeforeLeaving);
+    };
+  }, []);
 
   useEffect(() => {
     isApplyingCloudStateRef.current = isApplyingCloudState;
@@ -5611,7 +5643,6 @@ export default function App() {
         window.requestAnimationFrame(() => tapSurface.classList.add('tap-animate'));
         window.setTimeout(() => tapSurface.classList.remove('tap-animate'), 450);
       }
-      unlockFeedbackAudio();
       triggerHapticFeedback('tap');
     };
 
