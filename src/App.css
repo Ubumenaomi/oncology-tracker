@@ -873,6 +873,21 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.5; }
   padding: 6px 4px 12px;
 }
 
+.pagination-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.pagination-row span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .manager-question-row {
   width: 100%;
   border: 1px solid transparent;
@@ -1592,6 +1607,18 @@ button.tiny,
   color: var(--muted);
   font-size: 13px;
   font-weight: 800;
+}
+
+.section-mini-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.section-mini-head h3 {
+  margin: 0;
 }
 
 .flashcard-grid {
