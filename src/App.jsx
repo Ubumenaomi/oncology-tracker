@@ -508,6 +508,10 @@ const BANK_QUESTION_BY_ID = new Map(questionBank.map((question) => [question.id,
 const defaultState = {
   sessions: {},
   focusSessions: [],
+  focusTimer: {
+    activeSession: null,
+    leaderboardStartedAt: new Date().toISOString(),
+  },
   stats: {},
   settings: {
     dailyCount: 30,
@@ -907,6 +911,7 @@ function buildStorageSlices(state) {
     activity: {
       focusSessions: state.focusSessions || [],
       mockExams: state.mockExams || [],
+      focusTimer: state.focusTimer || defaultState.focusTimer,
     },
     sessions: {
       sessions: state.sessions || {},
@@ -969,6 +974,7 @@ function hydrateStateFromStorage() {
     cloudMeta: app?.cloudMeta ?? v2Core?.cloudMeta ?? legacyState.cloudMeta ?? defaultState.cloudMeta,
     focusSessions: activity?.focusSessions ?? v2Core?.focusSessions ?? legacyState.focusSessions ?? defaultState.focusSessions,
     mockExams: activity?.mockExams ?? v2Core?.mockExams ?? legacyState.mockExams ?? defaultState.mockExams,
+    focusTimer: activity?.focusTimer ?? v2Core?.focusTimer ?? legacyState.focusTimer ?? defaultState.focusTimer,
     sessions: sessions?.sessions ?? v2Core?.sessions ?? legacyState.sessions ?? defaultState.sessions,
     planProgress: progress?.planProgress ?? v2Core?.planProgress ?? legacyState.planProgress ?? defaultState.planProgress,
     planItemProgress: progress?.planItemProgress ?? v2Core?.planItemProgress ?? legacyState.planItemProgress ?? defaultState.planItemProgress,
@@ -1028,12 +1034,55 @@ function normalizeFocusSessions(focusSessions = []) {
     }));
 }
 
+function normalizeFocusTimer(focusTimer = {}) {
+  const active = focusTimer?.activeSession;
+  const activeSession = active?.id && active?.startedAt
+    ? {
+        id: String(active.id),
+        date: active.date || formatLocalDate(new Date(active.startedAt)),
+        startedAt: active.startedAt,
+        planTaskId: active.planTaskId || null,
+        planTopic: active.planTopic || '',
+        updatedAt: active.updatedAt || active.startedAt,
+      }
+    : null;
+  return {
+    activeSession,
+    leaderboardStartedAt: focusTimer?.leaderboardStartedAt || defaultState.focusTimer.leaderboardStartedAt,
+  };
+}
+
 function mergeFocusSessions(cloudSessions = [], localSessions = []) {
   const byId = new Map();
   [...normalizeFocusSessions(cloudSessions), ...normalizeFocusSessions(localSessions)].forEach((session) => {
     byId.set(session.id, session);
   });
   return [...byId.values()].sort((a, b) => String(b.startedAt || b.date).localeCompare(String(a.startedAt || a.date)));
+}
+
+function mergeFocusTimer(cloudTimer = {}, localTimer = {}) {
+  const cloud = normalizeFocusTimer(cloudTimer);
+  const local = normalizeFocusTimer(localTimer);
+  const activeSession = [cloud.activeSession, local.activeSession]
+    .filter(Boolean)
+    .sort((a, b) => String(b.updatedAt || b.startedAt).localeCompare(String(a.updatedAt || a.startedAt)))[0] || null;
+  const startedAtCandidates = [cloud.leaderboardStartedAt, local.leaderboardStartedAt].filter(Boolean).sort();
+  return {
+    activeSession,
+    leaderboardStartedAt: startedAtCandidates[0] || defaultState.focusTimer.leaderboardStartedAt,
+  };
+}
+
+function removeCompletedActiveFocusSession(focusTimer, focusSessions = []) {
+  const normalizedTimer = normalizeFocusTimer(focusTimer);
+  const completedIds = new Set(normalizeFocusSessions(focusSessions).map((session) => session.id));
+  if (normalizedTimer.activeSession && completedIds.has(normalizedTimer.activeSession.id)) {
+    return {
+      ...normalizedTimer,
+      activeSession: null,
+    };
+  }
+  return normalizedTimer;
 }
 
 function mergeCloudState(localState, cloudState) {
@@ -1048,6 +1097,7 @@ function mergeCloudState(localState, cloudState) {
   const cloudGameResetAt = cloudState?.cloudMeta?.gameResetAt || '';
   const planResetOwner = localPlanResetAt > cloudPlanResetAt ? 'local' : cloudPlanResetAt > localPlanResetAt ? 'cloud' : 'none';
   const gameResetOwner = localGameResetAt > cloudGameResetAt ? 'local' : cloudGameResetAt > localGameResetAt ? 'cloud' : 'none';
+  const mergedFocusSessions = mergeFocusSessions(cloudState.focusSessions, localState.focusSessions);
 
   return normalizeState({
     ...defaultState,
@@ -1057,7 +1107,8 @@ function mergeCloudState(localState, cloudState) {
       ...(cloudState.sessions || {}),
       ...(localState.sessions || {}),
     },
-    focusSessions: mergeFocusSessions(cloudState.focusSessions, localState.focusSessions),
+    focusSessions: mergedFocusSessions,
+    focusTimer: removeCompletedActiveFocusSession(mergeFocusTimer(cloudState.focusTimer, localState.focusTimer), mergedFocusSessions),
     stats: {
       ...(cloudState.stats || {}),
       ...(localState.stats || {}),
@@ -1402,6 +1453,7 @@ function normalizeState(state) {
     deletedQuestionIds: state?.deletedQuestionIds || {},
     deletedFlashcardIds,
     focusSessions: normalizeFocusSessions(state?.focusSessions),
+    focusTimer: normalizeFocusTimer(state?.focusTimer),
     flashcards,
     flashcardStats: normalizeFlashcardStats(removeDeletedFlashcardRecords(state?.flashcardStats, deletedFlashcardIds), flashcards),
     game: { ...game, xp, level: xpLevel(xp), streak: player.streak, badges: player.badges },
@@ -4113,7 +4165,7 @@ function SyncPanel({
       <div className="section-head">
         <div>
           <h2>Cloud Sync：手機同步</h2>
-          <p className="muted">登入同一組帳號後，MacBook、iPhone、iPad 會讀取同一份作答紀錄、錯題率、詳解與 100-Day Plan checklist。</p>
+          <p className="muted">登入同一組帳號後，MacBook、iPhone、iPad 會讀取同一份作答紀錄、錯題率、專注時間、讀書時長排行榜與 100-Day Plan checklist。</p>
         </div>
         <span className={user ? 'cloud-badge online' : 'cloud-badge offline'}>
           {user ? 'Cloud sync on' : 'Local only'}
@@ -4168,7 +4220,7 @@ function SyncPanel({
           <li>把專案 deploy 到 Vercel 或 Firebase Hosting。</li>
           <li>手機 Safari/Chrome 打開正式網址。</li>
           <li>登入同一組帳號。</li>
-          <li>Daily Practice、Review Queue、100-Day Plan 會自動同步。</li>
+          <li>Daily Practice、Review Queue、專注時間、讀書時長排行榜、100-Day Plan 會自動同步。</li>
         </ol>
       </div>
     </main>
@@ -5789,9 +5841,11 @@ export default function App() {
   const lastSyncedSignatureRef = useRef(getCloudSyncSignature(loadState()));
   const [practicePage, setPracticePage] = useState(0);
   const [practicePageMessage, setPracticePageMessage] = useState('');
-  const [focusStartedAt, setFocusStartedAt] = useState(null);
   const [focusTick, setFocusTick] = useState(() => Date.now());
-  const [leaderboardStartedAt, setLeaderboardStartedAt] = useState(() => Date.now());
+  const focusTimer = normalizeFocusTimer(state.focusTimer);
+  const activeFocusSession = focusTimer.activeSession;
+  const focusStartedAt = activeFocusSession?.startedAt || null;
+  const leaderboardStartedAt = new Date(focusTimer.leaderboardStartedAt).getTime();
 
   useEffect(() => {
     latestStateRef.current = state;
@@ -5857,10 +5911,6 @@ export default function App() {
     const timer = window.setInterval(() => setFocusTick(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, [focusStartedAt]);
-
-  useEffect(() => {
-    setLeaderboardStartedAt(Date.now());
-  }, []);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -5995,36 +6045,62 @@ export default function App() {
   };
 
   const startFocusSession = () => {
-    setFocusStartedAt(new Date().toISOString());
-    setFocusTick(Date.now());
+    const now = new Date().toISOString();
+    updateState((prev) => ({
+      ...prev,
+      focusTimer: {
+        ...normalizeFocusTimer(prev.focusTimer),
+        leaderboardStartedAt: now,
+        activeSession: {
+          id: `focus-${Date.now()}`,
+          date: TODAY,
+          startedAt: now,
+          planTaskId: questTask?.id || null,
+          planTopic: questTask?.topic || '',
+          updatedAt: now,
+        },
+      },
+    }), ['activity']);
+    setFocusTick(new Date(now).getTime());
   };
 
   const finishFocusSession = () => {
-    if (!focusStartedAt) return;
+    if (!activeFocusSession?.startedAt) return;
     const endedAt = new Date().toISOString();
-    const durationSeconds = Math.max(1, Math.round((new Date(endedAt).getTime() - new Date(focusStartedAt).getTime()) / 1000));
+    const durationSeconds = Math.max(1, Math.round((new Date(endedAt).getTime() - new Date(activeFocusSession.startedAt).getTime()) / 1000));
     const durationMinutes = Math.max(1, Math.round(durationSeconds / 60));
     updateState((prev) => ({
       ...prev,
       focusSessions: [
         {
-          id: `focus-${Date.now()}`,
-          date: TODAY,
-          startedAt: focusStartedAt,
+          id: activeFocusSession.id,
+          date: activeFocusSession.date || TODAY,
+          startedAt: activeFocusSession.startedAt,
           endedAt,
           durationSeconds,
           durationMinutes,
-          planTaskId: questTask?.id || null,
-          planTopic: questTask?.topic || '',
+          planTaskId: activeFocusSession.planTaskId || questTask?.id || null,
+          planTopic: activeFocusSession.planTopic || questTask?.topic || '',
         },
         ...(prev.focusSessions || []),
       ],
-    }));
-    setFocusStartedAt(null);
+      focusTimer: {
+        ...normalizeFocusTimer(prev.focusTimer),
+        activeSession: null,
+      },
+    }), ['activity']);
+    setFocusTick(new Date(endedAt).getTime());
   };
 
   const cancelFocusSession = () => {
-    setFocusStartedAt(null);
+    updateState((prev) => ({
+      ...prev,
+      focusTimer: {
+        ...normalizeFocusTimer(prev.focusTimer),
+        activeSession: null,
+      },
+    }), ['activity']);
+    setFocusTick(new Date().getTime());
   };
 
   const updateStat = (id, nextStat) => {
