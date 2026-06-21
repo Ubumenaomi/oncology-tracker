@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import './App.css';
 import { questionBank, cancerCategories } from './data/questionBank.js';
 import { buildFlashcardTags } from './data/taxonomy.js';
@@ -18,13 +18,25 @@ import {
 } from './firebase.js';
 
 const STORAGE_KEY = 'oncologyTracker.aiReview.v1';
-const STORAGE_VERSION = 2;
-const STORAGE_SLICE_KEYS = {
+const STORAGE_VERSION = 3;
+const STORAGE_V2_SLICE_KEYS = {
   core: `${STORAGE_KEY}.core.v2`,
   questionRecords: `${STORAGE_KEY}.questionRecords.v2`,
   questionEdits: `${STORAGE_KEY}.questionEdits.v2`,
   flashcards: `${STORAGE_KEY}.flashcards.v2`,
   flashcardStats: `${STORAGE_KEY}.flashcardStats.v2`,
+};
+const STORAGE_SLICE_KEYS = {
+  app: `${STORAGE_KEY}.app.v3`,
+  activity: `${STORAGE_KEY}.activity.v3`,
+  sessions: `${STORAGE_KEY}.sessions.v3`,
+  progress: `${STORAGE_KEY}.progress.v3`,
+  quest: `${STORAGE_KEY}.quest.v3`,
+  questionRecords: `${STORAGE_KEY}.questionRecords.v3`,
+  questionEdits: `${STORAGE_KEY}.questionEdits.v3`,
+  flashcards: `${STORAGE_KEY}.flashcards.v3`,
+  flashcardStats: `${STORAGE_KEY}.flashcardStats.v3`,
+  game: `${STORAGE_KEY}.game.v3`,
 };
 const EMPTY_ARRAY = Object.freeze([]);
 const QUESTION_MANAGER_PAGE_SIZE = 50;
@@ -460,6 +472,10 @@ function formatLocalDate(date) {
   return `${y}-${m}-${day}`;
 }
 
+function makeCustomQuestionId() {
+  return `custom-${Date.now()}`;
+}
+
 const TODAY = formatLocalDate(new Date());
 
 const EXAM_DATE = {
@@ -882,37 +898,46 @@ function readStorageJSON(key, fallback = null) {
 }
 
 function buildStorageSlices(state) {
-  const {
-    stats,
-    questionOverrides,
-    customQuestions,
-    deletedQuestionIds,
-    flashcards,
-    flashcardStats,
-    deletedFlashcardIds,
-    ...core
-  } = state;
-
   return {
-    core: {
-      ...core,
+    app: {
       storageVersion: STORAGE_VERSION,
+      settings: state.settings || defaultState.settings,
+      cloudMeta: state.cloudMeta || defaultState.cloudMeta,
+    },
+    activity: {
+      focusSessions: state.focusSessions || [],
+      mockExams: state.mockExams || [],
+    },
+    sessions: {
+      sessions: state.sessions || {},
+    },
+    progress: {
+      planProgress: state.planProgress || {},
+      planItemProgress: state.planItemProgress || {},
+    },
+    quest: {
+      dailyQuestProgress: state.dailyQuestProgress || {},
+      bossProgress: state.bossProgress || {},
     },
     questionRecords: {
-      stats: stats || {},
+      stats: state.stats || {},
     },
     questionEdits: {
-      questionOverrides: questionOverrides || {},
-      customQuestions: customQuestions || {},
-      deletedQuestionIds: deletedQuestionIds || {},
+      questionOverrides: state.questionOverrides || {},
+      customQuestions: state.customQuestions || {},
+      deletedQuestionIds: state.deletedQuestionIds || {},
     },
     flashcards: {
-      flashcards: flashcards || {},
-      deletedFlashcardIds: deletedFlashcardIds || {},
+      flashcards: state.flashcards || {},
+      deletedFlashcardIds: state.deletedFlashcardIds || {},
     },
     flashcardStats: {
-      flashcardStats: flashcardStats || {},
-      deletedFlashcardIds: deletedFlashcardIds || {},
+      flashcardStats: state.flashcardStats || {},
+      deletedFlashcardIds: state.deletedFlashcardIds || {},
+    },
+    game: {
+      game: state.game || defaultState.game,
+      player: state.player || defaultState.player,
     },
   };
 }
@@ -920,16 +945,35 @@ function buildStorageSlices(state) {
 function hydrateStateFromStorage() {
   const legacyRaw = readStorageJSON(STORAGE_KEY, null);
   const legacyState = legacyRaw?.storageVersion === STORAGE_VERSION ? {} : (legacyRaw || {});
-  const core = readStorageJSON(STORAGE_SLICE_KEYS.core, null);
-  const questionRecords = readStorageJSON(STORAGE_SLICE_KEYS.questionRecords, null);
-  const questionEdits = readStorageJSON(STORAGE_SLICE_KEYS.questionEdits, null);
-  const flashcardSlice = readStorageJSON(STORAGE_SLICE_KEYS.flashcards, null);
-  const flashcardStatsSlice = readStorageJSON(STORAGE_SLICE_KEYS.flashcardStats, null);
+  const v2Core = readStorageJSON(STORAGE_V2_SLICE_KEYS.core, null);
+  const app = readStorageJSON(STORAGE_SLICE_KEYS.app, null);
+  const activity = readStorageJSON(STORAGE_SLICE_KEYS.activity, null);
+  const sessions = readStorageJSON(STORAGE_SLICE_KEYS.sessions, null);
+  const progress = readStorageJSON(STORAGE_SLICE_KEYS.progress, null);
+  const quest = readStorageJSON(STORAGE_SLICE_KEYS.quest, null);
+  const game = readStorageJSON(STORAGE_SLICE_KEYS.game, null);
+  const questionRecords = readStorageJSON(STORAGE_SLICE_KEYS.questionRecords, null)
+    || readStorageJSON(STORAGE_V2_SLICE_KEYS.questionRecords, null);
+  const questionEdits = readStorageJSON(STORAGE_SLICE_KEYS.questionEdits, null)
+    || readStorageJSON(STORAGE_V2_SLICE_KEYS.questionEdits, null);
+  const flashcardSlice = readStorageJSON(STORAGE_SLICE_KEYS.flashcards, null)
+    || readStorageJSON(STORAGE_V2_SLICE_KEYS.flashcards, null);
+  const flashcardStatsSlice = readStorageJSON(STORAGE_SLICE_KEYS.flashcardStats, null)
+    || readStorageJSON(STORAGE_V2_SLICE_KEYS.flashcardStats, null);
 
   return normalizeState({
     ...defaultState,
     ...legacyState,
-    ...(core || {}),
+    ...(v2Core || {}),
+    settings: app?.settings ?? v2Core?.settings ?? legacyState.settings ?? defaultState.settings,
+    cloudMeta: app?.cloudMeta ?? v2Core?.cloudMeta ?? legacyState.cloudMeta ?? defaultState.cloudMeta,
+    focusSessions: activity?.focusSessions ?? v2Core?.focusSessions ?? legacyState.focusSessions ?? defaultState.focusSessions,
+    mockExams: activity?.mockExams ?? v2Core?.mockExams ?? legacyState.mockExams ?? defaultState.mockExams,
+    sessions: sessions?.sessions ?? v2Core?.sessions ?? legacyState.sessions ?? defaultState.sessions,
+    planProgress: progress?.planProgress ?? v2Core?.planProgress ?? legacyState.planProgress ?? defaultState.planProgress,
+    planItemProgress: progress?.planItemProgress ?? v2Core?.planItemProgress ?? legacyState.planItemProgress ?? defaultState.planItemProgress,
+    dailyQuestProgress: quest?.dailyQuestProgress ?? v2Core?.dailyQuestProgress ?? legacyState.dailyQuestProgress ?? defaultState.dailyQuestProgress,
+    bossProgress: quest?.bossProgress ?? v2Core?.bossProgress ?? legacyState.bossProgress ?? defaultState.bossProgress,
     stats: questionRecords?.stats ?? legacyState.stats ?? defaultState.stats,
     questionOverrides: questionEdits?.questionOverrides ?? legacyState.questionOverrides ?? defaultState.questionOverrides,
     customQuestions: questionEdits?.customQuestions ?? legacyState.customQuestions ?? defaultState.customQuestions,
@@ -937,6 +981,8 @@ function hydrateStateFromStorage() {
     flashcards: flashcardSlice?.flashcards ?? legacyState.flashcards ?? defaultState.flashcards,
     flashcardStats: flashcardStatsSlice?.flashcardStats ?? flashcardSlice?.flashcardStats ?? legacyState.flashcardStats ?? defaultState.flashcardStats,
     deletedFlashcardIds: flashcardStatsSlice?.deletedFlashcardIds ?? flashcardSlice?.deletedFlashcardIds ?? legacyState.deletedFlashcardIds ?? defaultState.deletedFlashcardIds,
+    game: game?.game ?? v2Core?.game ?? legacyState.game ?? defaultState.game,
+    player: game?.player ?? v2Core?.player ?? legacyState.player ?? defaultState.player,
   });
 }
 
@@ -948,10 +994,12 @@ function loadState() {
   }
 }
 
-function saveState(state) {
+function saveState(state, sliceNames = null) {
   const normalized = normalizeState(state);
   const slices = buildStorageSlices(normalized);
+  const requestedSlices = sliceNames ? new Set(sliceNames) : null;
   Object.entries(slices).forEach(([sliceName, value]) => {
+    if (requestedSlices && !requestedSlices.has(sliceName)) return;
     const serialized = JSON.stringify(value);
     if (lastSavedStorageSlices[sliceName] === serialized) return;
     localStorage.setItem(STORAGE_SLICE_KEYS[sliceName], serialized);
@@ -3647,8 +3695,8 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
           )}
           <span className="pill">{question.cancer}</span>
           <span className="pill soft">{question.topic}</span>
-          {question.trials?.map((trial) => <span key={trial} className="pill trial">{trial}</span>)}
-          {taxonomyChips.slice(0, compact ? 3 : 7).map((tag) => <span key={tag} className="pill tag">{tag}</span>)}
+          {question.trials?.map((trial, index) => <span key={`${trial}-${index}`} className="pill trial">{trial}</span>)}
+          {taxonomyChips.slice(0, compact ? 3 : 7).map((tag, index) => <span key={`${tag}-${index}`} className="pill tag">{tag}</span>)}
         </div>
         <div className="question-actions">
             {onEdit && <button className="secondary" onClick={() => onEdit(question.id)}>編輯題目</button>}
@@ -3664,7 +3712,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
       <p className="stem">{question.stem}</p>
       {!compact && question.tags?.hashTags?.length > 0 && (
         <div className="taxonomy-tags" aria-label="Question taxonomy tags">
-          {question.tags.hashTags.map((tag) => <span key={tag}>{tag}</span>)}
+          {question.tags.hashTags.map((tag, index) => <span key={`${tag}-${index}`}>{tag}</span>)}
         </div>
       )}
 
@@ -4827,8 +4875,8 @@ function QuestPanel({
           <p className="quest-topic">{task.topic}</p>
           <p className="muted">{task.details}</p>
           <div className="trial-tags">
-            {(task.goldenTrials || []).map((trial) => <span key={trial}>{trial}</span>)}
-            {(task.focusTags || []).map((tag) => <span key={tag}>{tag}</span>)}
+            {(task.goldenTrials || []).map((trial, index) => <span key={`${trial}-${index}`}>{trial}</span>)}
+            {(task.focusTags || []).map((tag, index) => <span key={`${tag}-${index}`}>{tag}</span>)}
             <span>Weight {task.highYieldWeight || 3}</span>
           </div>
         </div>
@@ -5473,8 +5521,8 @@ function FlashcardReviewPanel({ dueFlashcards, allFlashcards, onReviewCard, onUp
               <span className="pill">{card.type || card.sourceType || 'Flashcard'}</span>
               <span className="pill soft">{card.cancer}</span>
               <span className="pill soft">{card.topic}</span>
-              {card.trial?.map((trial) => <span className="pill trial" key={trial}>{trial}</span>)}
-              {card.tags?.map((tag) => <span className="pill tag" key={tag}>{tag}</span>)}
+              {card.trial?.map((trial, index) => <span className="pill trial" key={`${trial}-${index}`}>{trial}</span>)}
+              {card.tags?.map((tag, index) => <span className="pill tag" key={`${tag}-${index}`}>{tag}</span>)}
               {card.examValue >= 4 && <span className="priority high">EV{card.examValue}</span>}
             </div>
             <span className="priority">{activeIndex + 1}/{queue.length} · M{card.mastery || 0}</span>
@@ -5726,6 +5774,7 @@ function MockExamPanel({ state, onFinishMock }) {
 export default function App() {
   const [state, setState] = useState(loadState);
   const latestStateRef = useRef(state);
+  const dirtyStorageSlicesRef = useRef(null);
   const [tab, setTab] = useState('quest');
   const [search, setSearch] = useState('');
   const [bankCancer, setBankCancer] = useState('All');
@@ -5746,8 +5795,12 @@ export default function App() {
 
   useEffect(() => {
     latestStateRef.current = state;
+    const slicesToSave = dirtyStorageSlicesRef.current && dirtyStorageSlicesRef.current.size
+      ? [...dirtyStorageSlicesRef.current]
+      : null;
+    dirtyStorageSlicesRef.current = new Set();
     let idleId = null;
-    const saveLatestState = () => saveState(latestStateRef.current);
+    const saveLatestState = () => saveState(latestStateRef.current, slicesToSave);
     const timeoutId = window.setTimeout(() => {
       if ('requestIdleCallback' in window) {
         idleId = window.requestIdleCallback(saveLatestState, { timeout: 1200 });
@@ -5912,7 +5965,7 @@ export default function App() {
             device: navigator.userAgent,
           },
         };
-        saveState(nextState);
+        saveState(nextState, ['app']);
         lastSyncedSignatureRef.current = stateSignature;
         await setDoc(getCloudDocRef(user.uid), makeCloudPayload(nextState, syncedAt), { merge: true });
         setSyncStatus(`已同步到雲端：${new Date().toLocaleString()}`);
@@ -5926,7 +5979,20 @@ export default function App() {
     return () => clearTimeout(timeout);
   }, [state, user, isApplyingCloudState]);
 
-  const updateState = (updater) => setState((prev) => normalizeState(typeof updater === 'function' ? updater(prev) : updater));
+  const queueStorageSlices = (sliceNames = null) => {
+    if (!sliceNames) {
+      dirtyStorageSlicesRef.current = null;
+      return;
+    }
+    if (dirtyStorageSlicesRef.current === null) return;
+    const names = Array.isArray(sliceNames) ? sliceNames : [sliceNames];
+    names.forEach((name) => dirtyStorageSlicesRef.current.add(name));
+  };
+
+  const updateState = (updater, sliceNames = null) => {
+    queueStorageSlices(sliceNames);
+    setState((prev) => normalizeState(typeof updater === 'function' ? updater(prev) : updater));
+  };
 
   const startFocusSession = () => {
     setFocusStartedAt(new Date().toISOString());
@@ -5973,7 +6039,7 @@ export default function App() {
         game = awardXp(game, XP_RULES.highConfidenceWrongCorrected, 'High-confidence wrong corrected', { questionId: id });
       }
       return { ...prev, game, stats: { ...prev.stats, [id]: nextStat } };
-    });
+    }, ['questionRecords', 'game']);
   };
 
   const createTrialCard = (trialName, sourceQuestion = null) => {
@@ -5983,7 +6049,7 @@ export default function App() {
       ...prev,
       flashcards: { ...normalizeFlashcards(prev.flashcards), [card.id]: card },
       flashcardStats: { ...(prev.flashcardStats || {}), [card.id]: makeFlashcardStats(card) },
-    }));
+    }), ['flashcards', 'flashcardStats']);
   };
 
   const reviewFlashcard = (cardId, rating) => {
@@ -6030,7 +6096,7 @@ export default function App() {
           [TODAY]: writeDailyQuestTask(prev, TODAY, currentTask.id, dailyQuestProgress),
         },
       };
-    });
+    }, ['flashcards', 'flashcardStats', 'quest']);
   };
 
   const updateFlashcard = (cardId, patch) => {
@@ -6049,7 +6115,7 @@ export default function App() {
           }),
         },
       };
-    });
+    }, ['flashcards']);
   };
 
   const deleteFlashcard = (cardId) => {
@@ -6069,7 +6135,7 @@ export default function App() {
           [cardId]: new Date().toISOString(),
         },
       };
-    });
+    }, ['flashcards', 'flashcardStats']);
   };
 
   const importFlashcards = (rawJson) => {
@@ -6116,7 +6182,7 @@ export default function App() {
           ...(prev.flashcardStats || {}),
           ...Object.fromEntries(cards.map((card) => [card.id, makeFlashcardStats(card, now)])),
         },
-      }));
+      }), ['flashcards', 'flashcardStats']);
       return { ok: true, message: `已匯入 ${cards.length} 張卡。` };
     } catch (error) {
       return { ok: false, message: error.message || 'JSON 格式錯誤，沒有匯入任何卡片。' };
@@ -6132,13 +6198,13 @@ export default function App() {
         delete nextOverrides[id];
       }
       return { ...prev, questionOverrides: nextOverrides };
-    });
+    }, ['questionEdits']);
   };
 
   const saveCustomQuestion = (question) => {
     const normalized = normalizeQuestion({
       ...question,
-      id: question.id || `custom-${Date.now()}`,
+      id: question.id || makeCustomQuestionId(),
       sourceType: 'custom',
       updatedAt: new Date().toISOString(),
     });
@@ -6152,7 +6218,7 @@ export default function App() {
         ...(prev.deletedQuestionIds || {}),
         [normalized.id]: false,
       },
-    }));
+    }), ['questionEdits']);
   };
 
   const deleteQuestion = (id) => {
@@ -6175,7 +6241,7 @@ export default function App() {
         questionOverrides: nextOverrides,
         deletedQuestionIds: nextDeleted,
       };
-    });
+    }, ['questionEdits']);
   };
 
   const loginWithEmail = async (email, password) => {
@@ -6342,7 +6408,7 @@ export default function App() {
     },
   ];
 
-  const updatePracticeDraft = useCallback((questionId, patch) => {
+  const updatePracticeDraft = (questionId, patch) => {
     updateState((prev) => {
       const sess = prev.sessions?.[TODAY] || {};
       const drafts = { ...(sess.practiceDrafts || {}) };
@@ -6374,8 +6440,8 @@ export default function App() {
           },
         },
       };
-    });
-  }, []);
+    }, ['sessions']);
+  };
 
   const createTodaySession = ({ force = false } = {}) => {
     const modeConfig = getPracticeModeConfig(state.settings?.practiceMode);
@@ -6414,7 +6480,7 @@ export default function App() {
           },
         },
       };
-    });
+    }, ['sessions']);
     setPracticePage(0);
     setTab('today');
   };
@@ -6455,7 +6521,7 @@ export default function App() {
           },
         },
       };
-    });
+    }, ['sessions']);
     if (loadedMore) {
       setPracticePage(nextPage);
     } else {
@@ -6476,7 +6542,7 @@ export default function App() {
         streak: (prev.game?.streak || 0) + 1,
         dailyClaims: { ...(prev.game?.dailyClaims || {}), [TODAY]: true },
       },
-    }));
+    }), ['sessions', 'game']);
   };
 
   const claimDailyChest = () => {
@@ -6495,7 +6561,7 @@ export default function App() {
           trialGems: (prev.game?.trialGems || 0) + 1,
         },
       };
-    });
+    }, ['game']);
   };
 
   const markQuestRecall = (card, rating) => {
@@ -6552,7 +6618,7 @@ export default function App() {
           [TODAY]: writeDailyQuestTask(prev, TODAY, questTask.id, next),
         },
       };
-    });
+    }, isPersistentCard ? ['flashcards', 'flashcardStats', 'quest'] : ['quest']);
   };
 
   const setQuestBossResult = (bossId, passed) => {
@@ -6587,7 +6653,7 @@ export default function App() {
           [TODAY]: writeDailyQuestTask(prev, TODAY, questTask.id, next),
         },
       };
-    });
+    }, ['quest']);
   };
 
   const claimStageClear = () => {
@@ -6629,7 +6695,7 @@ export default function App() {
           }),
         },
       };
-    });
+    }, ['game', 'progress', 'quest']);
   };
 
   const regenerateTodaySession = () => {
@@ -6878,7 +6944,7 @@ export default function App() {
         },
       };
       return syncBossGameState(nextState);
-    });
+    }, ['progress', 'game']);
   };
 
   const togglePlanItem = (task, group, item) => {
@@ -6916,7 +6982,7 @@ export default function App() {
         planItemProgress: nextPlanItemProgress,
       };
       return syncBossGameState(nextState);
-    });
+    }, ['progress', 'game']);
   };
 
   const setPlanCancerCompleted = (cancer, completed) => {
@@ -6928,7 +6994,7 @@ export default function App() {
         nextItemProgress[task.id] = buildFullPlanItemProgress(task, completed);
       });
       return syncBossGameState({ ...prev, planProgress: next, planItemProgress: nextItemProgress });
-    });
+    }, ['progress', 'game']);
   };
 
   const resetPlanProgress = async () => {
@@ -6982,7 +7048,7 @@ export default function App() {
     }) : EMPTY_ARRAY, [needsBankQuestions, search, bankCancer, bankYear, questionDataState]);
 
   const updateSettings = (patch) => {
-    updateState((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } }));
+    updateState((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } }), ['app']);
   };
 
   const setPracticeMode = (practiceMode) => {
@@ -7016,7 +7082,7 @@ export default function App() {
           } : {}),
         },
       };
-    });
+    }, ['app', 'sessions']);
   };
 
   const exportBackup = () => {
