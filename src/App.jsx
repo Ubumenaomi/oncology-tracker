@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import './App.css';
-import { questionBank, cancerCategories } from './data/questionBank.js';
+import { QUESTION_BANK_TOTAL, QUESTION_YEARS, cancerCategories } from './data/questionBankMeta.js';
 import { buildFlashcardTags } from './data/taxonomy.js';
 import {
   auth,
@@ -41,6 +41,16 @@ const STORAGE_SLICE_KEYS = {
 const EMPTY_ARRAY = Object.freeze([]);
 const QUESTION_MANAGER_PAGE_SIZE = 50;
 const FLASHCARD_PAGE_SIZE = 24;
+const QUESTION_YEAR_LOADERS = {
+  111: () => import('./data/questions/year111.js').then((module) => module.questions111),
+  112: () => import('./data/questions/year112.js').then((module) => module.questions112),
+  113: () => import('./data/questions/year113.js').then((module) => module.questions113),
+  114: () => import('./data/questions/year114.js').then((module) => module.questions114),
+};
+const loadedQuestionYears = new Set();
+const questionYearLoadPromises = new Map();
+let questionBank = [];
+let BANK_QUESTION_BY_ID = new Map();
 const ERROR_TYPE_OPTIONS = [
   'Knowledge gap',
   'Misread question',
@@ -495,15 +505,50 @@ function getExamCountdown(now = new Date()) {
   return diffDays > 0 ? `D-${diffDays}` : `D+${Math.abs(diffDays)}`;
 }
 
-const QUESTION_YEARS = [...new Set(questionBank
-  .map((question) => Number(question.year))
-  .filter((year) => Number.isFinite(year)))]
-  .sort((a, b) => a - b);
 const QUESTION_YEAR_KEY = QUESTION_YEARS.join(',');
 const QUESTION_YEAR_LABEL = QUESTION_YEARS.length
   ? `${QUESTION_YEARS[0]}–${QUESTION_YEARS[QUESTION_YEARS.length - 1]}`
   : '題庫';
-const BANK_QUESTION_BY_ID = new Map(questionBank.map((question) => [question.id, question]));
+
+function normalizeQuestionYearList(years = QUESTION_YEARS) {
+  return [...new Set((years || [])
+    .map((year) => Number(year))
+    .filter((year) => QUESTION_YEARS.includes(year)))]
+    .sort((a, b) => a - b);
+}
+
+function areQuestionYearsLoaded(years = QUESTION_YEARS) {
+  const normalizedYears = normalizeQuestionYearList(years);
+  return normalizedYears.length > 0 && normalizedYears.every((year) => loadedQuestionYears.has(year));
+}
+
+function installQuestionYear(year, questions = []) {
+  const normalizedYear = Number(year);
+  questionBank = [
+    ...questionBank.filter((question) => Number(question.year) !== normalizedYear),
+    ...questions,
+  ].sort((a, b) => Number(a.year) - Number(b.year) || Number(a.number || 0) - Number(b.number || 0));
+  BANK_QUESTION_BY_ID = new Map(questionBank.map((question) => [question.id, question]));
+  loadedQuestionYears.add(normalizedYear);
+}
+
+async function loadQuestionYears(years = QUESTION_YEARS) {
+  const normalizedYears = normalizeQuestionYearList(years);
+  let loadedNewYear = false;
+  await Promise.all(normalizedYears.map(async (year) => {
+    if (loadedQuestionYears.has(year)) return;
+    const loader = QUESTION_YEAR_LOADERS[year];
+    if (!loader) return;
+    if (!questionYearLoadPromises.has(year)) {
+      questionYearLoadPromises.set(year, loader().then((questions) => {
+        installQuestionYear(year, questions);
+        loadedNewYear = true;
+      }));
+    }
+    await questionYearLoadPromises.get(year);
+  }));
+  return loadedNewYear;
+}
 
 const defaultState = {
   sessions: {},
@@ -3102,7 +3147,7 @@ function getQuickReadinessMetrics(state) {
   const highConfidenceWrongRate = confidenceAttempts ? clampPercent((highConfidenceWrong / confidenceAttempts) * 100) : 0;
   const confidenceCalibrationScore = clampPercent(100 - highConfidenceWrongRate);
   const attemptedQuestions = stats.filter((stat) => (stat.attempts || 0) > 0).length;
-  const coverageScore = clampPercent((attemptedQuestions / Math.max(1, questionBank.length)) * 100);
+  const coverageScore = clampPercent((attemptedQuestions / Math.max(1, QUESTION_BANK_TOTAL)) * 100);
   const readinessScore = clampPercent(
     0.45 * recentMixedMockAccuracy +
     0.25 * wrongRetestConversion +
@@ -5825,6 +5870,9 @@ function MockExamPanel({ state, onFinishMock }) {
 
 export default function App() {
   const [state, setState] = useState(loadState);
+  const [questionBankVersion, setQuestionBankVersion] = useState(0);
+  const [questionBankLoading, setQuestionBankLoading] = useState(false);
+  const [questionBankError, setQuestionBankError] = useState('');
   const latestStateRef = useRef(state);
   const dirtyStorageSlicesRef = useRef(null);
   const [tab, setTab] = useState('quest');
@@ -5846,6 +5894,48 @@ export default function App() {
   const activeFocusSession = focusTimer.activeSession;
   const focusStartedAt = activeFocusSession?.startedAt || null;
   const leaderboardStartedAt = new Date(focusTimer.leaderboardStartedAt).getTime();
+  const preferredQuestionYears = useMemo(
+    () => normalizeQuestionYearList(state.settings?.preferredYears?.length ? state.settings.preferredYears : QUESTION_YEARS),
+    [state.settings?.preferredYears]
+  );
+  const requestedQuestionYears = useMemo(() => {
+    if (bankYear !== 'All' && bankYear !== 'Custom') return normalizeQuestionYearList([bankYear]);
+    if (aiPromptOpen) return preferredQuestionYears;
+    if ([
+      'quest',
+      'today',
+      'questions',
+      'mock',
+      'review',
+      'analytics',
+      'readiness',
+      'critical',
+      'plan',
+      'stats',
+    ].includes(tab)) {
+      return tab === 'questions' && bankYear === 'All' ? QUESTION_YEARS : preferredQuestionYears;
+    }
+    return EMPTY_ARRAY;
+  }, [aiPromptOpen, bankYear, preferredQuestionYears, tab]);
+  const requestedQuestionYearKey = requestedQuestionYears.join(',');
+  const questionBankReady = requestedQuestionYears.length === 0 || areQuestionYearsLoaded(requestedQuestionYears);
+
+  const ensureQuestionYearsReady = async (years = preferredQuestionYears) => {
+    const normalizedYears = normalizeQuestionYearList(years.length ? years : QUESTION_YEARS);
+    if (!normalizedYears.length || areQuestionYearsLoaded(normalizedYears)) return true;
+    setQuestionBankLoading(true);
+    setQuestionBankError('');
+    try {
+      const loadedNewYear = await loadQuestionYears(normalizedYears);
+      if (loadedNewYear) setQuestionBankVersion((version) => version + 1);
+      return true;
+    } catch (error) {
+      setQuestionBankError(error.message || '題庫載入失敗，請重新整理後再試。');
+      return false;
+    } finally {
+      setQuestionBankLoading(false);
+    }
+  };
 
   useEffect(() => {
     latestStateRef.current = state;
@@ -5883,6 +5973,28 @@ export default function App() {
   useEffect(() => {
     isApplyingCloudStateRef.current = isApplyingCloudState;
   }, [isApplyingCloudState]);
+
+  useEffect(() => {
+    if (!requestedQuestionYearKey || areQuestionYearsLoaded(requestedQuestionYears)) return undefined;
+    let cancelled = false;
+    setQuestionBankLoading(true);
+    setQuestionBankError('');
+    loadQuestionYears(requestedQuestionYears)
+      .then((loadedNewYear) => {
+        if (cancelled) return;
+        if (loadedNewYear) setQuestionBankVersion((version) => version + 1);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setQuestionBankError(error.message || '題庫載入失敗，請重新整理後再試。');
+      })
+      .finally(() => {
+        if (!cancelled) setQuestionBankLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [requestedQuestionYearKey, requestedQuestionYears]);
 
   useEffect(() => {
     const handlePointerDown = (event) => {
@@ -6400,12 +6512,13 @@ export default function App() {
 
   const todaySession = state.sessions[TODAY];
   const questionDataState = useMemo(() => ({
+    questionBankVersion,
     stats: state.stats,
     sessions: state.sessions,
     questionOverrides: state.questionOverrides,
     customQuestions: state.customQuestions,
     deletedQuestionIds: state.deletedQuestionIds,
-  }), [state.stats, state.sessions, state.questionOverrides, state.customQuestions, state.deletedQuestionIds]);
+  }), [questionBankVersion, state.stats, state.sessions, state.questionOverrides, state.customQuestions, state.deletedQuestionIds]);
   const flashcardDataState = useMemo(() => ({
     flashcards: state.flashcards,
     flashcardStats: state.flashcardStats,
@@ -6519,7 +6632,12 @@ export default function App() {
     }, ['sessions']);
   };
 
-  const createTodaySession = ({ force = false } = {}) => {
+  const createTodaySession = async ({ force = false } = {}) => {
+    const ready = await ensureQuestionYearsReady(preferredQuestionYears);
+    if (!ready) {
+      setPracticePageMessage('題庫載入失敗，請重新整理後再試。');
+      return;
+    }
     const modeConfig = getPracticeModeConfig(state.settings?.practiceMode);
     updateState((prev) => {
       const existing = prev.sessions?.[TODAY];
@@ -6561,8 +6679,13 @@ export default function App() {
     setTab('today');
   };
 
-  const loadNextPracticePage = () => {
+  const loadNextPracticePage = async () => {
     setPracticePageMessage('');
+    const ready = await ensureQuestionYearsReady(preferredQuestionYears);
+    if (!ready) {
+      setPracticePageMessage('題庫載入失敗，請重新整理後再試。');
+      return;
+    }
     const nextPage = currentPracticePage + 1;
     const requiredCount = Math.min(todayPracticeConfig.total, (nextPage + 1) * PRACTICE_PAGE_SIZE);
     if (todayQuestions.length >= requiredCount) {
@@ -6807,7 +6930,7 @@ export default function App() {
   const questionTotal = useMemo(() => {
     const customCount = Object.keys(state.customQuestions || {}).length;
     const deletedCount = Object.entries(state.deletedQuestionIds || {}).filter(([, deleted]) => deleted).length;
-    return questionBank.length + customCount - deletedCount;
+    return QUESTION_BANK_TOTAL + customCount - deletedCount;
   }, [state.customQuestions, state.deletedQuestionIds]);
 
   const flashcardTotal = useMemo(() => Object.keys(normalizeFlashcards(state.flashcards)).length, [state.flashcards]);
@@ -7281,6 +7404,12 @@ export default function App() {
           <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>
         ))}
       </nav>
+
+      {(questionBankLoading || questionBankError || !questionBankReady) && (
+        <div className={questionBankError ? 'question-bank-status error' : 'question-bank-status'}>
+          {questionBankError || `題庫載入中：${requestedQuestionYears.join(', ') || QUESTION_YEAR_LABEL}`}
+        </div>
+      )}
 
       {tab === 'quest' && (
         <QuestPanel

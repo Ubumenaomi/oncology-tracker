@@ -197,6 +197,22 @@ h3 { margin: 0 0 8px; }
 .tabs button { border: 1px solid var(--line); background: var(--panel); color: var(--muted); padding: 10px 14px; border-radius: 999px; font-weight: 750; --tap-color: rgba(37, 99, 235, 0.22); }
 .tabs button.active { background: #0f172a; color: white; border-color: #0f172a; }
 
+.question-bank-status {
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 800;
+  margin: -6px 0 16px;
+  padding: 10px 12px;
+}
+
+.question-bank-status.error {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 26px; padding: 22px; box-shadow: var(--shadow); margin-bottom: 18px; }
 .panel-title { font-weight: 800; font-size: 18px; margin-bottom: 8px; }
 .muted { color: var(--muted); margin-top: 0; }
