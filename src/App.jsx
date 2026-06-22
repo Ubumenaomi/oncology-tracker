@@ -597,6 +597,7 @@ const defaultState = {
     xpEvents: [],
     dailyClaims: {},
     dailyChests: {},
+    dailyCheckIns: {},
     trialGems: 0,
   },
   cloudMeta: {
@@ -1271,6 +1272,20 @@ function addDays(dateString, days) {
   return formatLocalDate(date);
 }
 
+function getDailyCheckInStatus(state, date = TODAY) {
+  return Boolean(state?.game?.dailyCheckIns?.[date]);
+}
+
+function getDailyCheckInStreak(state, date = TODAY) {
+  let streak = 0;
+  let cursor = date;
+  while (state?.game?.dailyCheckIns?.[cursor]) {
+    streak += 1;
+    cursor = addDays(cursor, -1);
+  }
+  return streak;
+}
+
 function normalizeTextList(value = []) {
   if (Array.isArray(value)) {
     return value.flatMap((item) => normalizeTextList(item));
@@ -1443,6 +1458,10 @@ function mergeGameState(cloudGame = {}, localGame = {}) {
       ...(cloudGame?.dailyChests || {}),
       ...(localGame?.dailyChests || {}),
     },
+    dailyCheckIns: {
+      ...(cloudGame?.dailyCheckIns || {}),
+      ...(localGame?.dailyCheckIns || {}),
+    },
     trialGems: Math.max(cloudGame?.trialGems || 0, localGame?.trialGems || 0),
   };
 }
@@ -1478,6 +1497,7 @@ function normalizeState(state) {
     xpEvents: state?.game?.xpEvents || [],
     dailyClaims: state?.game?.dailyClaims || {},
     dailyChests: state?.game?.dailyChests || {},
+    dailyCheckIns: state?.game?.dailyCheckIns || {},
     trialGems: state?.game?.trialGems || 0,
   };
   const xp = Math.max(game.xp || 0, state?.player?.xp || 0);
@@ -1578,18 +1598,28 @@ function getTodayWrongNoteCount(state, date = TODAY) {
 }
 
 function getDailyChest(state, todayCompleted = false, date = TODAY) {
+  const checkedIn = getDailyCheckInStatus(state, date);
   const reviewCount = getTodayReviewQuestionCount(state, date);
   const flashcardCount = getTodayFlashcardReviewCount(state, date);
   const wrongNoteCount = getTodayWrongNoteCount(state, date);
   const rows = [
+    {
+      key: 'daily-check-in',
+      label: '每日打卡',
+      target: '按下今日打卡',
+      value: checkedIn ? 1 : 0,
+      max: 1,
+      points: checkedIn ? 10 : 0,
+      totalPoints: 10,
+    },
     {
       key: 'daily-practice',
       label: 'Daily Practice',
       target: '完成今日題組',
       value: todayCompleted ? 1 : 0,
       max: 1,
-      points: todayCompleted ? 35 : 0,
-      totalPoints: 35,
+      points: todayCompleted ? 30 : 0,
+      totalPoints: 30,
     },
     {
       key: 'review-queue',
@@ -1597,8 +1627,8 @@ function getDailyChest(state, todayCompleted = false, date = TODAY) {
       target: '8 題',
       value: Math.min(reviewCount, 8),
       max: 8,
-      points: Math.round(Math.min(reviewCount / 8, 1) * 30),
-      totalPoints: 30,
+      points: Math.round(Math.min(reviewCount / 8, 1) * 25),
+      totalPoints: 25,
     },
     {
       key: 'flashcards',
@@ -3462,7 +3492,7 @@ function StatsDashboard({ stats }) {
   );
 }
 
-function RewardDashboard({ state, dailyChest, bossRows, onClaimDailyChest }) {
+function RewardDashboard({ state, dailyChest, bossRows, checkedInToday, checkInStreak, onCheckIn, onClaimDailyChest }) {
   const xp = state.game?.xp || 0;
   const levelProgress = getLevelProgress(xp);
   const recentEvents = state.game?.xpEvents || [];
@@ -3485,6 +3515,12 @@ function RewardDashboard({ state, dailyChest, bossRows, onClaimDailyChest }) {
           <div className="reward-card-head">
             <strong>今日寶箱</strong>
             <span>{dailyChest.progress}/100</span>
+          </div>
+          <div className={checkedInToday ? 'daily-checkin-mini done' : 'daily-checkin-mini'}>
+            <span>每日打卡 · 連續 {checkInStreak} 天</span>
+            <button className={checkedInToday ? 'tiny good' : 'tiny'} type="button" disabled={checkedInToday} onClick={onCheckIn}>
+              {checkedInToday ? '已打卡' : '打卡'}
+            </button>
           </div>
           <div className="progress-bar large"><span style={{ width: `${dailyChest.progress}%` }} /></div>
           <div className="daily-chest-tasks">
@@ -4967,6 +5003,9 @@ function QuestPanel({
   bossChallenges,
   highYieldTopics,
   completionStatus,
+  checkedInToday,
+  checkInStreak,
+  onCheckIn,
   onCreatePractice,
   isCreatingPractice,
   practiceMode,
@@ -5011,6 +5050,17 @@ function QuestPanel({
 
   return (
     <main className="panel quest-panel">
+      <section className={checkedInToday ? 'daily-checkin-card done' : 'daily-checkin-card'}>
+        <div>
+          <div className="eyebrow dark">Daily Check-in</div>
+          <h3>{checkedInToday ? '今天已打卡' : '先把今天打開'}</h3>
+          <p className="muted">連續打卡 {checkInStreak} 天。打卡會同步到雲端，也會補進今日寶箱進度。</p>
+        </div>
+        <button className={checkedInToday ? 'good' : 'primary'} type="button" disabled={checkedInToday} onClick={onCheckIn}>
+          {checkedInToday ? '已完成' : '今日打卡'}
+        </button>
+      </section>
+
       <div className="quest-hero">
         <div>
           <div className="eyebrow">Today Quest</div>
@@ -6808,6 +6858,21 @@ export default function App() {
     }), ['sessions', 'game']);
   };
 
+  const markDailyCheckIn = () => {
+    if (getDailyCheckInStatus(state, TODAY)) return;
+    playTaskCompletionFeedback();
+    updateState((prev) => ({
+      ...prev,
+      game: {
+        ...(prev.game || defaultState.game),
+        dailyCheckIns: {
+          ...(prev.game?.dailyCheckIns || {}),
+          [TODAY]: { checkedAt: new Date().toISOString() },
+        },
+      },
+    }), ['game']);
+  };
+
   const claimDailyChest = () => {
     if (dailyChest.progress < 100 || dailyChest.claimed) return;
     playTaskCompletionFeedback();
@@ -7041,6 +7106,8 @@ export default function App() {
   }, [needsTaxonomyAnalytics, questionDataState]);
   const readiness = useMemo(() => needsFullReadiness ? getReadinessMetrics(readinessDataState) : getQuickReadinessMetrics(readinessDataState), [needsFullReadiness, readinessDataState]);
   const bossRows = useMemo(() => needsFullReadiness ? getBossRows(bossDataState, readiness) : EMPTY_ARRAY, [needsFullReadiness, bossDataState, readiness]);
+  const checkedInToday = getDailyCheckInStatus(state, TODAY);
+  const checkInStreak = getDailyCheckInStreak(state, TODAY);
   const dailyChest = getDailyChest(chestDataState, todayCompleted);
   const flashcardListState = useMemo(() => ({
     flashcards: state.flashcards,
@@ -7385,6 +7452,9 @@ export default function App() {
           <p>{QUESTION_YEAR_LABEL} 腫專考古題、mixed mock、confidence calibration、critical error queue、≥80 分預測。</p>
         </div>
         <div className="header-actions">
+          <button className={checkedInToday ? 'good' : 'primary'} disabled={checkedInToday} onClick={markDailyCheckIn}>
+            {checkedInToday ? '今日已打卡' : '每日打卡'}
+          </button>
           <button className="primary" disabled={isCreatingPractice} onClick={() => createTodaySession()}>
             {isCreatingPractice ? '產生中...' : '產生今日 Daily Practice'}
           </button>
@@ -7399,6 +7469,7 @@ export default function App() {
         <MetricCard label="今日待複習" value={dueCount} sub="依 next review date" />
         <MetricCard label="≥80 機率" value={`${readiness.probability80}%`} sub={readiness.readinessLevel} />
         <MetricCard label="Level / XP" value={`Lv ${state.game?.level || 1}`} sub={`${state.game?.xp || 0} XP · streak ${state.game?.streak || 0}`} />
+        <MetricCard label="每日打卡" value={checkedInToday ? 'Done' : '未打卡'} sub={`連續 ${checkInStreak} 天`} />
         <MetricCard label="今日專注" value={`${todayFocusMinutes} 分`} sub={`focus streak ${focusStreak} 天`} />
         <MetricCard label="Flashcards" value={flashcardTotal} sub={`${dueFlashcardCount} due today`} />
         <MetricCard label="同步狀態" value={user ? 'Cloud' : 'Local'} sub={user ? user.email : '尚未登入'} />
@@ -7485,6 +7556,9 @@ export default function App() {
           bossChallenges={questBossChallenges}
           highYieldTopics={highYieldTopics}
           completionStatus={completionStatus}
+          checkedInToday={checkedInToday}
+          checkInStreak={checkInStreak}
+          onCheckIn={markDailyCheckIn}
           onCreatePractice={createTodaySession}
           isCreatingPractice={isCreatingPractice}
           practiceMode={selectedPracticeMode}
@@ -7777,6 +7851,9 @@ export default function App() {
             state={state}
             dailyChest={dailyChest}
             bossRows={bossRows}
+            checkedInToday={checkedInToday}
+            checkInStreak={checkInStreak}
+            onCheckIn={markDailyCheckIn}
             onClaimDailyChest={claimDailyChest}
           />
 
