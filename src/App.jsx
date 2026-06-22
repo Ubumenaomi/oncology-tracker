@@ -519,7 +519,10 @@ function normalizeQuestionYearList(years = QUESTION_YEARS) {
 
 function areQuestionYearsLoaded(years = QUESTION_YEARS) {
   const normalizedYears = normalizeQuestionYearList(years);
-  return normalizedYears.length > 0 && normalizedYears.every((year) => loadedQuestionYears.has(year));
+  return normalizedYears.length > 0 && normalizedYears.every((year) => (
+    loadedQuestionYears.has(year)
+    && questionBank.some((question) => Number(question.year) === year)
+  ));
 }
 
 function installQuestionYear(year, questions = []) {
@@ -1845,7 +1848,11 @@ function findQuestionById(id, state = {}) {
   if (!id || state?.deletedQuestionIds?.[id]) return null;
   const customQuestion = state?.customQuestions?.[id];
   if (customQuestion) return normalizeQuestion({ ...customQuestion, sourceType: 'custom' });
-  return BANK_QUESTION_BY_ID.get(id) || null;
+  const bankQuestion = BANK_QUESTION_BY_ID.get(id) || questionBank.find((question) => question.id === id) || null;
+  if (bankQuestion && !BANK_QUESTION_BY_ID.has(id)) {
+    BANK_QUESTION_BY_ID.set(id, bankQuestion);
+  }
+  return bankQuestion;
 }
 
 function applyQuestionOverride(question, overrides = {}) {
@@ -1986,9 +1993,9 @@ function getQuestionPromptText(question) {
   ].filter(Boolean).join(' ').toLowerCase();
 }
 
-function questionMatchesHighYieldTopic(question, highYieldTopic) {
+function questionMatchesHighYieldTopic(question, highYieldTopic, cachedQuestionText = null) {
   if (!question || !highYieldTopic) return false;
-  const questionText = getQuestionContentText(question);
+  const questionText = cachedQuestionText || getQuestionContentText(question);
   const aliases = highYieldTopic.aliases || [];
   const cancerMatch = question.cancer === highYieldTopic.cancer
     || (highYieldTopic.cancer === 'Supportive/Stats' && ['Supportive/Stats', 'Other'].includes(question.cancer));
@@ -1996,31 +2003,7 @@ function questionMatchesHighYieldTopic(question, highYieldTopic) {
   return aliasHit || (cancerMatch && aliases.some((alias) => String(question.topic || '').toLowerCase().includes(String(alias).toLowerCase())));
 }
 
-function getQuestionHighYieldTopics(question) {
-  return HIGH_YIELD_TOPICS.filter((topic) => questionMatchesHighYieldTopic(question, topic));
-}
-
-function getHighYieldTopicQuestionStats(state, highYieldTopic) {
-  const rows = getQuestionPool(state)
-    .map((q) => getQuestionWithOverride(q.id, state))
-    .filter((q) => q && questionMatchesHighYieldTopic(q, highYieldTopic))
-    .map((q) => ({ q, stat: getStat(state, q.id) }));
-  const attempts = rows.reduce((sum, row) => sum + (row.stat.attempts || 0), 0);
-  const wrong = rows.reduce((sum, row) => sum + (row.stat.wrong || 0), 0);
-  const lastDates = rows
-    .map((row) => row.stat.lastAttemptAt)
-    .filter(Boolean)
-    .sort();
-  return {
-    total: rows.length,
-    attempts,
-    wrongRateFactor: attempts ? Math.max(1, wrong / attempts) : 1,
-    daysSinceReview: lastDates.length ? Math.max(1, daysBetween(lastDates[lastDates.length - 1], TODAY)) : 30,
-  };
-}
-
-function scoreHighYieldTopic(state, highYieldTopic) {
-  const stats = getHighYieldTopicQuestionStats(state, highYieldTopic);
+function scoreHighYieldTopicFromStats(highYieldTopic, stats) {
   const recencyFactor = Math.min(3, Math.log2(stats.daysSinceReview + 1));
   return Math.round(
     highYieldTopic.examFrequency
@@ -2032,10 +2015,38 @@ function scoreHighYieldTopic(state, highYieldTopic) {
 }
 
 function getRankedHighYieldTopics(state, task = null) {
+  const questionRows = getQuestionPool(state)
+    .map((q) => getQuestionWithOverride(q.id, state))
+    .filter(Boolean)
+    .map((q) => ({
+      q,
+      stat: getStat(state, q.id),
+      text: getQuestionContentText(q),
+    }));
+
   return HIGH_YIELD_TOPICS
     .map((topic) => {
+      let total = 0;
+      let attempts = 0;
+      let wrong = 0;
+      let latestAttemptAt = '';
+      questionRows.forEach((row) => {
+        if (!questionMatchesHighYieldTopic(row.q, topic, row.text)) return;
+        total += 1;
+        attempts += row.stat.attempts || 0;
+        wrong += row.stat.wrong || 0;
+        if (row.stat.lastAttemptAt && row.stat.lastAttemptAt > latestAttemptAt) {
+          latestAttemptAt = row.stat.lastAttemptAt;
+        }
+      });
+      const stats = {
+        total,
+        attempts,
+        wrongRateFactor: attempts ? Math.max(1, wrong / attempts) : 1,
+        daysSinceReview: latestAttemptAt ? Math.max(1, daysBetween(latestAttemptAt, TODAY)) : 30,
+      };
       const mainlineBonus = task && (topic.cancer === task.cancer || getTaskSearchText(task).includes(topic.label.toLowerCase())) ? 1.25 : 1;
-      const score = Math.round(scoreHighYieldTopic(state, topic) * mainlineBonus * 10) / 10;
+      const score = Math.round(scoreHighYieldTopicFromStats(topic, stats) * mainlineBonus * 10) / 10;
       return { ...topic, priorityScore: score };
     })
     .sort((a, b) => b.priorityScore - a.priorityScore || b.examFrequency - a.examFrequency || b.recentUpdate - a.recentUpdate);
@@ -2120,11 +2131,12 @@ function sortBossWeaknessRows(a, b) {
     || b.taskScore - a.taskScore;
 }
 
-function generateDailyQuestionIds(state, task = getTodayPlanTask(state), excludedIds = []) {
+function generateDailyQuestionIds(state, task = getTodayPlanTask(state), excludedIds = [], rankedHighYieldTopics = null) {
   const { preferredYears, preferredCancers } = state.settings;
   const modeConfig = getPracticeModeConfig(state.settings?.practiceMode);
   const excluded = new Set(excludedIds);
-  const highYieldTopicIds = new Set(getRankedHighYieldTopics(state, task).slice(0, 5).map((topic) => topic.id));
+  const rankedTopics = rankedHighYieldTopics || getRankedHighYieldTopics(state, task);
+  const topHighYieldTopics = rankedTopics.slice(0, 5);
 
   const pool = getQuestionPool(state)
     .map((q) => getQuestionWithOverride(q.id, state))
@@ -2136,7 +2148,7 @@ function generateDailyQuestionIds(state, task = getTodayPlanTask(state), exclude
       return yearOk && cancerOk;
     });
 
-  const withStats = pool.map((q) => ({ q, stat: getStat(state, q.id) }));
+  const withStats = pool.map((q) => ({ q, stat: getStat(state, q.id), questionText: getQuestionContentText(q) }));
   const topical = withStats
     .map((item) => ({ ...item, taskScore: scoreQuestionForTask(item.q, task) }))
     .filter((item) => questionMatchesTask(item.q, task))
@@ -2154,8 +2166,8 @@ function generateDailyQuestionIds(state, task = getTodayPlanTask(state), exclude
       || b.taskScore - a.taskScore);
   const highYield = withStats
     .map((item) => {
-      const matchedTopics = getQuestionHighYieldTopics(item.q).filter((topic) => highYieldTopicIds.has(topic.id));
-      const topicScore = matchedTopics.reduce((max, topic) => Math.max(max, scoreHighYieldTopic(state, topic)), 0);
+      const matchedTopics = topHighYieldTopics.filter((topic) => questionMatchesHighYieldTopic(item.q, topic, item.questionText));
+      const topicScore = matchedTopics.reduce((max, topic) => Math.max(max, topic.priorityScore || 0), 0);
       const personalScore = 1
         + wrongRate(item.stat) / 100
         + ((item.stat.highConfidenceWrong || 0) * 0.5)
@@ -2235,9 +2247,9 @@ function generateDailyQuestionIds(state, task = getTodayPlanTask(state), exclude
   return result.slice(0, modeConfig.total);
 }
 
-function fillDailyQuestionIds(state, task, existingIds = [], targetCount = PRACTICE_PAGE_SIZE) {
+function fillDailyQuestionIds(state, task, existingIds = [], targetCount = PRACTICE_PAGE_SIZE, rankedHighYieldTopics = null) {
   const baseIds = Array.isArray(existingIds) ? existingIds : [];
-  const generatedIds = generateDailyQuestionIds(state, task, baseIds);
+  const generatedIds = generateDailyQuestionIds(state, task, baseIds, rankedHighYieldTopics);
   const questionIds = [...baseIds, ...generatedIds]
     .filter((id, index, ids) => ids.indexOf(id) === index)
     .slice(0, targetCount);
@@ -4923,6 +4935,7 @@ function QuestPanel({
   highYieldTopics,
   completionStatus,
   onCreatePractice,
+  isCreatingPractice,
   practiceMode,
   onPracticeModeChange,
   onMarkRecall,
@@ -4943,7 +4956,7 @@ function QuestPanel({
       done: progress.practiceDone,
       text: '完成今日 Daily Practice 題目並評分。',
       action: progress.practiceDone ? onOpenPractice : onCreatePractice,
-      actionText: progress.practiceDone ? '查看今日練習' : '產生今日練習',
+      actionText: progress.practiceDone ? '查看今日練習' : isCreatingPractice ? '產生中...' : '產生今日練習',
     },
     {
       key: 'memory',
@@ -5000,7 +5013,15 @@ function QuestPanel({
           <div className={star.done ? 'quest-star done' : 'quest-star'} key={star.key}>
             <strong>{star.done ? '⭐' : '☆'} {star.title}</strong>
             <p>{star.text}</p>
-            {star.action && <button className="secondary" onClick={star.action}>{star.actionText}</button>}
+            {star.action && (
+              <button
+                className="secondary"
+                disabled={star.key === 'practice' && isCreatingPractice}
+                onClick={star.action}
+              >
+                {star.actionText}
+              </button>
+            )}
             {star.key === 'practice' && (
               <PracticeModeSelector value={practiceMode} onChange={onPracticeModeChange} />
             )}
@@ -5887,6 +5908,8 @@ export default function App() {
   const [isApplyingCloudState, setIsApplyingCloudState] = useState(false);
   const isApplyingCloudStateRef = useRef(false);
   const lastSyncedSignatureRef = useRef(getCloudSyncSignature(loadState()));
+  const [isCreatingPractice, setIsCreatingPractice] = useState(false);
+  const isCreatingPracticeRef = useRef(false);
   const [practicePage, setPracticePage] = useState(0);
   const [practicePageMessage, setPracticePageMessage] = useState('');
   const [focusTick, setFocusTick] = useState(() => Date.now());
@@ -6528,14 +6551,8 @@ export default function App() {
   const rawTodayIds = todaySession?.questionIds || EMPTY_ARRAY;
   const todaySessionPlanTaskId = todaySession?.planTaskId || null;
   const todaySessionMatchesQuest = Number(todaySessionPlanTaskId) === Number(baseQuestTask?.id);
-  const todayIds = useMemo(
-    () => (todaySessionMatchesQuest ? rawTodayIds : EMPTY_ARRAY),
-    [todaySessionMatchesQuest, rawTodayIds]
-  );
-  const todayQuestions = useMemo(
-    () => todayIds.map((id) => getQuestionWithOverride(id, questionDataState)).filter(Boolean),
-    [todayIds, questionDataState]
-  );
+  const todayIds = todaySessionMatchesQuest ? rawTodayIds : EMPTY_ARRAY;
+  const todayQuestions = todayIds.map((id) => getQuestionWithOverride(id, questionDataState)).filter(Boolean);
   const selectedPracticeMode = state.settings?.practiceMode || 'standard';
   const selectedPracticeConfig = getPracticeModeConfig(selectedPracticeMode);
   const todayPracticeMode = todaySession?.practiceMode || selectedPracticeMode;
@@ -6632,51 +6649,66 @@ export default function App() {
     }, ['sessions']);
   };
 
-  const createTodaySession = async ({ force = false } = {}) => {
-    const ready = await ensureQuestionYearsReady(preferredQuestionYears);
-    if (!ready) {
-      setPracticePageMessage('題庫載入失敗，請重新整理後再試。');
-      return;
-    }
-    const modeConfig = getPracticeModeConfig(state.settings?.practiceMode);
-    updateState((prev) => {
-      const existing = prev.sessions?.[TODAY];
-      const existingMatchesQuest = Number(existing?.planTaskId) === Number(questTask.id);
-      const existingQuestionIds = existingMatchesQuest ? (existing?.questionIds || []) : [];
-      const targetCount = force ? modeConfig.total : Math.min(modeConfig.total, Math.max(PRACTICE_PAGE_SIZE, existingQuestionIds.length));
-      const questionIds = fillDailyQuestionIds(prev, questTask, force ? [] : existingQuestionIds, targetCount);
-      if (!force && existingQuestionIds.length >= targetCount && existingMatchesQuest) return prev;
-      return {
-        ...prev,
-        sessions: {
-          ...prev.sessions,
-          [TODAY]: {
-            ...(force ? {} : existing),
-            date: TODAY,
-            planTaskId: questTask.id,
-            planTopic: questTask.topic,
-            practiceMode: state.settings?.practiceMode || 'standard',
-            practiceModeLabel: modeConfig.shortLabel,
-            practiceRecipe: {
-              total: modeConfig.total,
-              newCount: modeConfig.newCount,
-              topicCount: modeConfig.topicCount,
-              dueCount: modeConfig.dueCount,
-              weaknessCount: modeConfig.weaknessCount,
-              highYieldCount: modeConfig.highYieldCount || 0,
+  const createTodaySession = ({ force = false } = {}) => {
+    if (isCreatingPracticeRef.current) return;
+    isCreatingPracticeRef.current = true;
+    setIsCreatingPractice(true);
+    setPracticePageMessage('');
+
+    window.setTimeout(async () => {
+      try {
+        const ready = await ensureQuestionYearsReady(preferredQuestionYears);
+        if (!ready) {
+          setPracticePageMessage('題庫載入失敗，請重新整理後再試。');
+          return;
+        }
+
+        await new Promise((resolve) => window.requestAnimationFrame(resolve));
+        updateState((prev) => {
+          const modeConfig = getPracticeModeConfig(prev.settings?.practiceMode);
+          const existing = prev.sessions?.[TODAY];
+          const existingMatchesQuest = Number(existing?.planTaskId) === Number(questTask.id);
+          const existingQuestionIds = existingMatchesQuest ? (existing?.questionIds || []) : [];
+          const targetCount = force ? modeConfig.total : Math.min(modeConfig.total, Math.max(PRACTICE_PAGE_SIZE, existingQuestionIds.length));
+          const rankedHighYieldTopics = getRankedHighYieldTopics(prev, questTask);
+          const questionIds = fillDailyQuestionIds(prev, questTask, force ? [] : existingQuestionIds, targetCount, rankedHighYieldTopics);
+          if (!force && existingQuestionIds.length >= targetCount && existingMatchesQuest) return prev;
+          return {
+            ...prev,
+            sessions: {
+              ...prev.sessions,
+              [TODAY]: {
+                ...(force ? {} : existing),
+                date: TODAY,
+                planTaskId: questTask.id,
+                planTopic: questTask.topic,
+                practiceMode: prev.settings?.practiceMode || 'standard',
+                practiceModeLabel: modeConfig.shortLabel,
+                practiceRecipe: {
+                  total: modeConfig.total,
+                  newCount: modeConfig.newCount,
+                  topicCount: modeConfig.topicCount,
+                  dueCount: modeConfig.dueCount,
+                  weaknessCount: modeConfig.weaknessCount,
+                  highYieldCount: modeConfig.highYieldCount || 0,
+                },
+                highYieldInserts: rankedHighYieldTopics.slice(0, 5).map(({ id, label, type, priorityScore }) => ({ id, label, type, priorityScore })),
+                questionIds,
+                createdAt: force || !existing?.createdAt ? new Date().toISOString() : existing.createdAt,
+                updatedAt: new Date().toISOString(),
+                completed: false,
+                practiceDrafts: force ? {} : (existing?.practiceDrafts || {}),
+              },
             },
-            highYieldInserts: getRankedHighYieldTopics(prev, questTask).slice(0, 5).map(({ id, label, type, priorityScore }) => ({ id, label, type, priorityScore })),
-            questionIds,
-            createdAt: force || !existing?.createdAt ? new Date().toISOString() : existing.createdAt,
-            updatedAt: new Date().toISOString(),
-            completed: false,
-            practiceDrafts: force ? {} : (existing?.practiceDrafts || {}),
-          },
-        },
-      };
-    }, ['sessions']);
-    setPracticePage(0);
-    setTab('today');
+          };
+        }, ['sessions']);
+        setPracticePage(0);
+        setTab('today');
+      } finally {
+        isCreatingPracticeRef.current = false;
+        setIsCreatingPractice(false);
+      }
+    }, 0);
   };
 
   const loadNextPracticePage = async () => {
@@ -6704,7 +6736,8 @@ export default function App() {
       if (!existingMatchesQuest) return prev;
       const existingQuestionIds = existing?.questionIds || [];
       const targetCount = Math.min(todayPracticeConfig.total, (nextPage + 1) * PRACTICE_PAGE_SIZE);
-      const questionIds = fillDailyQuestionIds(prev, questTask, existingQuestionIds, targetCount);
+      const rankedHighYieldTopics = getRankedHighYieldTopics(prev, questTask);
+      const questionIds = fillDailyQuestionIds(prev, questTask, existingQuestionIds, targetCount, rankedHighYieldTopics);
       if (questionIds.length <= existingQuestionIds.length) return prev;
       loadedMore = true;
 
@@ -7321,7 +7354,9 @@ export default function App() {
           <p>{QUESTION_YEAR_LABEL} 腫專考古題、mixed mock、confidence calibration、critical error queue、≥80 分預測。</p>
         </div>
         <div className="header-actions">
-          <button className="primary" onClick={() => createTodaySession()}>產生今日 Daily Practice</button>
+          <button className="primary" disabled={isCreatingPractice} onClick={() => createTodaySession()}>
+            {isCreatingPractice ? '產生中...' : '產生今日 Daily Practice'}
+          </button>
           <button className="secondary" onClick={() => setAiPromptOpen(!aiPromptOpen)}>AI Review Prompt</button>
         </div>
       </header>
@@ -7420,6 +7455,7 @@ export default function App() {
           highYieldTopics={highYieldTopics}
           completionStatus={completionStatus}
           onCreatePractice={createTodaySession}
+          isCreatingPractice={isCreatingPractice}
           practiceMode={selectedPracticeMode}
           onPracticeModeChange={setPracticeMode}
           onMarkRecall={markQuestRecall}
@@ -7517,7 +7553,7 @@ export default function App() {
               </p>
             </div>
             <div className="inline-actions">
-              <button className="secondary" onClick={regenerateTodaySession}>重新抽題</button>
+              <button className="secondary" disabled={isCreatingPractice} onClick={regenerateTodaySession}>重新抽題</button>
               <button className="good" disabled={!todayCompleted || state.game?.dailyClaims?.[TODAY]} onClick={claimDailyCompletion}>
                 {state.game?.dailyClaims?.[TODAY] ? '今日 XP 已領取' : '領取每日 XP'}
               </button>
@@ -7536,7 +7572,9 @@ export default function App() {
                   </span>
                 ))}
               </div>
-              <button className="primary" onClick={() => createTodaySession()}>產生今日 Daily Practice</button>
+              <button className="primary" disabled={isCreatingPractice} onClick={() => createTodaySession()}>
+                {isCreatingPractice ? '產生中...' : '產生今日 Daily Practice'}
+              </button>
             </div>
           ) : (
             <>
