@@ -509,12 +509,20 @@ const QUESTION_YEAR_KEY = QUESTION_YEARS.join(',');
 const QUESTION_YEAR_LABEL = QUESTION_YEARS.length
   ? `${QUESTION_YEARS[0]}–${QUESTION_YEARS[QUESTION_YEARS.length - 1]}`
   : '題庫';
+const DEFAULT_QUESTION_MANAGER_YEAR = String(QUESTION_YEARS[QUESTION_YEARS.length - 1] || 'All');
 
 function normalizeQuestionYearList(years = QUESTION_YEARS) {
   return [...new Set((years || [])
     .map((year) => Number(year))
     .filter((year) => QUESTION_YEARS.includes(year)))]
     .sort((a, b) => a - b);
+}
+
+function getQuestionYearsFromIds(ids = []) {
+  return normalizeQuestionYearList((ids || []).map((id) => {
+    const match = String(id || '').match(/\b(111|112|113|114)\b/);
+    return match ? Number(match[1]) : null;
+  }));
 }
 
 function areQuestionYearsLoaded(years = QUESTION_YEARS) {
@@ -2848,6 +2856,28 @@ function FocusMarquee() {
   );
 }
 
+function getWeakCancerRowsFromStoredStats(state) {
+  const rows = Object.values(state.stats || {}).reduce((acc, stat) => {
+    const recentEvent = [...(stat.answerHistory || [])].reverse().find((event) => event?.cancer);
+    const cancer = recentEvent?.cancer || stat.cancer || 'Unclassified';
+    if (!acc[cancer]) acc[cancer] = { cancer, attempts: 0, correct: 0, wrong: 0 };
+    acc[cancer].attempts += stat.attempts || 0;
+    acc[cancer].correct += stat.correct || 0;
+    acc[cancer].wrong += stat.wrong || 0;
+    return acc;
+  }, {});
+
+  return Object.values(rows).map((row) => ({
+    ...row,
+    total: row.attempts,
+    attemptedQuestions: row.attempts,
+    coverage: 0,
+    accuracy: row.attempts ? Math.round((row.correct / row.attempts) * 100) : 0,
+    wrongRate: row.attempts ? Math.round((row.wrong / row.attempts) * 100) : 0,
+    status: row.wrong > 0 ? 'Red' : 'Green',
+  }));
+}
+
 function getStatsDashboard(state, planSummary, readiness, cancerSummary, date = TODAY) {
   const stats = Object.values(state.stats || {}).map((stat) => ({ ...emptyStat(), ...stat }));
   const attempts = stats.reduce((sum, stat) => sum + (stat.attempts || 0), 0);
@@ -2901,7 +2931,7 @@ function getStatsDashboard(state, planSummary, readiness, cancerSummary, date = 
   const masteredCards = flashcardList.filter((card) => (state.flashcardStats?.[card.id]?.mastery ?? card.mastery ?? 0) >= 4).length;
   const dueCards = getDueFlashcards(state).length;
   const criticalErrors = readiness.criticalErrors || [];
-  const weakCancerRows = cancerSummary
+  const weakCancerRows = (cancerSummary.length ? cancerSummary : getWeakCancerRowsFromStoredStats(state))
     .filter((row) => row.attempts > 0)
     .sort((a, b) => b.wrongRate - a.wrongRate || b.wrong - a.wrong)
     .slice(0, 5);
@@ -3685,6 +3715,9 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
     const answerEvent = {
       date: TODAY,
       mode: practiceMode ? 'daily' : 'review',
+      questionId: question.id,
+      cancer: question.cancer,
+      topic: question.topic,
       selected: selected || null,
       correctAnswer: correctAnswer || previous.correctAnswer || question.answer || null,
       isCorrect,
@@ -5685,7 +5718,7 @@ function FlashcardReviewPanel({ dueFlashcards, allFlashcards, onReviewCard, onUp
   );
 }
 
-function MockExamPanel({ state, onFinishMock }) {
+function MockExamPanel({ state, onFinishMock, onEnsureQuestionYears }) {
   const [questionCount, setQuestionCount] = useState(80);
   const [timerMinutes, setTimerMinutes] = useState(120);
   const [examMode, setExamMode] = useState('diagnostic-mock-0');
@@ -5695,7 +5728,10 @@ function MockExamPanel({ state, onFinishMock }) {
   const [answers, setAnswers] = useState({});
   const [showResults, setShowResults] = useState(false);
 
-  const startMock = () => {
+  const startMock = async () => {
+    const yearsToLoad = examYear === 'All' ? state.settings?.preferredYears || QUESTION_YEARS : [examYear];
+    const ready = await onEnsureQuestionYears(yearsToLoad);
+    if (!ready) return;
     const pool = shuffleStable(getQuestionPool(state)
       .map((q) => getQuestionWithOverride(q.id, state))
       .filter(Boolean)
@@ -5899,7 +5935,7 @@ export default function App() {
   const [tab, setTab] = useState('quest');
   const [search, setSearch] = useState('');
   const [bankCancer, setBankCancer] = useState('All');
-  const [bankYear, setBankYear] = useState('All');
+  const [bankYear, setBankYear] = useState(DEFAULT_QUESTION_MANAGER_YEAR);
   const [editingQuestionId, setEditingQuestionId] = useState(null);
   const [aiPromptOpen, setAiPromptOpen] = useState(false);
   const [user, setUser] = useState(null);
@@ -5917,29 +5953,25 @@ export default function App() {
   const activeFocusSession = focusTimer.activeSession;
   const focusStartedAt = activeFocusSession?.startedAt || null;
   const leaderboardStartedAt = new Date(focusTimer.leaderboardStartedAt).getTime();
+  const todaySession = state.sessions[TODAY];
   const preferredQuestionYears = useMemo(
     () => normalizeQuestionYearList(state.settings?.preferredYears?.length ? state.settings.preferredYears : QUESTION_YEARS),
     [state.settings?.preferredYears]
   );
+  const todaySessionQuestionYears = useMemo(
+    () => getQuestionYearsFromIds(todaySession?.questionIds || EMPTY_ARRAY),
+    [todaySession?.questionIds]
+  );
   const requestedQuestionYears = useMemo(() => {
-    if (bankYear !== 'All' && bankYear !== 'Custom') return normalizeQuestionYearList([bankYear]);
     if (aiPromptOpen) return preferredQuestionYears;
-    if ([
-      'quest',
-      'today',
-      'questions',
-      'mock',
-      'review',
-      'analytics',
-      'readiness',
-      'critical',
-      'plan',
-      'stats',
-    ].includes(tab)) {
-      return tab === 'questions' && bankYear === 'All' ? QUESTION_YEARS : preferredQuestionYears;
+    if (tab === 'questions') {
+      if (bankYear === 'Custom') return EMPTY_ARRAY;
+      return bankYear === 'All' ? QUESTION_YEARS : normalizeQuestionYearList([bankYear]);
     }
+    if (tab === 'today' || tab === 'quest') return todaySessionQuestionYears;
+    if (['review', 'analytics', 'readiness', 'critical', 'plan'].includes(tab)) return preferredQuestionYears;
     return EMPTY_ARRAY;
-  }, [aiPromptOpen, bankYear, preferredQuestionYears, tab]);
+  }, [aiPromptOpen, bankYear, preferredQuestionYears, tab, todaySessionQuestionYears]);
   const requestedQuestionYearKey = requestedQuestionYears.join(',');
   const questionBankReady = requestedQuestionYears.length === 0 || areQuestionYearsLoaded(requestedQuestionYears);
 
@@ -6533,7 +6565,6 @@ export default function App() {
     }
   };
 
-  const todaySession = state.sessions[TODAY];
   const questionDataState = useMemo(() => ({
     questionBankVersion,
     stats: state.stats,
@@ -6937,8 +6968,8 @@ export default function App() {
 
   const needsDueReview = tab === 'review';
   const needsWeakQuestions = ['review', 'analytics', 'flashcards'].includes(tab);
-  const needsFullReadiness = ['stats', 'readiness', 'analytics', 'critical', 'plan'].includes(tab);
-  const needsCancerSummary = ['stats', 'readiness', 'analytics'].includes(tab);
+  const needsFullReadiness = ['readiness', 'analytics', 'critical', 'plan'].includes(tab);
+  const needsCancerSummary = ['readiness', 'analytics'].includes(tab);
   const needsTaxonomyAnalytics = tab === 'analytics';
   const needsBankQuestions = tab === 'questions';
   const needsFlashcardLists = ['stats', 'flashcards', 'flashcard-review', 'plan'].includes(tab);
@@ -7502,7 +7533,7 @@ export default function App() {
       )}
 
       {tab === 'mock' && (
-        <MockExamPanel state={state} onFinishMock={finishMockExam} />
+        <MockExamPanel state={state} onFinishMock={finishMockExam} onEnsureQuestionYears={ensureQuestionYearsReady} />
       )}
 
       {tab === 'critical' && (
