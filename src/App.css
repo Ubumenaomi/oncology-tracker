@@ -1349,6 +1349,26 @@ button.tiny,
   gap: 18px;
 }
 
+.daily-checkin-card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #f8fafc;
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 16px;
+}
+
+.daily-checkin-card h3 {
+  margin: 2px 0 4px;
+}
+
+.daily-checkin-card.done {
+  border-color: rgba(21, 128, 61, 0.28);
+  background: #f0fdf4;
+}
+
 .quest-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
@@ -2036,6 +2056,24 @@ button:disabled {
 
 .primary-reward {
   background: #f8fafc;
+}
+
+.daily-checkin-mini {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #ffffff;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.daily-checkin-mini.done {
+  border-color: rgba(21, 128, 61, 0.26);
+  background: #f0fdf4;
 }
 
 .daily-chest-tasks,
