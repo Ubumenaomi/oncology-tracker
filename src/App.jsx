@@ -64,9 +64,9 @@ const ERROR_TYPE_OPTIONS = [
 
 const ERROR_TYPE_REMEDIATION = {
   'Knowledge gap': {
-    task: 'Guideline / core table review',
-    cardType: 'Core Table Card',
-    action: '回 guideline 與核心表格，把缺口整理成一張核心整理卡。',
+    task: 'Cloze Card',
+    cardType: 'Cloze Card',
+    action: '回 guideline 與核心表格，把缺口整理成 cutoff、eligibility、endpoint 或關鍵事實填空卡。',
   },
   'Trial confusion': {
     task: 'Trial Card',
@@ -84,23 +84,23 @@ const ERROR_TYPE_REMEDIATION = {
     action: '把一線/二線/維持/術前術後順序整理成流程卡。',
   },
   'Misread question': {
-    task: 'Question-reading reminder',
-    cardType: 'Exam Trap Card',
+    task: 'Trap Card',
+    cardType: 'Trap Card',
     action: '補一條審題提醒：否定詞、例外條件、疾病期別、line of therapy。',
   },
   Toxicity: {
-    task: 'Toxicity comparison',
-    cardType: 'Toxicity Card',
-    action: '整理 AE、contraindication、dose hold/discontinue 的比較表。',
+    task: 'Trap Card',
+    cardType: 'Trap Card',
+    action: '整理 AE、contraindication、dose hold/discontinue 的常見錯選陷阱。',
   },
   'Guideline outdated': {
-    task: 'Latest guideline check',
-    cardType: 'Guideline Update Card',
-    action: '標記需更新 NCCN / ESMO / ASCO，補上新舊標準差異。',
+    task: 'Algorithm Card',
+    cardType: 'Algorithm Card',
+    action: '標記需更新 NCCN / ESMO / ASCO，補成新舊標準差異與治療順序流程卡。',
   },
   Overconfidence: {
-    task: 'High-confidence wrong audit',
-    cardType: 'Exam Trap Card',
+    task: 'Trap Card',
+    cardType: 'Trap Card',
     action: '回看為什麼很有把握卻錯，寫成陷阱提醒與重測題。',
   },
 };
@@ -132,6 +132,12 @@ const FLASHCARD_TYPE_ALIASES = {
   imported: 'Trap Card',
 };
 
+const FLASHCARD_TYPE_GUIDANCE_PROMPT = `卡片類型選擇：
+- Trial Card: pivotal trial、population/intervention/comparator/outcome、適用情境、trial 間差異。
+- Algorithm Card: 治療順序、line of therapy、stage-based decision、contraindication、例外情境。
+- Cloze Card: cutoff、duration、dose、endpoint、eligibility、biomarker threshold、數字型記憶點。
+- Trap Card: 常見錯誤敘述、misread clue、toxicity/contraindication 陷阱、高信心但答錯的錯因。`;
+
 const FLASHCARD_SCHEMA_PROMPT = `每張卡必須包含：
 - front
 - back
@@ -151,8 +157,11 @@ const FLASHCARD_SCHEMA_PROMPT = `每張卡必須包含：
 4. Algorithm Card 必須包含 treatment sequencing 與 contraindication / exception。
 5. Cloze Card 必須針對 cutoff、duration、endpoint、dose、eligibility。
 6. Trap Card 必須指出常見錯誤敘述為何錯。
-7. 醫學名詞與藥名保留英文，其餘用繁體中文。
-8. back 要 concise，但要足夠讓我考前複習。`;
+7. 不可輸出 Core Table Card、Exam Trap Card、Toxicity Card、Guideline Update Card 或其他舊 type；這些一律改寫成上面四種新版卡。
+8. 醫學名詞與藥名保留英文，其餘用繁體中文。
+9. back 要 concise，但要足夠讓我考前複習。
+
+${FLASHCARD_TYPE_GUIDANCE_PROMPT}`;
 
 const FLASHCARD_RATINGS = {
   Again: { interval: 1, masteryDelta: -1 },
@@ -1971,7 +1980,7 @@ function wrongRate(stat) {
 function getRemediationForErrorType(errorType) {
   return ERROR_TYPE_REMEDIATION[errorType] || {
     task: 'Targeted correction task',
-    cardType: 'Exam Trap Card',
+    cardType: 'Trap Card',
     action: '把錯因整理成一張可重測的補救卡。',
   };
 }
@@ -5301,6 +5310,9 @@ function FlashcardsPanel({
           .map(([key, value]) => `(${key}) ${value}`)
           .join('\n');
 
+        const errorType = stat.lastErrorType || stat.errorTypes?.[stat.errorTypes.length - 1] || 'none';
+        const remediation = errorType !== 'none' ? getRemediationForErrorType(errorType) : null;
+
         return `
 [${index + 1}] ${q.id}
 Cancer: ${q.cancer || ''}
@@ -5312,8 +5324,9 @@ Wrong: ${stat.wrong}
 Wrong rate: ${wrongRate(stat)}%
 Mastery: ${stat.mastery}
 Bookmarked: ${stat.bookmarked ? 'yes' : 'no'}
-Last error type: ${stat.lastErrorType || stat.errorTypes?.[stat.errorTypes.length - 1] || 'none'}
-Recommended remediation: ${stat.lastRemediationTask?.task || (stat.lastErrorType ? getRemediationForErrorType(stat.lastErrorType).task : 'none')}
+Last error type: ${errorType}
+Recommended remediation: ${stat.lastRemediationTask?.task || remediation?.task || 'none'}
+Recommended card type: ${stat.lastRemediationTask?.cardType || remediation?.cardType || 'none'}
 
 Stem:
 ${q.stem || ''}
@@ -5340,7 +5353,7 @@ ${stat.wrongNotes || ''}
 
 ${FLASHCARD_SCHEMA_PROMPT}
 
-請優先抽出可轉移的 decision rule，不要把「題目放正面、選項放背面」。每題產生 2–4 張卡，優先涵蓋 pivotal trial、treatment sequencing、cutoff/duration/endpoint、常見錯選項。
+請優先抽出可轉移的 decision rule，不要把「題目放正面、選項放背面」。每題產生 2–4 張卡，必須只在 Trial Card / Algorithm Card / Cloze Card / Trap Card 四種新版卡中選 type。若來源資料有 Recommended card type，至少產生一張該 type 的卡；其餘再依內容補 pivotal trial、treatment sequencing、cutoff/duration/endpoint、常見錯選項。
 
 以下是錯題與 due questions 來源資料：
 
