@@ -164,10 +164,10 @@ const FLASHCARD_SCHEMA_PROMPT = `每張卡必須包含：
 ${FLASHCARD_TYPE_GUIDANCE_PROMPT}`;
 
 const FLASHCARD_RATINGS = {
-  Again: { interval: 1, masteryDelta: -1 },
-  Hard: { interval: 3, masteryDelta: 0 },
-  Good: { interval: 7, masteryDelta: 1 },
-  Easy: { interval: 21, masteryDelta: 2 },
+  Again: { masteryDelta: -1, tone: '重學' },
+  Hard: { masteryDelta: 0, tone: '偏難' },
+  Good: { masteryDelta: 1, tone: '正常' },
+  Easy: { masteryDelta: 2, tone: '熟悉' },
 };
 
 const XP_RULES = {
@@ -1986,12 +1986,44 @@ function getRemediationForErrorType(errorType) {
 }
 
 function nextIntervalByRating(rating, stat) {
-  const current = stat.intervalDays || 1;
+  return getAnkiIntervalDays(rating, stat);
+}
+
+function getAnkiIntervalDays(rating, stat = {}) {
+  const current = Math.max(1, Number(stat.intervalDays) || 1);
+  const attempts = Number(stat.attempts) || 0;
+
   if (rating === 'Again') return 1;
+
+  if (attempts <= 0) {
+    if (rating === 'Hard') return 2;
+    if (rating === 'Good') return 3;
+    if (rating === 'Easy') return 5;
+  }
+
   if (rating === 'Hard') return Math.max(2, Math.round(current * 1.2));
-  if (rating === 'Good') return Math.max(4, Math.round(current * 2.2));
-  if (rating === 'Easy') return Math.max(7, Math.round(current * 3.0));
-  return 3;
+  if (rating === 'Good') return Math.max(current + 1, Math.round(current * 2.5));
+  if (rating === 'Easy') return Math.max(current + 3, Math.round(current * 3.5));
+  return Math.max(3, current);
+}
+
+function formatReviewDueLabel(nextReviewDate, date = TODAY) {
+  const days = daysBetween(date, nextReviewDate);
+  if (days < 0) return `已到期 · ${nextReviewDate}`;
+  if (days === 0) return `今天 · ${nextReviewDate}`;
+  if (days === 1) return `明天 · ${nextReviewDate}`;
+  return `${days} 天後 · ${nextReviewDate}`;
+}
+
+function getReviewSchedulePreview(rating, stat = {}, date = TODAY) {
+  const intervalDays = getAnkiIntervalDays(rating, stat);
+  const nextReviewDate = addDays(date, intervalDays);
+  return {
+    intervalDays,
+    nextReviewDate,
+    dueLabel: formatReviewDueLabel(nextReviewDate, date),
+    shortLabel: intervalDays === 1 ? '明天' : `${intervalDays} 天後`,
+  };
 }
 
 
@@ -3711,6 +3743,9 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
     question.tags?.questionType,
     ...(question.tags?.biomarker || []),
   ].filter(Boolean);
+  const ratingSchedulePreviews = Object.fromEntries(
+    Object.keys(FLASHCARD_RATINGS).map((rating) => [rating, getReviewSchedulePreview(rating, stat)])
+  );
 
   const recordRating = (rating, { countAttempt = true, allowMissingErrorType = false } = {}) => {
     if (practiceMode && practiceDraft?.rated && countAttempt) {
@@ -4000,35 +4035,35 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                 <div className="rating-buttons">
                   <button
                     className="rating-button again"
-                    title="Again（重複）：重新學習，建議 1 天後複習"
+                    title={`Again（重複）：重新學習，下次 ${ratingSchedulePreviews.Again.dueLabel}`}
                     onClick={() => recordRating('Again', { countAttempt: !practiceDraft?.rated })}
                   >
                     🔁 Again
-                    <div className="rating-sub">重複 · 1 天</div>
+                    <div className="rating-sub">重學 · {ratingSchedulePreviews.Again.shortLabel}</div>
                   </button>
                   <button
                     className="rating-button hard"
-                    title="Hard（難）：答對但不穩，建議 3 天後複習"
+                    title={`Hard（難）：答對但不穩，下次 ${ratingSchedulePreviews.Hard.dueLabel}`}
                     onClick={() => recordRating('Hard', { countAttempt: !practiceDraft?.rated })}
                   >
                     🟠 Hard
-                    <div className="rating-sub">困難 · 約 3 天</div>
+                    <div className="rating-sub">偏難 · {ratingSchedulePreviews.Hard.shortLabel}</div>
                   </button>
                   <button
                     className="rating-button good"
-                    title="Good（好）：正常答對，建議 7–14 天後複習"
+                    title={`Good（好）：正常答對，下次 ${ratingSchedulePreviews.Good.dueLabel}`}
                     onClick={() => recordRating('Good', { countAttempt: !practiceDraft?.rated })}
                   >
                     ✅ Good
-                    <div className="rating-sub">良好 · 7–14 天</div>
+                    <div className="rating-sub">正常 · {ratingSchedulePreviews.Good.shortLabel}</div>
                   </button>
                   <button
                     className="rating-button easy"
-                    title="Easy（非常熟）：秒答且熟悉，建議 21–30 天後複習"
+                    title={`Easy（非常熟）：秒答且熟悉，下次 ${ratingSchedulePreviews.Easy.dueLabel}`}
                     onClick={() => recordRating('Easy', { countAttempt: !practiceDraft?.rated })}
                   >
                     ✨ Easy
-                    <div className="rating-sub">非常熟 · 21–30 天</div>
+                    <div className="rating-sub">熟悉 · {ratingSchedulePreviews.Easy.shortLabel}</div>
                   </button>
                 </div>
                 <button className="secondary" onClick={saveNote}>儲存詳解/筆記</button>
@@ -5175,7 +5210,12 @@ function QuestPanel({
                 <div className="inline-actions">
                   <button className="secondary" onClick={() => setOpenRecallId(open ? '' : card.id)}>{open ? '收合' : '翻卡'}</button>
                   {Object.keys(FLASHCARD_RATINGS).map((ratingOption) => (
-                    <button className="tiny" key={ratingOption} onClick={() => onMarkRecall(card, ratingOption)}>{ratingOption}</button>
+                    <FlashcardRatingButton
+                      key={ratingOption}
+                      rating={ratingOption}
+                      card={card}
+                      onClick={() => onMarkRecall(card, ratingOption)}
+                    />
                   ))}
                 </div>
               </article>
@@ -5634,10 +5674,15 @@ function FlashcardCard({
             <button className="secondary" onClick={onStartEdit}>修改</button>
             <button className="danger" onClick={deleteCard}>刪除</button>
             {Object.keys(FLASHCARD_RATINGS).map((rating) => (
-              <button key={rating} className={`tiny ${rating.toLowerCase()}`} onClick={() => onReviewCard(card.id, rating)}>{rating}</button>
+              <FlashcardRatingButton
+                key={rating}
+                rating={rating}
+                card={card}
+                onClick={() => onReviewCard(card.id, rating)}
+              />
             ))}
           </div>
-          <div className="stats-line">next review {card.nextReviewDate || 'today'} · interval {card.intervalDays || 1} days</div>
+          <div className="stats-line">next review {formatReviewDueLabel(card.nextReviewDate || TODAY)} · interval {card.intervalDays || 1} days</div>
         </>
       )}
     </article>
@@ -5660,6 +5705,21 @@ function makeFlashcardEditDraft(card) {
 
 function splitEditableList(value) {
   return [...new Set(String(value || '').split(/[,;\n]/).map((item) => item.trim()).filter(Boolean))];
+}
+
+function FlashcardRatingButton({ rating, card, onClick, disabled = false }) {
+  const schedule = getReviewSchedulePreview(rating, card);
+  return (
+    <button
+      className={`tiny schedule-rating ${rating.toLowerCase()}`}
+      disabled={disabled}
+      title={`${rating}：下次 ${schedule.dueLabel}`}
+      onClick={onClick}
+    >
+      <span>{rating}</span>
+      <small>{schedule.shortLabel}</small>
+    </button>
+  );
 }
 
 
@@ -5713,7 +5773,7 @@ function FlashcardReviewPanel({ dueFlashcards, allFlashcards, onReviewCard, onUp
       <div className="section-head">
         <div>
           <h2>Flashcard Review</h2>
-          <p className="muted">最小可行版：Front → Show Answer → Again / Hard / Good / Easy。這個 review queue 會餵給 Memory Star。</p>
+          <p className="muted">Front → Show Answer → Again / Hard / Good / Easy；依 Anki-inspired 間隔直接排入下一次複習日。</p>
         </div>
         <div className="inline-actions">
           <button className={queueMode === 'due' ? 'primary' : 'secondary'} onClick={() => { setQueueMode('due'); setActiveIndex(0); setShowBack(false); }}>Due Cards</button>
@@ -5769,10 +5829,16 @@ function FlashcardReviewPanel({ dueFlashcards, allFlashcards, onReviewCard, onUp
                 <button className="secondary" onClick={() => { setDraft(makeFlashcardEditDraft(card)); setEditing(true); }}>修改</button>
                 <button className="danger" onClick={deleteCard}>刪除</button>
                 {Object.keys(FLASHCARD_RATINGS).map((rating) => (
-                  <button key={rating} className={`tiny ${rating.toLowerCase()}`} disabled={!showBack} onClick={() => rateCard(rating)}>{rating}</button>
+                  <FlashcardRatingButton
+                    key={rating}
+                    rating={rating}
+                    card={card}
+                    disabled={!showBack}
+                    onClick={() => rateCard(rating)}
+                  />
                 ))}
               </div>
-              <div className="stats-line">next review {card.nextReviewDate || 'today'} · attempts {card.attempts || 0} · correct {card.correct || 0} / wrong {card.wrong || 0}</div>
+              <div className="stats-line">next review {formatReviewDueLabel(card.nextReviewDate || TODAY)} · attempts {card.attempts || 0} · correct {card.correct || 0} / wrong {card.wrong || 0}</div>
             </>
           )}
         </section>
@@ -6367,6 +6433,7 @@ export default function App() {
       const card = cards[cardId];
       if (!card) return prev;
       const previousStats = prev.flashcardStats?.[cardId] || makeFlashcardStats(card);
+      const schedule = getReviewSchedulePreview(rating, previousStats);
       const mastery = Math.max(0, Math.min(5, (previousStats.mastery ?? card.mastery ?? 0) + rule.masteryDelta));
       const currentQuest = getDailyQuestProgress(prev, TODAY, getTodayPlanTask(prev), todayCompleted);
       const currentTask = studyPlan100.find((task) => task.id === currentQuest.planTaskId) || getTodayPlanTask(prev);
@@ -6391,8 +6458,8 @@ export default function App() {
             wrong: (previousStats.wrong || 0) + (isWrong ? 1 : 0),
             lastRating: rating,
             lastReviewedAt: TODAY,
-            intervalDays: rule.interval,
-            nextReviewDate: addDays(TODAY, rule.interval),
+            intervalDays: schedule.intervalDays,
+            nextReviewDate: schedule.nextReviewDate,
             mastery,
             updatedAt: new Date().toISOString(),
           },
@@ -6927,6 +6994,7 @@ export default function App() {
       const persistedCard = cards[cardId];
       const previousStats = prev.flashcardStats?.[cardId] || makeFlashcardStats(persistedCard);
       const isWrong = rating === 'Again';
+      const schedule = getReviewSchedulePreview(rating, previousStats);
       const mastery = Math.max(0, Math.min(5, (previousStats.mastery ?? persistedCard.mastery ?? 0) + rule.masteryDelta));
       return {
         ...prev,
@@ -6948,8 +7016,8 @@ export default function App() {
             wrong: (previousStats.wrong || 0) + (isWrong ? 1 : 0),
             lastRating: rating,
             lastReviewedAt: TODAY,
-            intervalDays: rule.interval,
-            nextReviewDate: addDays(TODAY, rule.interval),
+            intervalDays: schedule.intervalDays,
+            nextReviewDate: schedule.nextReviewDate,
             mastery,
             updatedAt: new Date().toISOString(),
           },
