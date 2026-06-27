@@ -1832,9 +1832,51 @@ button.tiny,
   background: var(--panel-soft);
 }
 
+.cloze-blank,
+.cloze-answer {
+  display: inline-flex;
+  align-items: center;
+  min-width: 3.8rem;
+  min-height: 1.65em;
+  padding: 0 0.45rem;
+  border-radius: 8px;
+  font-weight: 900;
+  vertical-align: baseline;
+}
+
+.cloze-blank {
+  color: transparent;
+  background: #111827;
+  box-shadow: inset 0 -2px 0 rgba(255, 255, 255, 0.22);
+  user-select: none;
+}
+
+.cloze-answer {
+  color: #166534;
+  background: #dcfce7;
+  border: 1px solid rgba(22, 101, 52, 0.22);
+}
+
 .flashcard-back {
   background: #f0fdf4;
   border: 1px solid rgba(21, 128, 61, 0.22);
+}
+
+.algorithm-answer {
+  white-space: normal;
+}
+
+.algorithm-answer ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.algorithm-answer li {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .flashcard-editor {
