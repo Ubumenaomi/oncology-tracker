@@ -134,9 +134,9 @@ const FLASHCARD_TYPE_ALIASES = {
 
 const FLASHCARD_TYPE_GUIDANCE_PROMPT = `卡片類型選擇：
 - Trial Card: pivotal trial、population/intervention/comparator/outcome、適用情境、trial 間差異。
-- Algorithm Card: 治療順序、line of therapy、stage-based decision、contraindication、例外情境。
+- Algorithm Card: basic card 的變體；用來練治療順序、line of therapy、stage-based decision、contraindication、例外情境，back 要能逐步揭開。
 - Cloze Card: cutoff、duration、dose、endpoint、eligibility、biomarker threshold、數字型記憶點。
-- Trap Card: 常見錯誤敘述、misread clue、toxicity/contraindication 陷阱、高信心但答錯的錯因。`;
+- Trap Card: basic card；正面問陷阱或常見錯誤，背面直接說明為何錯與正確判斷。`;
 
 const FLASHCARD_SCHEMA_PROMPT = `每張卡必須包含：
 - front
@@ -154,12 +154,13 @@ const FLASHCARD_SCHEMA_PROMPT = `每張卡必須包含：
 1. 不要把整個題目題幹直接變成 front。
 2. 每張卡只測一個可轉移的 decision rule 或核心概念。
 3. Trial Card 必須包含 population / intervention / comparator / endpoint / exam trap。
-4. Algorithm Card 必須包含 treatment sequencing 與 contraindication / exception。
+4. Algorithm Card 必須包含 treatment sequencing 與 contraindication / exception；back 請寫成多行 numbered steps，讓 app 可以一步一步 reveal。
 5. Cloze Card 必須針對 cutoff、duration、endpoint、dose、eligibility。
-6. Trap Card 必須指出常見錯誤敘述為何錯。
-7. 不可輸出 Core Table Card、Exam Trap Card、Toxicity Card、Guideline Update Card 或其他舊 type；這些一律改寫成上面四種新版卡。
-8. 醫學名詞與藥名保留英文，其餘用繁體中文。
-9. back 要 concise，但要足夠讓我考前複習。
+6. Cloze Card 使用 Anki cloze 格式，例如 {{c1::50%}}；不同 c-number 會分成不同複習卡，同一 c-number 會在同一次複習一起遮擋。
+7. Trap Card 不做特殊互動，視為 Basic card；必須指出常見錯誤敘述為何錯。
+8. 不可輸出 Core Table Card、Exam Trap Card、Toxicity Card、Guideline Update Card 或其他舊 type；這些一律改寫成上面四種新版卡。
+9. 醫學名詞與藥名保留英文，其餘用繁體中文。
+10. back 要 concise，但要足夠讓我考前複習。
 
 ${FLASHCARD_TYPE_GUIDANCE_PROMPT}`;
 
@@ -1325,6 +1326,96 @@ function normalizeFlashcardErrorType(errorType) {
   return ERROR_TYPE_OPTIONS.includes(errorType) ? errorType : 'Knowledge gap';
 }
 
+function hasClozeMarkup(value) {
+  return /\{\{c\d+::.*?\}\}/.test(String(value || ''));
+}
+
+function getClozeNumbers(value) {
+  const text = String(value || '');
+  const clozePattern = /\{\{c(\d+)::.*?\}\}/g;
+  const numbers = [];
+  let match;
+  while ((match = clozePattern.exec(text)) !== null) {
+    if (!numbers.includes(match[1])) numbers.push(match[1]);
+  }
+  return numbers;
+}
+
+function getFlashcardFrontText(card = {}) {
+  const front = String(card.front || '');
+  const cloze = String(card.cloze || '');
+  if (hasClozeMarkup(front)) return front;
+  if (normalizeFlashcardType(card.type, card.sourceType) === 'Cloze Card' && cloze) return cloze;
+  return front;
+}
+
+function getFlashcardBaseId(cardId = '') {
+  return String(cardId).split('::c')[0];
+}
+
+function getFlashcardReviewId(card = {}) {
+  return card.reviewId || card.id;
+}
+
+function getFlashcardEditId(card = {}) {
+  return card.baseId || card.id;
+}
+
+function isAlgorithmFlashcard(card = {}) {
+  return normalizeFlashcardType(card.type, card.sourceType) === 'Algorithm Card';
+}
+
+function getAlgorithmSteps(card = {}) {
+  const back = String(card.back || '').trim();
+  if (!isAlgorithmFlashcard(card) || !back) return [];
+  const lineSteps = back
+    .split(/\n+/)
+    .map((line) => line.trim().replace(/^(?:step\s*)?\d+[.)、:：-]?\s*/i, '').replace(/^[•*-]\s*/, ''))
+    .filter(Boolean);
+  if (lineSteps.length > 1) return lineSteps;
+  return back
+    .split(/\s*(?:→|->|=>|;|；)\s*/)
+    .map((step) => step.trim())
+    .filter(Boolean);
+}
+
+function renderClozeText(value, revealAnswer = false, activeClozeNumber = null) {
+  const text = String(value || '');
+  const clozePattern = /\{\{c\d+::(.*?)(?:::(.*?))?\}\}/g;
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = clozePattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    const clozeNumber = match[0].match(/^\{\{c(\d+)::/)?.[1] || null;
+    const answer = match[1] || '';
+    const hint = match[2] || '';
+    const isActiveCloze = !activeClozeNumber || clozeNumber === String(activeClozeNumber);
+    const shouldReveal = revealAnswer || !isActiveCloze;
+    parts.push(
+      <span className={shouldReveal ? 'cloze-answer' : 'cloze-blank'} key={`${match.index}-${answer}`}>
+        {shouldReveal ? answer : hint || '_____'}
+      </span>
+    );
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts.length ? parts : text;
+}
+
+function formatAlgorithmBackForStepReveal(card = {}) {
+  const steps = getAlgorithmSteps(card);
+  if (steps.length <= 1) return String(card.back || '');
+  return steps.map((step, index) => `${index + 1}. ${step}`).join('\n');
+}
+
 function normalizeFlashcard(card) {
   const normalizedTags = [...new Set(normalizeTextList(card.tags))];
   const normalizedTrial = [...new Set(normalizeTextList(card.trial))];
@@ -1334,11 +1425,17 @@ function normalizeFlashcard(card) {
     trial: normalizedTrial,
   };
   const taxonomyTags = buildFlashcardTags(baseCard);
+  const type = normalizeFlashcardType(card.type, card.sourceType);
+  const rawBack = String(card.back || '');
+  const normalizedBack = type === 'Algorithm Card'
+    ? formatAlgorithmBackForStepReveal({ ...baseCard, type, back: rawBack })
+    : rawBack;
   return {
     ...baseCard,
     front: String(card.front || ''),
-    back: String(card.back || ''),
-    type: normalizeFlashcardType(card.type, card.sourceType),
+    back: normalizedBack,
+    cloze: String(card.cloze || ''),
+    type,
     tags: [...new Set([...normalizedTags, ...(taxonomyTags.hashTags || [])])],
     taxonomyTags,
     examValue: normalizeExamValue(card.examValue),
@@ -1360,6 +1457,7 @@ function normalizeFlashcardStats(stats = {}, flashcards = {}) {
   const cards = normalizeFlashcards(flashcards);
   const normalized = stats && typeof stats === 'object' && !Array.isArray(stats) ? { ...stats } : {};
   Object.values(cards).forEach((card) => {
+    const baseStats = normalized[card.id] || {};
     normalized[card.id] = {
       attempts: 0,
       correct: 0,
@@ -1368,8 +1466,20 @@ function normalizeFlashcardStats(stats = {}, flashcards = {}) {
       intervalDays: card.intervalDays || 1,
       nextReviewDate: card.nextReviewDate || null,
       lastReviewedAt: card.lastReviewedAt || null,
-      ...(normalized[card.id] || {}),
+      ...baseStats,
     };
+    const clozeNumbers = normalizeFlashcardType(card.type, card.sourceType) === 'Cloze Card'
+      ? getClozeNumbers(getFlashcardFrontText(card))
+      : [];
+    clozeNumbers.forEach((number) => {
+      const reviewId = `${card.id}::c${number}`;
+      normalized[reviewId] = {
+        ...normalized[card.id],
+        ...(normalized[reviewId] || {}),
+        id: reviewId,
+        baseId: card.id,
+      };
+    });
   });
   return normalized;
 }
@@ -1414,14 +1524,30 @@ function getFlashcardList(stateOrFlashcards = {}, statsOverride = null) {
   const rawFlashcards = stateOrFlashcards?.flashcards !== undefined ? stateOrFlashcards.flashcards : stateOrFlashcards;
   const stats = statsOverride || stateOrFlashcards?.flashcardStats || {};
   return Object.values(normalizeFlashcards(rawFlashcards))
-    .map((card) => ({
-      ...card,
-      ...(stats?.[card.id] || {}),
-      id: card.id,
-      mastery: stats?.[card.id]?.mastery ?? card.mastery ?? 0,
-      intervalDays: stats?.[card.id]?.intervalDays ?? card.intervalDays ?? 1,
-      nextReviewDate: stats?.[card.id]?.nextReviewDate ?? card.nextReviewDate ?? TODAY,
-    }))
+    .flatMap((card) => {
+      const clozeNumbers = getClozeNumbers(getFlashcardFrontText(card));
+      const shouldExpandCloze = normalizeFlashcardType(card.type, card.sourceType) === 'Cloze Card' && clozeNumbers.length > 0;
+      const reviewKeys = shouldExpandCloze ? clozeNumbers.map((number) => `c${number}`) : [null];
+
+      return reviewKeys.map((clozeKey, index) => {
+        const reviewId = clozeKey ? `${card.id}::${clozeKey}` : card.id;
+        const cardStats = stats?.[reviewId] || stats?.[card.id] || {};
+        return {
+          ...card,
+          ...cardStats,
+          id: reviewId,
+          baseId: card.id,
+          reviewId,
+          clozeNumber: clozeKey ? clozeKey.slice(1) : null,
+          clozeLabel: clozeKey ? clozeKey.toUpperCase() : null,
+          clozeIndex: shouldExpandCloze ? index + 1 : null,
+          clozeTotal: shouldExpandCloze ? reviewKeys.length : null,
+          mastery: cardStats.mastery ?? card.mastery ?? 0,
+          intervalDays: cardStats.intervalDays ?? card.intervalDays ?? 1,
+          nextReviewDate: cardStats.nextReviewDate ?? card.nextReviewDate ?? TODAY,
+        };
+      });
+    })
     .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
 }
 
@@ -5745,14 +5871,34 @@ function FlashcardCard({
   onCancelEdit,
 }) {
   const [showBack, setShowBack] = useState(false);
+  const [algorithmStepCount, setAlgorithmStepCount] = useState(0);
   const [draft, setDraft] = useState(() => makeFlashcardEditDraft(card));
+  const algorithmSteps = getAlgorithmSteps(card);
+  const hasAlgorithmSteps = algorithmSteps.length > 0;
 
   useEffect(() => {
     if (editing) setDraft(makeFlashcardEditDraft(card));
   }, [card, editing]);
 
+  useEffect(() => {
+    setShowBack(false);
+    setAlgorithmStepCount(0);
+  }, [card.id]);
+
+  const toggleAnswer = () => {
+    setShowBack((visible) => {
+      const nextVisible = !visible;
+      setAlgorithmStepCount(nextVisible && hasAlgorithmSteps ? 1 : 0);
+      return nextVisible;
+    });
+  };
+
+  const revealNextAlgorithmStep = () => {
+    setAlgorithmStepCount((count) => Math.min(algorithmSteps.length, count + 1));
+  };
+
   const saveEdit = () => {
-    onUpdateCard(card.id, {
+    onUpdateCard(getFlashcardEditId(card), {
       front: draft.front,
       back: draft.back,
       type: draft.type,
@@ -5768,7 +5914,7 @@ function FlashcardCard({
 
   const deleteCard = () => {
     if (!window.confirm('確定要刪除這張 card？刪除後也會移除它的複習紀錄。')) return;
-    onDeleteCard(card.id);
+    onDeleteCard(getFlashcardEditId(card));
     onCancelEdit();
   };
 
@@ -5777,6 +5923,7 @@ function FlashcardCard({
       <div className="question-top">
         <div>
           <span className="pill">{card.type || 'Flashcard'}</span>
+          {card.clozeLabel && <span className="pill">{card.clozeLabel}</span>}
           <span className="pill">{card.cancer}</span>
           <span className="pill soft">{card.topic}</span>
           {card.trial?.map((trial) => <span className="pill trial" key={trial}>{trial}</span>)}
@@ -5806,11 +5953,24 @@ function FlashcardCard({
         </div>
       ) : (
         <>
-          <pre className="flashcard-front">{card.front}</pre>
-          {!compact && card.cloze && <p className="muted">{card.cloze}</p>}
-          {showBack && <pre className="flashcard-back">{card.back || '尚未填寫背面。'}</pre>}
+          <pre className="flashcard-front">{renderClozeText(getFlashcardFrontText(card), showBack, card.clozeNumber)}</pre>
+          {!compact && card.cloze && !hasClozeMarkup(getFlashcardFrontText(card)) && (
+            <p className="muted">{renderClozeText(card.cloze, showBack)}</p>
+          )}
+          {showBack && hasAlgorithmSteps ? (
+            <div className="flashcard-back algorithm-answer">
+              <ol>
+                {algorithmSteps.slice(0, algorithmStepCount).map((step, index) => (
+                  <li key={`${step}-${index}`}>{step}</li>
+                ))}
+              </ol>
+            </div>
+          ) : showBack && <pre className="flashcard-back">{card.back || '尚未填寫背面。'}</pre>}
           <div className="inline-actions">
-            <button className="secondary" onClick={() => setShowBack(!showBack)}>{showBack ? '收合答案' : '顯示答案'}</button>
+            <button className="secondary" onClick={toggleAnswer}>{showBack ? '收合答案' : '顯示答案'}</button>
+            {showBack && hasAlgorithmSteps && algorithmStepCount < algorithmSteps.length && (
+              <button className="secondary" onClick={revealNextAlgorithmStep}>下一步</button>
+            )}
             <button className="secondary" onClick={onStartEdit}>修改</button>
             <button className="danger" onClick={deleteCard}>刪除</button>
             {Object.keys(FLASHCARD_RATINGS).map((rating) => (
@@ -5818,7 +5978,7 @@ function FlashcardCard({
                 key={rating}
                 rating={rating}
                 card={card}
-                onClick={() => onReviewCard(card.id, rating)}
+                onClick={() => onReviewCard(getFlashcardReviewId(card), rating)}
               />
             ))}
           </div>
@@ -5867,26 +6027,45 @@ function FlashcardReviewPanel({ dueFlashcards, allFlashcards, onReviewCard, onUp
   const [queueMode, setQueueMode] = useState('due');
   const [activeIndex, setActiveIndex] = useState(0);
   const [showBack, setShowBack] = useState(false);
+  const [algorithmStepCount, setAlgorithmStepCount] = useState(0);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(() => makeFlashcardEditDraft({}));
   const queue = queueMode === 'all' ? allFlashcards : dueFlashcards;
   const card = queue[activeIndex] || null;
+  const algorithmSteps = getAlgorithmSteps(card || {});
+  const hasAlgorithmSteps = algorithmSteps.length > 0;
+  const canRateCard = showBack && (!hasAlgorithmSteps || algorithmStepCount >= algorithmSteps.length);
 
   useEffect(() => {
     setEditing(false);
+    setShowBack(false);
+    setAlgorithmStepCount(0);
     setDraft(makeFlashcardEditDraft(card || {}));
   }, [card]);
 
   const rateCard = (rating) => {
     if (!card) return;
-    onReviewCard(card.id, rating);
+    onReviewCard(getFlashcardReviewId(card), rating);
     setShowBack(false);
+    setAlgorithmStepCount(0);
     setActiveIndex((index) => Math.min(index + 1, Math.max(0, queue.length - 1)));
+  };
+
+  const toggleAnswer = () => {
+    setShowBack((visible) => {
+      const nextVisible = !visible;
+      setAlgorithmStepCount(nextVisible && hasAlgorithmSteps ? 1 : 0);
+      return nextVisible;
+    });
+  };
+
+  const revealNextAlgorithmStep = () => {
+    setAlgorithmStepCount((count) => Math.min(algorithmSteps.length, count + 1));
   };
 
   const saveEdit = () => {
     if (!card) return;
-    onUpdateCard(card.id, {
+    onUpdateCard(getFlashcardEditId(card), {
       front: draft.front,
       back: draft.back,
       type: draft.type,
@@ -5902,8 +6081,9 @@ function FlashcardReviewPanel({ dueFlashcards, allFlashcards, onReviewCard, onUp
 
   const deleteCard = () => {
     if (!card || !window.confirm('確定要刪除這張 card？刪除後也會移除它的複習紀錄。')) return;
-    onDeleteCard(card.id);
+    onDeleteCard(getFlashcardEditId(card));
     setShowBack(false);
+    setAlgorithmStepCount(0);
     setEditing(false);
     setActiveIndex((index) => Math.min(index, Math.max(0, queue.length - 2)));
   };
@@ -5916,8 +6096,8 @@ function FlashcardReviewPanel({ dueFlashcards, allFlashcards, onReviewCard, onUp
           <p className="muted">Front → Show Answer → Again / Hard / Good / Easy；依 Anki-inspired 間隔直接排入下一次複習日。</p>
         </div>
         <div className="inline-actions">
-          <button className={queueMode === 'due' ? 'primary' : 'secondary'} onClick={() => { setQueueMode('due'); setActiveIndex(0); setShowBack(false); }}>Due Cards</button>
-          <button className={queueMode === 'all' ? 'primary' : 'secondary'} onClick={() => { setQueueMode('all'); setActiveIndex(0); setShowBack(false); }}>All Cards</button>
+          <button className={queueMode === 'due' ? 'primary' : 'secondary'} onClick={() => { setQueueMode('due'); setActiveIndex(0); setShowBack(false); setAlgorithmStepCount(0); }}>Due Cards</button>
+          <button className={queueMode === 'all' ? 'primary' : 'secondary'} onClick={() => { setQueueMode('all'); setActiveIndex(0); setShowBack(false); setAlgorithmStepCount(0); }}>All Cards</button>
           <button className="secondary" onClick={onOpenImport}>Import</button>
         </div>
       </div>
@@ -5933,13 +6113,14 @@ function FlashcardReviewPanel({ dueFlashcards, allFlashcards, onReviewCard, onUp
           <div className="question-top">
             <div>
               <span className="pill">{card.type || card.sourceType || 'Flashcard'}</span>
+              {card.clozeLabel && <span className="pill">{card.clozeLabel}</span>}
               <span className="pill soft">{card.cancer}</span>
               <span className="pill soft">{card.topic}</span>
               {card.trial?.map((trial, index) => <span className="pill trial" key={`${trial}-${index}`}>{trial}</span>)}
               {card.tags?.map((tag, index) => <span className="pill tag" key={`${tag}-${index}`}>{tag}</span>)}
               {card.examValue >= 4 && <span className="priority high">EV{card.examValue}</span>}
             </div>
-            <span className="priority">{activeIndex + 1}/{queue.length} · M{card.mastery || 0}</span>
+            <span className="priority">{activeIndex + 1}/{queue.length}{card.clozeTotal ? ` · ${card.clozeIndex}/${card.clozeTotal}` : ''} · M{card.mastery || 0}</span>
           </div>
           {editing ? (
             <div className="flashcard-editor">
@@ -5962,10 +6143,21 @@ function FlashcardReviewPanel({ dueFlashcards, allFlashcards, onReviewCard, onUp
             </div>
           ) : (
             <>
-              <pre className="flashcard-front large">{card.front}</pre>
-              {showBack && <pre className="flashcard-back large">{card.back}</pre>}
+              <pre className="flashcard-front large">{renderClozeText(getFlashcardFrontText(card), showBack, card.clozeNumber)}</pre>
+              {showBack && hasAlgorithmSteps ? (
+                <div className="flashcard-back large algorithm-answer">
+                  <ol>
+                    {algorithmSteps.slice(0, algorithmStepCount).map((step, index) => (
+                      <li key={`${step}-${index}`}>{step}</li>
+                    ))}
+                  </ol>
+                </div>
+              ) : showBack && <pre className="flashcard-back large">{card.back || '已顯示克漏字答案。'}</pre>}
               <div className="inline-actions review-actions">
-                <button className="secondary" onClick={() => setShowBack(!showBack)}>{showBack ? 'Hide Answer' : 'Show Answer'}</button>
+                <button className="secondary" onClick={toggleAnswer}>{showBack ? 'Hide Answer' : 'Show Answer'}</button>
+                {showBack && hasAlgorithmSteps && algorithmStepCount < algorithmSteps.length && (
+                  <button className="secondary" onClick={revealNextAlgorithmStep}>下一步</button>
+                )}
                 <button className="secondary" onClick={() => { setDraft(makeFlashcardEditDraft(card)); setEditing(true); }}>修改</button>
                 <button className="danger" onClick={deleteCard}>刪除</button>
                 {Object.keys(FLASHCARD_RATINGS).map((rating) => (
@@ -5973,7 +6165,7 @@ function FlashcardReviewPanel({ dueFlashcards, allFlashcards, onReviewCard, onUp
                     key={rating}
                     rating={rating}
                     card={card}
-                    disabled={!showBack}
+                    disabled={!canRateCard}
                     onClick={() => rateCard(rating)}
                   />
                 ))}
@@ -6570,9 +6762,10 @@ export default function App() {
     playResultFeedback(isWrong ? 'wrong' : 'correct');
     updateState((prev) => {
       const cards = normalizeFlashcards(prev.flashcards);
-      const card = cards[cardId];
+      const baseCardId = getFlashcardBaseId(cardId);
+      const card = cards[baseCardId];
       if (!card) return prev;
-      const previousStats = prev.flashcardStats?.[cardId] || makeFlashcardStats(card);
+      const previousStats = prev.flashcardStats?.[cardId] || prev.flashcardStats?.[baseCardId] || makeFlashcardStats(card);
       const schedule = getReviewSchedulePreview(rating, previousStats);
       const mastery = Math.max(0, Math.min(5, (previousStats.mastery ?? card.mastery ?? 0) + rule.masteryDelta));
       const currentQuest = getDailyQuestProgress(prev, TODAY, getTodayPlanTask(prev), todayCompleted);
@@ -6582,7 +6775,7 @@ export default function App() {
         ...prev,
         flashcards: {
           ...cards,
-          [cardId]: {
+          [baseCardId]: {
             ...card,
             difficulty: rating === 'Again' ? Math.min(5, (card.difficulty || 3) + 0.5) : card.difficulty || 3,
             updatedAt: new Date().toISOString(),
@@ -6593,6 +6786,8 @@ export default function App() {
           ...(prev.flashcardStats || {}),
           [cardId]: {
             ...previousStats,
+            id: cardId,
+            baseId: baseCardId,
             attempts: (previousStats.attempts || 0) + 1,
             correct: (previousStats.correct || 0) + (isWrong ? 0 : 1),
             wrong: (previousStats.wrong || 0) + (isWrong ? 1 : 0),
@@ -6639,6 +6834,9 @@ export default function App() {
       const nextStats = { ...(prev.flashcardStats || {}) };
       delete nextCards[cardId];
       delete nextStats[cardId];
+      Object.keys(nextStats).forEach((statId) => {
+        if (statId.startsWith(`${cardId}::c`)) delete nextStats[statId];
+      });
       return {
         ...prev,
         flashcards: nextCards,
@@ -7115,7 +7313,8 @@ export default function App() {
 
   const markQuestRecall = (card, rating) => {
     const cardId = typeof card === 'string' ? card : card.id;
-    const isPersistentCard = typeof card !== 'string' && card.sourceType !== 'topic-recall' && normalizeFlashcards(state.flashcards)[card.id];
+    const baseCardId = getFlashcardBaseId(cardId);
+    const isPersistentCard = typeof card !== 'string' && card.sourceType !== 'topic-recall' && normalizeFlashcards(state.flashcards)[baseCardId];
     const rule = FLASHCARD_RATINGS[rating] || FLASHCARD_RATINGS.Good;
     playResultFeedback(rating === 'Again' ? 'wrong' : 'correct');
     updateState((prev) => {
@@ -7132,8 +7331,8 @@ export default function App() {
       }
 
       const cards = normalizeFlashcards(prev.flashcards);
-      const persistedCard = cards[cardId];
-      const previousStats = prev.flashcardStats?.[cardId] || makeFlashcardStats(persistedCard);
+      const persistedCard = cards[baseCardId];
+      const previousStats = prev.flashcardStats?.[cardId] || prev.flashcardStats?.[baseCardId] || makeFlashcardStats(persistedCard);
       const isWrong = rating === 'Again';
       const schedule = getReviewSchedulePreview(rating, previousStats);
       const mastery = Math.max(0, Math.min(5, (previousStats.mastery ?? persistedCard.mastery ?? 0) + rule.masteryDelta));
@@ -7141,7 +7340,7 @@ export default function App() {
         ...prev,
         flashcards: {
           ...cards,
-          [cardId]: {
+          [baseCardId]: {
             ...persistedCard,
             difficulty: rating === 'Again' ? Math.min(5, (persistedCard.difficulty || 3) + 0.5) : persistedCard.difficulty || 3,
             updatedAt: new Date().toISOString(),
@@ -7152,6 +7351,8 @@ export default function App() {
           ...(prev.flashcardStats || {}),
           [cardId]: {
             ...previousStats,
+            id: cardId,
+            baseId: baseCardId,
             attempts: (previousStats.attempts || 0) + 1,
             correct: (previousStats.correct || 0) + (isWrong ? 0 : 1),
             wrong: (previousStats.wrong || 0) + (isWrong ? 1 : 0),
@@ -7285,8 +7486,10 @@ export default function App() {
   }, [state.customQuestions, state.deletedQuestionIds]);
 
   const flashcardTotal = useMemo(() => Object.keys(normalizeFlashcards(state.flashcards)).length, [state.flashcards]);
-  const dueFlashcardCount = useMemo(() => Object.values(state.flashcardStats || {})
-    .filter((stat) => !stat.nextReviewDate || stat.nextReviewDate <= TODAY).length, [state.flashcardStats]);
+  const dueFlashcardCount = useMemo(() => getDueFlashcards({
+    flashcards: state.flashcards,
+    flashcardStats: state.flashcardStats,
+  }).length, [state.flashcards, state.flashcardStats]);
 
   const dueReview = useMemo(() => needsDueReview ? getQuestionPool(questionDataState)
     .map((q) => ({ q: getQuestionWithOverride(q.id, questionDataState), stat: getStat(questionDataState, q.id) }))
