@@ -5107,20 +5107,21 @@ function QuestPanel({
 }) {
   const [openRecallId, setOpenRecallId] = useState(recallCards[0]?.id || '');
   const [openBossId, setOpenBossId] = useState(bossChallenges[0]?.id || '');
-  const [selectedHistoryId, setSelectedHistoryId] = useState(reviewHistory[0]?.id || '');
+  const [selectedMemoryView, setSelectedMemoryView] = useState('today');
   const [openHistoryCardId, setOpenHistoryCardId] = useState('');
   const bossPassed = Object.values(progress.bossResults || {}).filter(Boolean).length;
   const bossAnswered = Object.keys(progress.bossResults || {}).length;
   const allStars = progress.stars >= 3;
-  const selectedHistory = reviewHistory.find((item) => item.id === selectedHistoryId) || reviewHistory[0] || null;
+  const selectedHistory = selectedMemoryView === 'today'
+    ? null
+    : reviewHistory.find((item) => item.id === selectedMemoryView) || null;
 
   useEffect(() => {
-    if (!reviewHistory.length) return;
-    if (!reviewHistory.some((item) => item.id === selectedHistoryId)) {
-      setSelectedHistoryId(reviewHistory[0].id);
+    if (selectedMemoryView !== 'today' && !reviewHistory.some((item) => item.id === selectedMemoryView)) {
+      setSelectedMemoryView('today');
       setOpenHistoryCardId('');
     }
-  }, [reviewHistory, selectedHistoryId]);
+  }, [reviewHistory, selectedMemoryView]);
 
   const starRows = [
     {
@@ -5250,111 +5251,115 @@ function QuestPanel({
         </section>
       )}
 
-      <section className="subsection">
-        <h3>Memory Star｜Topic Recall / Flashcard Review</h3>
-        <div className="recall-grid">
-          {recallCards.map((card) => {
-            const rating = progress.recallRatings?.[card.id];
-            const open = openRecallId === card.id;
-            return (
-              <article className={rating ? 'recall-card done' : 'recall-card'} key={card.id}>
-                <div className="question-top">
-                  <span className="pill">{card.type}</span>
-                  {rating && <span className="priority high">{rating}</span>}
-                </div>
-                <strong>{card.front}</strong>
-                {open && <p className="recall-back">{card.back}</p>}
-                <div className="inline-actions">
-                  <button className="secondary" onClick={() => setOpenRecallId(open ? '' : card.id)}>{open ? '收合' : '翻卡'}</button>
-                  {Object.keys(FLASHCARD_RATINGS).map((ratingOption) => (
-                    <FlashcardRatingButton
-                      key={ratingOption}
-                      rating={ratingOption}
-                      card={card}
-                      onClick={() => onMarkRecall(card, ratingOption)}
-                    />
-                  ))}
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="subsection quest-review-history">
+      <section className="subsection quest-memory-section">
         <div className="section-head compact">
           <div>
-            <h3>之前複習紀錄</h3>
-            <p className="muted">回看過去 Quest 的 Topic Recall / Flashcard Review 評分與卡片內容。</p>
+            <h3>Memory Star｜Topic Recall / Flashcard Review</h3>
+            <p className="muted">今日可繼續評分；切到日期時，用同一區塊回看過去紀錄。</p>
           </div>
-          <span className="priority">{reviewHistory.length} days</span>
+          <span className="priority">{selectedMemoryView === 'today' ? 'Today' : 'History'}</span>
         </div>
 
-        {reviewHistory.length === 0 ? (
-          <div className="empty-state small">
-            <h3>還沒有可回看的記憶紀錄</h3>
-            <p>完成一次 Topic Recall 或 Flashcard Review 後，這裡會保留日期、任務與每張卡的評分。</p>
+        <div className="memory-view-switcher" aria-label="Memory review switcher">
+          <button
+            className={selectedMemoryView === 'today' ? 'memory-view-chip active' : 'memory-view-chip'}
+            type="button"
+            onClick={() => {
+              setSelectedMemoryView('today');
+              setOpenHistoryCardId('');
+            }}
+          >
+            <span>今日</span>
+            <strong>{recallCards.length} cards · {progress.stars}/3 stars</strong>
+          </button>
+          {reviewHistory.map((item) => (
+            <button
+              className={selectedMemoryView === item.id ? 'memory-view-chip active' : 'memory-view-chip'}
+              type="button"
+              key={item.id}
+              onClick={() => {
+                setSelectedMemoryView(item.id);
+                setOpenHistoryCardId('');
+              }}
+            >
+              <span>{item.date}</span>
+              <strong>{item.reviewedCount} cards · {item.stars}/3 stars</strong>
+              <em>{item.taskLabel}</em>
+            </button>
+          ))}
+        </div>
+
+        {selectedMemoryView === 'today' ? (
+          <div className="recall-grid">
+            {recallCards.map((card) => {
+              const rating = progress.recallRatings?.[card.id];
+              const open = openRecallId === card.id;
+              return (
+                <article className={rating ? 'recall-card done' : 'recall-card'} key={card.id}>
+                  <div className="question-top">
+                    <span className="pill">{card.type}</span>
+                    {rating && <span className="priority high">{rating}</span>}
+                  </div>
+                  <strong>{card.front}</strong>
+                  {open && <p className="recall-back">{card.back}</p>}
+                  <div className="inline-actions">
+                    <button className="secondary" onClick={() => setOpenRecallId(open ? '' : card.id)}>{open ? '收合' : '翻卡'}</button>
+                    {Object.keys(FLASHCARD_RATINGS).map((ratingOption) => (
+                      <FlashcardRatingButton
+                        key={ratingOption}
+                        rating={ratingOption}
+                        card={card}
+                        onClick={() => onMarkRecall(card, ratingOption)}
+                      />
+                    ))}
+                  </div>
+                </article>
+              );
+            })}
           </div>
-        ) : (
-          <div className="quest-history-layout">
-            <div className="quest-history-list" aria-label="Quest review dates">
-              {reviewHistory.map((item) => (
-                <button
-                  className={selectedHistory?.id === item.id ? 'quest-history-row active' : 'quest-history-row'}
-                  type="button"
-                  key={item.id}
-                  onClick={() => {
-                    setSelectedHistoryId(item.id);
-                    setOpenHistoryCardId('');
-                  }}
-                >
-                  <span>{item.date}</span>
-                  <strong>{item.taskLabel}</strong>
-                  <em>{item.reviewedCount} cards · {item.stars}/3 stars</em>
-                </button>
-              ))}
+        ) : selectedHistory ? (
+          <div className="quest-history-detail">
+            <div className="quest-history-summary">
+              <div>
+                <span className="pill">{selectedHistory.cancer}</span>
+                <strong>{selectedHistory.taskLabel}</strong>
+                <p>{selectedHistory.date} · {selectedHistory.reviewedCount} 張已評分</p>
+              </div>
+              <div className="quest-history-stars" aria-label="Quest stars">
+                {['Practice', 'Memory', 'Mastery'].map((label, index) => {
+                  const done = [selectedHistory.practiceDone, selectedHistory.memoryDone, selectedHistory.bossDone][index];
+                  return <span className={done ? 'done' : ''} key={label}>{done ? '★' : '☆'} {label}</span>;
+                })}
+              </div>
             </div>
 
-            {selectedHistory && (
-              <div className="quest-history-detail">
-                <div className="quest-history-summary">
-                  <div>
-                    <span className="pill">{selectedHistory.cancer}</span>
-                    <strong>{selectedHistory.taskLabel}</strong>
-                    <p>{selectedHistory.date} · {selectedHistory.reviewedCount} 張已評分</p>
-                  </div>
-                  <div className="quest-history-stars" aria-label="Quest stars">
-                    {['Practice', 'Memory', 'Mastery'].map((label, index) => {
-                      const done = [selectedHistory.practiceDone, selectedHistory.memoryDone, selectedHistory.bossDone][index];
-                      return <span className={done ? 'done' : ''} key={label}>{done ? '★' : '☆'} {label}</span>;
-                    })}
-                  </div>
-                </div>
-
-                {selectedHistory.recallRows.length === 0 ? (
-                  <p className="muted">這一天有星星進度，但沒有留下單張卡片評分。</p>
-                ) : (
-                  <div className="quest-history-cards">
-                    {selectedHistory.recallRows.map((card) => {
-                      const open = openHistoryCardId === card.id;
-                      return (
-                        <article className="quest-history-card" key={card.id}>
-                          <div className="question-top">
-                            <span className="pill">{card.type}</span>
-                            <span className="priority high">{card.rating}</span>
-                          </div>
-                          <strong>{card.front}</strong>
-                          {open && <p className="recall-back">{card.back || '這張卡目前沒有背面內容。'}</p>}
-                          <button className="secondary" type="button" onClick={() => setOpenHistoryCardId(open ? '' : card.id)}>
-                            {open ? '收合' : '看內容'}
-                          </button>
-                        </article>
-                      );
-                    })}
-                  </div>
-                )}
+            {selectedHistory.recallRows.length === 0 ? (
+              <p className="muted">這一天有星星進度，但沒有留下單張卡片評分。</p>
+            ) : (
+              <div className="quest-history-cards">
+                {selectedHistory.recallRows.map((card) => {
+                  const open = openHistoryCardId === card.id;
+                  return (
+                    <article className="quest-history-card" key={card.id}>
+                      <div className="question-top">
+                        <span className="pill">{card.type}</span>
+                        <span className="priority high">{card.rating}</span>
+                      </div>
+                      <strong>{card.front}</strong>
+                      {open && <p className="recall-back">{card.back || '這張卡目前沒有背面內容。'}</p>}
+                      <button className="secondary" type="button" onClick={() => setOpenHistoryCardId(open ? '' : card.id)}>
+                        {open ? '收合' : '看內容'}
+                      </button>
+                    </article>
+                  );
+                })}
               </div>
             )}
+          </div>
+        ) : (
+          <div className="empty-state small">
+            <h3>還沒有可回看的記憶紀錄</h3>
+            <p>完成一次 Topic Recall 或 Flashcard Review 後，日期會出現在上方，可直接切換回看。</p>
           </div>
         )}
       </section>

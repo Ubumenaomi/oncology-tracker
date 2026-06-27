@@ -1643,7 +1643,7 @@ button.tiny,
   color: #1e3a8a;
 }
 
-.quest-review-history {
+.quest-memory-section {
   border-top: 1px solid var(--line);
   padding-top: 18px;
 }
@@ -1652,14 +1652,6 @@ button.tiny,
   margin-bottom: 12px;
 }
 
-.quest-history-layout {
-  display: grid;
-  grid-template-columns: minmax(220px, 0.72fr) minmax(0, 1.28fr);
-  gap: 14px;
-  align-items: start;
-}
-
-.quest-history-list,
 .quest-history-detail,
 .quest-history-card {
   border: 1px solid var(--line);
@@ -1667,28 +1659,32 @@ button.tiny,
   background: #ffffff;
 }
 
-.quest-history-list {
-  display: grid;
+.memory-view-switcher {
+  display: flex;
   gap: 8px;
-  padding: 8px;
-  max-height: 520px;
-  overflow: auto;
+  margin-bottom: 14px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scroll-snap-type: x proximity;
 }
 
-.quest-history-row {
-  border: 1px solid transparent;
+.memory-view-chip {
+  border: 1px solid var(--line);
   border-radius: 14px;
-  background: var(--panel-soft);
+  background: #ffffff;
   color: var(--text);
   display: grid;
-  gap: 4px;
-  padding: 10px;
+  flex: 0 0 190px;
+  gap: 3px;
+  min-width: 160px;
+  max-width: 220px;
+  padding: 10px 12px;
   text-align: left;
-  width: 100%;
+  scroll-snap-align: start;
 }
 
-.quest-history-row span,
-.quest-history-row em,
+.memory-view-chip span,
+.memory-view-chip em,
 .quest-history-summary p {
   color: var(--muted);
   font-size: 12px;
@@ -1696,11 +1692,19 @@ button.tiny,
   font-weight: 750;
 }
 
-.quest-history-row strong {
+.memory-view-chip strong {
   line-height: 1.35;
+  white-space: nowrap;
 }
 
-.quest-history-row.active {
+.memory-view-chip em {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memory-view-chip.active {
   border-color: rgba(37, 99, 235, 0.28);
   background: #eff6ff;
 }
@@ -1898,12 +1902,8 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
-  .quest-history-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .quest-history-list {
-    max-height: none;
+  .memory-view-switcher {
+    margin-right: -4px;
   }
 
   .quest-history-summary {
