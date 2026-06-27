@@ -2670,6 +2670,51 @@ function getQuestMemoryCards(state, task) {
   return picked.slice(0, 5);
 }
 
+function getQuestReviewHistory(state, flashcardState) {
+  const cardsById = new Map(getFlashcardList(flashcardState).map((card) => [card.id, card]));
+  return Object.entries(state.dailyQuestProgress || {})
+    .flatMap(([date]) => {
+      const bucket = getDailyQuestBucket(state, date);
+      return Object.entries(bucket.tasks || {}).map(([taskId, saved]) => {
+        const planTaskId = Number(saved.planTaskId || taskId);
+        const task = studyPlan100.find((item) => Number(item.id) === planTaskId) || studyPlan100[planTaskId - 1] || null;
+        const topicRecallCards = new Map(buildTopicRecallCards(task).map((card) => [card.id, card]));
+        const recallRows = Object.entries(saved.recallRatings || {}).map(([cardId, rating]) => {
+          const card = cardsById.get(cardId) || topicRecallCards.get(cardId) || {
+            id: cardId,
+            type: 'Flashcard',
+            front: cardId,
+            back: '',
+          };
+          return {
+            id: cardId,
+            rating,
+            type: card.type || card.sourceType || 'Flashcard',
+            front: card.front || cardId,
+            back: card.back || '',
+            topic: card.topic || task?.topic || '',
+          };
+        });
+        return {
+          id: `${date}-${planTaskId}`,
+          date,
+          taskId: planTaskId,
+          taskLabel: task ? `${task.day}｜${task.topic}` : `Task ${planTaskId}`,
+          cancer: task?.cancer || saved.cancer || 'Quest',
+          stars: saved.stars || [saved.practiceDone, saved.memoryDone, saved.bossDone].filter(Boolean).length,
+          memoryDone: Boolean(saved.memoryDone),
+          practiceDone: Boolean(saved.practiceDone),
+          bossDone: Boolean(saved.bossDone),
+          reviewedCount: saved.memoryCardsReviewed || recallRows.length,
+          recallRows,
+        };
+      });
+    })
+    .filter((row) => row.reviewedCount > 0 || row.memoryDone || row.stars > 0)
+    .sort((a, b) => b.date.localeCompare(a.date) || b.taskId - a.taskId)
+    .slice(0, 14);
+}
+
 function getWeaknessQuestion(state, task) {
   const rows = getQuestionPool(state)
     .map((q) => ({ q: getQuestionWithOverride(q.id, state), stat: getStat(state, q.id) }))
@@ -5044,6 +5089,7 @@ function QuestPanel({
   task,
   progress,
   recallCards,
+  reviewHistory,
   bossChallenges,
   highYieldTopics,
   completionStatus,
@@ -5061,9 +5107,20 @@ function QuestPanel({
 }) {
   const [openRecallId, setOpenRecallId] = useState(recallCards[0]?.id || '');
   const [openBossId, setOpenBossId] = useState(bossChallenges[0]?.id || '');
+  const [selectedHistoryId, setSelectedHistoryId] = useState(reviewHistory[0]?.id || '');
+  const [openHistoryCardId, setOpenHistoryCardId] = useState('');
   const bossPassed = Object.values(progress.bossResults || {}).filter(Boolean).length;
   const bossAnswered = Object.keys(progress.bossResults || {}).length;
   const allStars = progress.stars >= 3;
+  const selectedHistory = reviewHistory.find((item) => item.id === selectedHistoryId) || reviewHistory[0] || null;
+
+  useEffect(() => {
+    if (!reviewHistory.length) return;
+    if (!reviewHistory.some((item) => item.id === selectedHistoryId)) {
+      setSelectedHistoryId(reviewHistory[0].id);
+      setOpenHistoryCardId('');
+    }
+  }, [reviewHistory, selectedHistoryId]);
 
   const starRows = [
     {
@@ -5222,6 +5279,84 @@ function QuestPanel({
             );
           })}
         </div>
+      </section>
+
+      <section className="subsection quest-review-history">
+        <div className="section-head compact">
+          <div>
+            <h3>之前複習紀錄</h3>
+            <p className="muted">回看過去 Quest 的 Topic Recall / Flashcard Review 評分與卡片內容。</p>
+          </div>
+          <span className="priority">{reviewHistory.length} days</span>
+        </div>
+
+        {reviewHistory.length === 0 ? (
+          <div className="empty-state small">
+            <h3>還沒有可回看的記憶紀錄</h3>
+            <p>完成一次 Topic Recall 或 Flashcard Review 後，這裡會保留日期、任務與每張卡的評分。</p>
+          </div>
+        ) : (
+          <div className="quest-history-layout">
+            <div className="quest-history-list" aria-label="Quest review dates">
+              {reviewHistory.map((item) => (
+                <button
+                  className={selectedHistory?.id === item.id ? 'quest-history-row active' : 'quest-history-row'}
+                  type="button"
+                  key={item.id}
+                  onClick={() => {
+                    setSelectedHistoryId(item.id);
+                    setOpenHistoryCardId('');
+                  }}
+                >
+                  <span>{item.date}</span>
+                  <strong>{item.taskLabel}</strong>
+                  <em>{item.reviewedCount} cards · {item.stars}/3 stars</em>
+                </button>
+              ))}
+            </div>
+
+            {selectedHistory && (
+              <div className="quest-history-detail">
+                <div className="quest-history-summary">
+                  <div>
+                    <span className="pill">{selectedHistory.cancer}</span>
+                    <strong>{selectedHistory.taskLabel}</strong>
+                    <p>{selectedHistory.date} · {selectedHistory.reviewedCount} 張已評分</p>
+                  </div>
+                  <div className="quest-history-stars" aria-label="Quest stars">
+                    {['Practice', 'Memory', 'Mastery'].map((label, index) => {
+                      const done = [selectedHistory.practiceDone, selectedHistory.memoryDone, selectedHistory.bossDone][index];
+                      return <span className={done ? 'done' : ''} key={label}>{done ? '★' : '☆'} {label}</span>;
+                    })}
+                  </div>
+                </div>
+
+                {selectedHistory.recallRows.length === 0 ? (
+                  <p className="muted">這一天有星星進度，但沒有留下單張卡片評分。</p>
+                ) : (
+                  <div className="quest-history-cards">
+                    {selectedHistory.recallRows.map((card) => {
+                      const open = openHistoryCardId === card.id;
+                      return (
+                        <article className="quest-history-card" key={card.id}>
+                          <div className="question-top">
+                            <span className="pill">{card.type}</span>
+                            <span className="priority high">{card.rating}</span>
+                          </div>
+                          <strong>{card.front}</strong>
+                          {open && <p className="recall-back">{card.back || '這張卡目前沒有背面內容。'}</p>}
+                          <button className="secondary" type="button" onClick={() => setOpenHistoryCardId(open ? '' : card.id)}>
+                            {open ? '收合' : '看內容'}
+                          </button>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       <section className="subsection">
@@ -6742,6 +6877,7 @@ export default function App() {
   const visibleTodayQuestions = todayQuestions.slice(currentPracticePage * PRACTICE_PAGE_SIZE, (currentPracticePage + 1) * PRACTICE_PAGE_SIZE);
   const totalPracticePages = Math.ceil(todayPracticeConfig.total / PRACTICE_PAGE_SIZE);
   const questRecallCards = tab === 'quest' ? getQuestMemoryCards(flashcardDataState, questTask) : EMPTY_ARRAY;
+  const questReviewHistory = tab === 'quest' ? getQuestReviewHistory(state, flashcardDataState) : EMPTY_ARRAY;
   const questBossChallenges = tab === 'quest' ? buildBossChallenges(questTask, questionDataState) : EMPTY_ARRAY;
   const highYieldTopics = tab === 'quest' || tab === 'today' ? getRankedHighYieldTopics(questionDataState, questTask) : EMPTY_ARRAY;
   const todayHighValueCards = tab === 'quest' ? getHighValueCardsCreatedToday(flashcardDataState) : EMPTY_ARRAY;
@@ -7634,6 +7770,7 @@ export default function App() {
           task={questTask}
           progress={questProgress}
           recallCards={questRecallCards}
+          reviewHistory={questReviewHistory}
           bossChallenges={questBossChallenges}
           highYieldTopics={highYieldTopics}
           completionStatus={completionStatus}

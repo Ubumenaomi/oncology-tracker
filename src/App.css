@@ -1643,6 +1643,128 @@ button.tiny,
   color: #1e3a8a;
 }
 
+.quest-review-history {
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
+
+.section-head.compact {
+  margin-bottom: 12px;
+}
+
+.quest-history-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.72fr) minmax(0, 1.28fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.quest-history-list,
+.quest-history-detail,
+.quest-history-card {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.quest-history-list {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  max-height: 520px;
+  overflow: auto;
+}
+
+.quest-history-row {
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: var(--panel-soft);
+  color: var(--text);
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  text-align: left;
+  width: 100%;
+}
+
+.quest-history-row span,
+.quest-history-row em,
+.quest-history-summary p {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 750;
+}
+
+.quest-history-row strong {
+  line-height: 1.35;
+}
+
+.quest-history-row.active {
+  border-color: rgba(37, 99, 235, 0.28);
+  background: #eff6ff;
+}
+
+.quest-history-detail {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.quest-history-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.quest-history-summary strong {
+  display: block;
+  margin-top: 8px;
+}
+
+.quest-history-summary p {
+  margin: 4px 0 0;
+}
+
+.quest-history-stars {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.quest-history-stars span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 850;
+  padding: 5px 8px;
+  white-space: nowrap;
+}
+
+.quest-history-stars span.done {
+  border-color: rgba(245, 158, 11, 0.42);
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.quest-history-cards {
+  display: grid;
+  gap: 10px;
+}
+
+.quest-history-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.quest-history-card strong {
+  line-height: 1.45;
+}
+
 .import-card-panel textarea {
   width: 100%;
   min-height: 220px;
@@ -1774,6 +1896,22 @@ button:disabled {
 
   .adaptive-practice-card {
     grid-template-columns: 1fr;
+  }
+
+  .quest-history-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .quest-history-list {
+    max-height: none;
+  }
+
+  .quest-history-summary {
+    flex-direction: column;
+  }
+
+  .quest-history-stars {
+    justify-content: flex-start;
   }
 
   .high-yield-list {
