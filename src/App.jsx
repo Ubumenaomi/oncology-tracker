@@ -4030,11 +4030,17 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
     } else {
       triggerHapticFeedback('tap');
     }
-    const defaultRating = isCorrectSelection ? 'Good' : 'Again';
-    const recorded = recordRating(defaultRating, { allowMissingErrorType: true });
-    if (!recorded) {
-      setFeedback(answerIsSingleChoice ? (isCorrectSelection ? '答對。' : '答錯。') : '已顯示詳解。');
+    if (answerIsSingleChoice && isCorrectSelection) {
+      const recorded = recordRating('Good');
+      if (!recorded) {
+        setFeedback('答對。');
+      }
+      return;
     }
+
+    setFeedback(answerIsSingleChoice
+      ? '答錯。請先選擇 Error type，再按 Again / Hard / Good / Easy 記錄錯題。'
+      : '已顯示詳解。');
   };
 
   const saveNote = () => {
