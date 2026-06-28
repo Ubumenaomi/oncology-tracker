@@ -2648,15 +2648,31 @@ function getHighValueCardsCreatedToday(state, date = TODAY) {
   ));
 }
 
+function hasDailyPracticeRating(state, id, date = TODAY) {
+  const draft = state.sessions?.[date]?.practiceDrafts?.[id] || {};
+  if (draft.rated) return true;
+
+  const stat = getStat(state, id);
+  return (stat.answerHistory || []).some((event) => (
+    event?.date === date
+    && event?.mode === 'daily'
+    && event?.questionId === id
+  )) || (stat.lastAttemptAt === date && (stat.attempts || 0) > 0);
+}
+
 function getDailyWrongErrorTypeStatus(state, questionIds = [], date = TODAY) {
   const wrongRated = questionIds
     .map((id) => {
       const question = getQuestionWithOverride(id, state);
       const draft = state.sessions?.[date]?.practiceDrafts?.[id] || {};
-      const selected = String(draft.selected || '').trim().toUpperCase();
-      const correctAnswer = String(draft.correctAnswer || question?.answer || '').trim().toUpperCase();
-      const isWrong = draft.rated && selected && correctAnswer && selected !== correctAnswer;
-      return isWrong ? { id, errorType: draft.errorType || getStat(state, id).lastErrorType || '' } : null;
+      const stat = getStat(state, id);
+      const latestDailyEvent = [...(stat.answerHistory || [])]
+        .reverse()
+        .find((event) => event?.date === date && event?.mode === 'daily' && event?.questionId === id);
+      const selected = String(draft.selected || latestDailyEvent?.selected || stat.userAnswer || '').trim().toUpperCase();
+      const correctAnswer = String(draft.correctAnswer || latestDailyEvent?.correctAnswer || stat.correctAnswer || question?.answer || '').trim().toUpperCase();
+      const isWrong = hasDailyPracticeRating(state, id, date) && selected && correctAnswer && selected !== correctAnswer;
+      return isWrong ? { id, errorType: draft.errorType || latestDailyEvent?.errorType || stat.lastErrorType || '' } : null;
     })
     .filter(Boolean);
   return {
@@ -3136,7 +3152,7 @@ function getStatsDashboard(state, planSummary, readiness, cancerSummary, date = 
   const todayAttempts = getTodayAttemptSummary(state, date);
   const todaySession = state.sessions?.[date] || {};
   const todayQuestionCount = (todaySession.questionIds || []).length;
-  const todayRatedCount = Object.values(todaySession.practiceDrafts || {}).filter((draft) => draft?.rated).length;
+  const todayRatedCount = (todaySession.questionIds || []).filter((id) => hasDailyPracticeRating(state, id, date)).length;
   const todayFlashcards = getTodayFlashcardReviewCount(state, date);
   const todayReviewQuestions = getTodayReviewQuestionCount(state, date);
   const todayWrongNotes = getTodayWrongNoteCount(state, date);
@@ -4088,7 +4104,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
   };
 
   return (
-    <article className="question-card">
+    <article className="question-card" data-question-id={question.id}>
       <div className="question-top">
         <div>
           <button className="link-button" onClick={() => setOpen(!open)}>{open ? '收合' : '展開'}</button>
@@ -7068,7 +7084,9 @@ export default function App() {
   const todayPracticeConfig = getPracticeModeConfig(todayPracticeMode);
   const todayPracticeTargetCount = todayPracticeConfig.total;
   const todayPracticeTargetIds = todayIds.slice(0, todayPracticeTargetCount);
-  const todayRatedCount = todayPracticeTargetIds.filter((id) => todaySession?.practiceDrafts?.[id]?.rated).length;
+  const todayRatedCount = todayPracticeTargetIds.filter((id) => hasDailyPracticeRating(state, id, TODAY)).length;
+  const firstIncompletePracticeIndex = todayPracticeTargetIds.findIndex((id) => !hasDailyPracticeRating(state, id, TODAY));
+  const firstIncompletePracticeId = firstIncompletePracticeIndex >= 0 ? todayPracticeTargetIds[firstIncompletePracticeIndex] : null;
   const todayCompleted = todaySessionMatchesQuest
     && todayPracticeTargetCount > 0
     && todayPracticeTargetIds.length >= todayPracticeTargetCount
@@ -7271,8 +7289,32 @@ export default function App() {
     }
   };
 
+  const openFirstIncompletePracticeQuestion = () => {
+    if (!todaySessionMatchesQuest || todayPracticeTargetIds.length === 0) {
+      createTodaySession();
+      return true;
+    }
+
+    if (!firstIncompletePracticeId) return false;
+
+    const page = Math.floor(firstIncompletePracticeIndex / PRACTICE_PAGE_SIZE);
+    setTab('today');
+    setPracticePage(page);
+    setPracticePageMessage(`還有 ${todayPracticeTargetCount - todayRatedCount} 題未完成；已跳到第 ${firstIncompletePracticeIndex + 1} 題。`);
+    window.setTimeout(() => {
+      document
+        .querySelector(`[data-question-id="${firstIncompletePracticeId}"]`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+    return true;
+  };
+
   const claimDailyCompletion = () => {
-    if (!todayCompleted || state.game?.dailyClaims?.[TODAY]) return;
+    if (state.game?.dailyClaims?.[TODAY]) return;
+    if (!todayCompleted) {
+      openFirstIncompletePracticeQuestion();
+      return;
+    }
     updateState((prev) => ({
       ...prev,
       sessions: {
@@ -8002,7 +8044,13 @@ export default function App() {
           onMarkRecall={markQuestRecall}
           onSetBossResult={setQuestBossResult}
           onClaimStageClear={claimStageClear}
-          onOpenPractice={() => setTab('today')}
+          onOpenPractice={() => {
+            if (!todayCompleted && firstIncompletePracticeId) {
+              openFirstIncompletePracticeQuestion();
+              return;
+            }
+            setTab('today');
+          }}
         />
       )}
 
@@ -8095,8 +8143,8 @@ export default function App() {
             </div>
             <div className="inline-actions">
               <button className="secondary" disabled={isCreatingPractice} onClick={regenerateTodaySession}>重新抽題</button>
-              <button className="good" disabled={!todayCompleted || state.game?.dailyClaims?.[TODAY]} onClick={claimDailyCompletion}>
-                {state.game?.dailyClaims?.[TODAY] ? '今日 XP 已領取' : '領取每日 XP'}
+              <button className={todayCompleted ? 'good' : 'secondary'} disabled={state.game?.dailyClaims?.[TODAY]} onClick={claimDailyCompletion}>
+                {state.game?.dailyClaims?.[TODAY] ? '今日 XP 已領取' : todayCompleted ? '領取每日 XP' : '跳到未完成題目'}
               </button>
             </div>
           </div>
