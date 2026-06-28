@@ -3917,9 +3917,13 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
   const ratingSchedulePreviews = Object.fromEntries(
     Object.keys(FLASHCARD_RATINGS).map((rating) => [rating, getReviewSchedulePreview(rating, stat)])
   );
+  const hasRecordedCurrentPracticeAttempt = practiceMode && (
+    (stat.answerHistory || []).some((event) => event?.date === TODAY && event?.mode === 'daily' && event?.questionId === question.id)
+    || (practiceDraft?.rated && stat.lastAttemptAt === TODAY && (stat.attempts || 0) > 0)
+  );
 
   const recordRating = (rating, { countAttempt = true, allowMissingErrorType = false } = {}) => {
-    if (practiceMode && practiceDraft?.rated && countAttempt) {
+    if (practiceMode && hasRecordedCurrentPracticeAttempt && countAttempt) {
       setFeedback('此題已評分，跳過重複紀錄。');
       return false;
     }
@@ -4213,7 +4217,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                   <button
                     className="rating-button again"
                     title={`Again（重複）：重新學習，下次 ${ratingSchedulePreviews.Again.dueLabel}`}
-                    onClick={() => recordRating('Again', { countAttempt: !practiceDraft?.rated })}
+                    onClick={() => recordRating('Again', { countAttempt: !hasRecordedCurrentPracticeAttempt })}
                   >
                     🔁 Again
                     <div className="rating-sub">重學 · {ratingSchedulePreviews.Again.shortLabel}</div>
@@ -4221,7 +4225,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                   <button
                     className="rating-button hard"
                     title={`Hard（難）：答對但不穩，下次 ${ratingSchedulePreviews.Hard.dueLabel}`}
-                    onClick={() => recordRating('Hard', { countAttempt: !practiceDraft?.rated })}
+                    onClick={() => recordRating('Hard', { countAttempt: !hasRecordedCurrentPracticeAttempt })}
                   >
                     🟠 Hard
                     <div className="rating-sub">偏難 · {ratingSchedulePreviews.Hard.shortLabel}</div>
@@ -4229,7 +4233,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                   <button
                     className="rating-button good"
                     title={`Good（好）：正常答對，下次 ${ratingSchedulePreviews.Good.dueLabel}`}
-                    onClick={() => recordRating('Good', { countAttempt: !practiceDraft?.rated })}
+                    onClick={() => recordRating('Good', { countAttempt: !hasRecordedCurrentPracticeAttempt })}
                   >
                     ✅ Good
                     <div className="rating-sub">正常 · {ratingSchedulePreviews.Good.shortLabel}</div>
@@ -4237,7 +4241,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                   <button
                     className="rating-button easy"
                     title={`Easy（非常熟）：秒答且熟悉，下次 ${ratingSchedulePreviews.Easy.dueLabel}`}
-                    onClick={() => recordRating('Easy', { countAttempt: !practiceDraft?.rated })}
+                    onClick={() => recordRating('Easy', { countAttempt: !hasRecordedCurrentPracticeAttempt })}
                   >
                     ✨ Easy
                     <div className="rating-sub">熟悉 · {ratingSchedulePreviews.Easy.shortLabel}</div>
