@@ -1368,6 +1368,7 @@ button.tiny,
 .quest-panel {
   display: grid;
   gap: 18px;
+  min-width: 0;
 }
 
 .daily-checkin-card {
@@ -1399,6 +1400,7 @@ button.tiny,
   border-radius: 20px;
   background: linear-gradient(135deg, #f8fafc, #eef6ff);
   padding: 18px;
+  min-width: 0;
 }
 
 .quest-topic {
@@ -1434,8 +1436,9 @@ button.tiny,
 
 .quest-star-strip {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 12px;
+  min-width: 0;
 }
 
 .quest-star-token {
@@ -1475,8 +1478,9 @@ button.tiny,
 .recall-grid,
 .boss-challenge-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 14px;
+  min-width: 0;
 }
 
 .quest-star,
@@ -1489,6 +1493,7 @@ button.tiny,
   display: grid;
   gap: 10px;
   align-content: start;
+  min-width: 0;
 }
 
 .quest-star p,
@@ -1511,6 +1516,7 @@ button.tiny,
   grid-template-columns: minmax(0, 1fr) minmax(260px, 0.85fr);
   gap: 14px;
   align-items: start;
+  min-width: 0;
 }
 
 .adaptive-practice-card.compact {
@@ -1526,6 +1532,7 @@ button.tiny,
   flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
+  min-width: 0;
 }
 
 .high-yield-list.preview {
@@ -1545,6 +1552,10 @@ button.tiny,
   padding: 6px 10px;
   font-size: 12px;
   font-weight: 850;
+  max-width: 100%;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .high-yield-chip strong {
@@ -1561,6 +1572,7 @@ button.tiny,
   border-radius: 18px;
   background: #ffffff;
   padding: 16px;
+  min-width: 0;
 }
 
 .completion-criteria-card h3 {
@@ -1569,8 +1581,9 @@ button.tiny,
 
 .completion-criteria-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 10px;
+  min-width: 0;
 }
 
 .completion-item {
@@ -1581,6 +1594,7 @@ button.tiny,
   grid-template-columns: auto minmax(0, 1fr);
   gap: 10px;
   padding: 12px;
+  min-width: 0;
 }
 
 .completion-item > span {
@@ -1931,12 +1945,30 @@ button:disabled {
   margin-top: 14px;
 }
 
+@media (max-width: 1100px) {
+  .quest-star-strip,
+  .quest-star-grid,
+  .completion-criteria-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .adaptive-practice-card {
+    grid-template-columns: 1fr;
+  }
+
+  .high-yield-list {
+    justify-content: flex-start;
+  }
+}
+
 @media (max-width: 768px) {
   .quest-hero {
     grid-template-columns: 1fr;
   }
 
-  .quest-star-strip {
+  .quest-star-strip,
+  .quest-star-grid,
+  .completion-criteria-grid {
     grid-template-columns: 1fr;
   }
 
