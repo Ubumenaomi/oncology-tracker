@@ -608,6 +608,7 @@ const defaultState = {
     dailyClaims: {},
     dailyChests: {},
     dailyCheckIns: {},
+    reviewQueueCompletions: {},
     trialGems: 0,
   },
   cloudMeta: {
@@ -1597,6 +1598,10 @@ function mergeGameState(cloudGame = {}, localGame = {}) {
       ...(cloudGame?.dailyCheckIns || {}),
       ...(localGame?.dailyCheckIns || {}),
     },
+    reviewQueueCompletions: {
+      ...(cloudGame?.reviewQueueCompletions || {}),
+      ...(localGame?.reviewQueueCompletions || {}),
+    },
     trialGems: Math.max(cloudGame?.trialGems || 0, localGame?.trialGems || 0),
   };
 }
@@ -1633,6 +1638,7 @@ function normalizeState(state) {
     dailyClaims: state?.game?.dailyClaims || {},
     dailyChests: state?.game?.dailyChests || {},
     dailyCheckIns: state?.game?.dailyCheckIns || {},
+    reviewQueueCompletions: state?.game?.reviewQueueCompletions || {},
     trialGems: state?.game?.trialGems || 0,
   };
   const xp = Math.max(game.xp || 0, state?.player?.xp || 0);
@@ -1718,10 +1724,15 @@ function awardXp(game = defaultState.game, amount, reason, meta = {}) {
 }
 
 function getTodayReviewQuestionCount(state, date = TODAY) {
-  return Object.values(state.stats || {}).reduce((sum, stat) => {
-    const reviewedToday = (stat.answerHistory || []).some((event) => event.date === date && event.mode === 'review');
-    return sum + (reviewedToday ? 1 : 0);
-  }, 0);
+  const completedIds = new Set(Object.keys(state.game?.reviewQueueCompletions?.[date] || {}));
+  Object.values(state.stats || {}).forEach((stat) => {
+    (stat.answerHistory || []).forEach((event) => {
+      if (event?.date === date && event?.mode === 'review' && event?.questionId) {
+        completedIds.add(event.questionId);
+      }
+    });
+  });
+  return completedIds.size;
 }
 
 function getTodayFlashcardReviewCount(state, date = TODAY) {
@@ -7564,6 +7575,33 @@ export default function App() {
     })
     .filter(Boolean)
     .sort((a, b) => wrongRate(b.stat) - wrongRate(a.stat) || b.stat.wrong - a.stat.wrong) : EMPTY_ARRAY, [needsDueReview, weakQuestions]);
+  const todayReviewQueueCompletions = state.game?.reviewQueueCompletions?.[TODAY] || {};
+  const isReviewQueueItemComplete = (id) => Boolean(todayReviewQueueCompletions[id]);
+  const markReviewQueueComplete = (id) => {
+    const question = getQuestionWithOverride(id, questionDataState);
+    updateState((prev) => {
+      const currentDateCompletions = prev.game?.reviewQueueCompletions?.[TODAY] || {};
+      if (currentDateCompletions[id]) return prev;
+      return {
+        ...prev,
+        game: {
+          ...(prev.game || defaultState.game),
+          reviewQueueCompletions: {
+            ...(prev.game?.reviewQueueCompletions || {}),
+            [TODAY]: {
+              ...currentDateCompletions,
+              [id]: {
+                completedAt: new Date().toISOString(),
+                questionId: id,
+                cancer: question?.cancer || '',
+                topic: question?.topic || '',
+              },
+            },
+          },
+        },
+      };
+    }, ['game']);
+  };
 
   const summary = useMemo(() => {
     const stats = Object.values(state.stats);
@@ -8218,26 +8256,62 @@ export default function App() {
           <div className="subsection">
             <h3>錯因補救任務</h3>
             {remediationQueue.length === 0 ? <p className="muted">答錯並選擇 Error type 後，這裡會自動排入 Trial Card、Cloze Card、Algorithm Card 等補救任務。</p> : remediationQueue.slice(0, 20).map(({ q, stat, remediation }) => (
-              <div className="remediation-row" key={`${q.id}-${remediation.errorType || remediation.task}`}>
+              <div className={isReviewQueueItemComplete(q.id) ? 'remediation-row done' : 'remediation-row'} key={`${q.id}-${remediation.errorType || remediation.task}`}>
                 <div>
                   <strong>{q.id}</strong> · {q.cancer} · {q.topic} · wrong rate {wrongRate(stat)}%
                   <p>{remediation.errorType || stat.lastErrorType} → {remediation.task}</p>
                   <span>{remediation.action}</span>
                 </div>
-                <span className="pill tag">{remediation.cardType}</span>
+                <div className="review-queue-actions">
+                  <span className="pill tag">{remediation.cardType}</span>
+                  <button
+                    className={isReviewQueueItemComplete(q.id) ? 'tiny good' : 'tiny'}
+                    type="button"
+                    disabled={isReviewQueueItemComplete(q.id)}
+                    onClick={() => markReviewQueueComplete(q.id)}
+                  >
+                    {isReviewQueueItemComplete(q.id) ? '已完成' : '完成複習'}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
           <div className="subsection">
             <h3>今日到期複習</h3>
             {dueReview.length === 0 ? <p className="muted">目前沒有到期題目。</p> : dueReview.slice(0, 30).map(({ q, stat }) => (
-              <QuestionCard key={q.id} question={q} stat={stat} onUpdateStat={updateStat} compact />
+              <div className={isReviewQueueItemComplete(q.id) ? 'review-queue-card done' : 'review-queue-card'} key={q.id}>
+                <div className="review-queue-card-head">
+                  <span>{isReviewQueueItemComplete(q.id) ? '✓ 已完成今日複習' : 'Review Queue'}</span>
+                  <button
+                    className={isReviewQueueItemComplete(q.id) ? 'tiny good' : 'tiny'}
+                    type="button"
+                    disabled={isReviewQueueItemComplete(q.id)}
+                    onClick={() => markReviewQueueComplete(q.id)}
+                  >
+                    {isReviewQueueItemComplete(q.id) ? '已完成' : '完成複習'}
+                  </button>
+                </div>
+                <QuestionCard question={q} stat={stat} onUpdateStat={updateStat} compact />
+              </div>
             ))}
           </div>
           <div className="subsection">
             <h3>高錯誤率 / 標記題</h3>
             {weakQuestions.slice(0, 30).map(({ q, stat }) => (
-              <QuestionCard key={q.id} question={q} stat={stat} onUpdateStat={updateStat} compact />
+              <div className={isReviewQueueItemComplete(q.id) ? 'review-queue-card done' : 'review-queue-card'} key={q.id}>
+                <div className="review-queue-card-head">
+                  <span>{isReviewQueueItemComplete(q.id) ? '✓ 已完成今日複習' : 'Review Queue'}</span>
+                  <button
+                    className={isReviewQueueItemComplete(q.id) ? 'tiny good' : 'tiny'}
+                    type="button"
+                    disabled={isReviewQueueItemComplete(q.id)}
+                    onClick={() => markReviewQueueComplete(q.id)}
+                  >
+                    {isReviewQueueItemComplete(q.id) ? '已完成' : '完成複習'}
+                  </button>
+                </div>
+                <QuestionCard question={q} stat={stat} onUpdateStat={updateStat} compact />
+              </div>
             ))}
           </div>
         </main>
