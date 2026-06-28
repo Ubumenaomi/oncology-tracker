@@ -609,6 +609,12 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.5; }
   gap: 12px;
   align-items: flex-start;
 }
+.remediation-row.done {
+  border-color: rgba(21, 128, 61, 0.26);
+  background: #f0fdf4;
+  border-radius: 14px;
+  padding: 12px;
+}
 .remediation-row p {
   margin: 4px 0;
   color: #1d4ed8;
@@ -617,6 +623,42 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.5; }
 .remediation-row span:not(.pill) {
   color: var(--muted);
   font-size: 13px;
+}
+.review-queue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 140px;
+}
+.review-queue-card {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #ffffff;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.review-queue-card.done {
+  border-color: rgba(21, 128, 61, 0.28);
+  background: #f0fdf4;
+}
+.review-queue-card .question-card {
+  border: 0;
+  box-shadow: none;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+.review-queue-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
 }
 .plan-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
 .plan-card { border: 1px solid var(--line); border-radius: 20px; padding: 16px; background: var(--panel-soft); }
