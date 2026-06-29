@@ -3930,6 +3930,9 @@ export const questions114 = [
     "trials": [],
     "answer": null,
     "explanation": "原題已經設定好non-inferiority margin: 1.2\n因此若新藥(T), 要符合宣稱的non-inferiority,\n其發生event rate必須要小於1.2 (整個confidence interval要在裡面)",
+    "questionFigures": [
+      "/explanations/114/Q075/question_figure_1.png"
+    ],
     "tags": {
       "domain": "Heme",
       "cancerDomain": "Heme",
