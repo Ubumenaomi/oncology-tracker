@@ -40,7 +40,6 @@ const STORAGE_SLICE_KEYS = {
 };
 const EMPTY_ARRAY = Object.freeze([]);
 const QUESTION_MANAGER_PAGE_SIZE = 50;
-const FLASHCARD_PAGE_SIZE = 24;
 const QUESTION_YEAR_LOADERS = {
   111: () => import('./data/questions/year111.js').then((module) => module.questions111),
   112: () => import('./data/questions/year112.js').then((module) => module.questions112),
@@ -5558,42 +5557,17 @@ function FlashcardsPanel({
   allFlashcards,
   dueFlashcards,
   weakQuestions,
-  onReviewCard,
   onCreateTrialCard,
   onImportFlashcards,
-  onUpdateFlashcard,
-  onDeleteFlashcard,
+  onOpenReview,
 }) {
   const [trialName, setTrialName] = useState('');
   const [importJson, setImportJson] = useState('');
   const [importMessage, setImportMessage] = useState('');
   const [cardPrompt, setCardPrompt] = useState('');
   const [cardPromptMessage, setCardPromptMessage] = useState('');
-  const [editingCardId, setEditingCardId] = useState(null);
-  const [duePage, setDuePage] = useState(0);
-  const [trialPage, setTrialPage] = useState(0);
   const trialCards = allFlashcards.filter((card) => card.sourceType === 'trial' || card.type === 'Trial Card');
   const weakCards = allFlashcards.filter((card) => (card.mastery || 0) <= 2);
-  const duePageCount = Math.max(1, Math.ceil(dueFlashcards.length / FLASHCARD_PAGE_SIZE));
-  const trialPageCount = Math.max(1, Math.ceil(trialCards.length / FLASHCARD_PAGE_SIZE));
-  const currentDuePage = Math.min(duePage, duePageCount - 1);
-  const currentTrialPage = Math.min(trialPage, trialPageCount - 1);
-  const visibleDueFlashcards = dueFlashcards.slice(
-    currentDuePage * FLASHCARD_PAGE_SIZE,
-    (currentDuePage + 1) * FLASHCARD_PAGE_SIZE
-  );
-  const visibleTrialCards = trialCards.slice(
-    currentTrialPage * FLASHCARD_PAGE_SIZE,
-    (currentTrialPage + 1) * FLASHCARD_PAGE_SIZE
-  );
-
-  useEffect(() => {
-    setDuePage(0);
-  }, [dueFlashcards.length]);
-
-  useEffect(() => {
-    setTrialPage(0);
-  }, [trialCards.length]);
 
   const submitTrialCard = () => {
     onCreateTrialCard(trialName);
@@ -5782,9 +5756,10 @@ ${trialText || '目前沒有符合條件的 trial 來源。'}
     <main className="panel">
       <div className="section-head">
         <div>
-          <h2>Flashcards</h2>
-          <p className="muted">錯題只整理來源素材；先產生 ChatGPT prompt，再匯入 AI 產出的 JSON cards。</p>
+          <h2>Card Input</h2>
+          <p className="muted">只負責新增卡片、產生 ChatGPT prompt、匯入 JSON；做題與修改集中到 Card Review / Edit。</p>
         </div>
+        <button className="primary" type="button" onClick={onOpenReview}>去做題 / 編輯 Card</button>
       </div>
 
       <section className="readiness-hero">
@@ -5832,197 +5807,7 @@ ${trialText || '目前沒有符合條件的 trial 來源。'}
           {importMessage && <span className="save-message">{importMessage}</span>}
         </div>
       </div>
-
-      <div className="subsection">
-        <div className="section-mini-head">
-          <h3>Due Cards</h3>
-          <span className="muted">{dueFlashcards.length} cards · page {currentDuePage + 1}/{duePageCount}</span>
-        </div>
-        {!dueFlashcards.length ? <p className="muted">今天沒有到期卡片。</p> : (
-          <>
-            <div className="flashcard-grid">
-              {visibleDueFlashcards.map((card) => (
-                <FlashcardCard
-                  key={card.id}
-                  card={card}
-                  onReviewCard={onReviewCard}
-                  onUpdateCard={onUpdateFlashcard}
-                  onDeleteCard={onDeleteFlashcard}
-                  editing={editingCardId === card.id}
-                  onStartEdit={() => setEditingCardId(card.id)}
-                  onCancelEdit={() => setEditingCardId(null)}
-                />
-              ))}
-            </div>
-            <div className="pagination-row">
-              <button className="secondary" type="button" disabled={currentDuePage === 0} onClick={() => setDuePage((page) => Math.max(0, page - 1))}>上一頁</button>
-              <span>{currentDuePage + 1} / {duePageCount}</span>
-              <button className="secondary" type="button" disabled={currentDuePage + 1 >= duePageCount} onClick={() => setDuePage((page) => Math.min(duePageCount - 1, page + 1))}>下一頁</button>
-            </div>
-          </>
-        )}
-      </div>
-
-      <div className="subsection">
-        <div className="section-mini-head">
-          <h3>Trial Cards</h3>
-          <span className="muted">{trialCards.length} cards · page {currentTrialPage + 1}/{trialPageCount}</span>
-        </div>
-        {!trialCards.length ? <p className="muted">尚未建立 Trial Card。</p> : (
-          <>
-            <div className="flashcard-grid">
-              {visibleTrialCards.map((card) => (
-                <FlashcardCard
-                  key={card.id}
-                  card={card}
-                  onReviewCard={onReviewCard}
-                  onUpdateCard={onUpdateFlashcard}
-                  onDeleteCard={onDeleteFlashcard}
-                  compact
-                  editing={editingCardId === card.id}
-                  onStartEdit={() => setEditingCardId(card.id)}
-                  onCancelEdit={() => setEditingCardId(null)}
-                />
-              ))}
-            </div>
-            <div className="pagination-row">
-              <button className="secondary" type="button" disabled={currentTrialPage === 0} onClick={() => setTrialPage((page) => Math.max(0, page - 1))}>上一頁</button>
-              <span>{currentTrialPage + 1} / {trialPageCount}</span>
-              <button className="secondary" type="button" disabled={currentTrialPage + 1 >= trialPageCount} onClick={() => setTrialPage((page) => Math.min(trialPageCount - 1, page + 1))}>下一頁</button>
-            </div>
-          </>
-        )}
-      </div>
     </main>
-  );
-}
-
-function FlashcardCard({
-  card,
-  onReviewCard,
-  onUpdateCard,
-  onDeleteCard,
-  compact = false,
-  editing = false,
-  onStartEdit,
-  onCancelEdit,
-}) {
-  const [showBack, setShowBack] = useState(false);
-  const [algorithmStepCount, setAlgorithmStepCount] = useState(0);
-  const [draft, setDraft] = useState(() => makeFlashcardEditDraft(card));
-  const algorithmSteps = getAlgorithmSteps(card);
-  const hasAlgorithmSteps = algorithmSteps.length > 0;
-
-  useEffect(() => {
-    if (editing) setDraft(makeFlashcardEditDraft(card));
-  }, [card, editing]);
-
-  useEffect(() => {
-    setShowBack(false);
-    setAlgorithmStepCount(0);
-  }, [card.id]);
-
-  const toggleAnswer = () => {
-    setShowBack((visible) => {
-      const nextVisible = !visible;
-      setAlgorithmStepCount(nextVisible && hasAlgorithmSteps ? 1 : 0);
-      return nextVisible;
-    });
-  };
-
-  const revealNextAlgorithmStep = () => {
-    setAlgorithmStepCount((count) => Math.min(algorithmSteps.length, count + 1));
-  };
-
-  const saveEdit = () => {
-    onUpdateCard(getFlashcardEditId(card), {
-      front: draft.front,
-      back: draft.back,
-      type: draft.type,
-      cancer: draft.cancer,
-      topic: draft.topic,
-      trial: splitEditableList(draft.trial),
-      tags: splitEditableList(draft.tags),
-      examValue: normalizeExamValue(draft.examValue),
-      errorType: normalizeFlashcardErrorType(draft.errorType),
-    });
-    onCancelEdit();
-  };
-
-  const deleteCard = () => {
-    if (!window.confirm('確定要刪除這張 card？刪除後也會移除它的複習紀錄。')) return;
-    onDeleteCard(getFlashcardEditId(card));
-    onCancelEdit();
-  };
-
-  return (
-    <article className="flashcard-card">
-      <div className="question-top">
-        <div>
-          <span className="pill">{card.type || 'Flashcard'}</span>
-          {card.clozeLabel && <span className="pill">{card.clozeLabel}</span>}
-          <span className="pill">{card.cancer}</span>
-          <span className="pill soft">{card.topic}</span>
-          {card.trial?.map((trial) => <span className="pill trial" key={trial}>{trial}</span>)}
-          {card.tags?.map((tag) => <span className="pill tag" key={tag}>{tag}</span>)}
-          {card.examValue >= 4 && <span className="priority high">EV{card.examValue}</span>}
-        </div>
-        <span className="priority">M{card.mastery || 0}</span>
-      </div>
-      {editing ? (
-        <div className="flashcard-editor">
-          <label>Front<textarea value={draft.front} onChange={(e) => setDraft((prev) => ({ ...prev, front: e.target.value }))} /></label>
-          <label>Back<textarea value={draft.back} onChange={(e) => setDraft((prev) => ({ ...prev, back: e.target.value }))} /></label>
-          <div className="flashcard-editor-grid">
-            <label>Type<select value={draft.type} onChange={(e) => setDraft((prev) => ({ ...prev, type: e.target.value }))}>{FLASHCARD_TYPE_OPTIONS.map((type) => <option value={type} key={type}>{type}</option>)}</select></label>
-            <label>Cancer<input value={draft.cancer} onChange={(e) => setDraft((prev) => ({ ...prev, cancer: e.target.value }))} /></label>
-            <label>Topic<input value={draft.topic} onChange={(e) => setDraft((prev) => ({ ...prev, topic: e.target.value }))} /></label>
-            <label>Trial names<input value={draft.trial} onChange={(e) => setDraft((prev) => ({ ...prev, trial: e.target.value }))} placeholder="PACIFIC, KEYNOTE-671" /></label>
-            <label>Exam value<input type="number" min="1" max="5" value={draft.examValue} onChange={(e) => setDraft((prev) => ({ ...prev, examValue: e.target.value }))} /></label>
-            <label>Error type<select value={draft.errorType} onChange={(e) => setDraft((prev) => ({ ...prev, errorType: e.target.value }))}>{ERROR_TYPE_OPTIONS.map((errorType) => <option value={errorType} key={errorType}>{errorType}</option>)}</select></label>
-          </div>
-          <label>Tags<input value={draft.tags} onChange={(e) => setDraft((prev) => ({ ...prev, tags: e.target.value }))} placeholder="trial, endpoint, NSCLC" /></label>
-          <div className="inline-actions">
-            <button className="primary" onClick={saveEdit}>儲存修改</button>
-            <button className="secondary" onClick={onCancelEdit}>取消</button>
-            <button className="danger" onClick={deleteCard}>刪除 Card</button>
-          </div>
-        </div>
-      ) : (
-        <>
-          <pre className="flashcard-front">{renderClozeText(getFlashcardFrontText(card), showBack, card.clozeNumber)}</pre>
-          {!compact && card.cloze && !hasClozeMarkup(getFlashcardFrontText(card)) && (
-            <p className="muted">{renderClozeText(card.cloze, showBack)}</p>
-          )}
-          {showBack && hasAlgorithmSteps ? (
-            <div className="flashcard-back algorithm-answer">
-              <ol>
-                {algorithmSteps.slice(0, algorithmStepCount).map((step, index) => (
-                  <li key={`${step}-${index}`}>{step}</li>
-                ))}
-              </ol>
-            </div>
-          ) : showBack && <pre className="flashcard-back">{card.back || '尚未填寫背面。'}</pre>}
-          <div className="inline-actions">
-            <button className="secondary" onClick={toggleAnswer}>{showBack ? '收合答案' : '顯示答案'}</button>
-            {showBack && hasAlgorithmSteps && algorithmStepCount < algorithmSteps.length && (
-              <button className="secondary" onClick={revealNextAlgorithmStep}>下一步</button>
-            )}
-            <button className="secondary" onClick={onStartEdit}>修改</button>
-            <button className="danger" onClick={deleteCard}>刪除</button>
-            {Object.keys(FLASHCARD_RATINGS).map((rating) => (
-              <FlashcardRatingButton
-                key={rating}
-                rating={rating}
-                card={card}
-                onClick={() => onReviewCard(getFlashcardReviewId(card), rating)}
-              />
-            ))}
-          </div>
-          <div className="stats-line">next review {formatReviewDueLabel(card.nextReviewDate || TODAY)} · interval {card.intervalDays || 1} days</div>
-        </>
-      )}
-    </article>
   );
 }
 
@@ -6069,6 +5854,8 @@ function FlashcardReviewPanel({ dueFlashcards, allFlashcards, onReviewCard, onUp
   const [draft, setDraft] = useState(() => makeFlashcardEditDraft({}));
   const queue = queueMode === 'all' ? allFlashcards : dueFlashcards;
   const card = queue[activeIndex] || null;
+  const trialCards = allFlashcards.filter((item) => item.sourceType === 'trial' || item.type === 'Trial Card');
+  const weakCards = allFlashcards.filter((item) => (item.mastery || 0) <= 2);
   const algorithmSteps = getAlgorithmSteps(card || {});
   const hasAlgorithmSteps = algorithmSteps.length > 0;
   const canRateCard = showBack && (!hasAlgorithmSteps || algorithmStepCount >= algorithmSteps.length);
@@ -6086,6 +5873,13 @@ function FlashcardReviewPanel({ dueFlashcards, allFlashcards, onReviewCard, onUp
     setShowBack(false);
     setAlgorithmStepCount(0);
     setActiveIndex((index) => Math.min(index + 1, Math.max(0, queue.length - 1)));
+  };
+
+  const selectQueueMode = (mode) => {
+    setQueueMode(mode);
+    setActiveIndex(0);
+    setShowBack(false);
+    setAlgorithmStepCount(0);
   };
 
   const toggleAnswer = () => {
@@ -6129,87 +5923,110 @@ function FlashcardReviewPanel({ dueFlashcards, allFlashcards, onReviewCard, onUp
     <main className="panel flashcard-review-panel">
       <div className="section-head">
         <div>
-          <h2>Flashcard Review</h2>
-          <p className="muted">Front → Show Answer → Again / Hard / Good / Easy；依 Anki-inspired 間隔直接排入下一次複習日。</p>
+          <h2>Card Review / Edit</h2>
+          <p className="muted">集中做 card 題目、看答案、排下一次複習，也在同一頁修改或刪除 card。</p>
         </div>
         <div className="inline-actions">
-          <button className={queueMode === 'due' ? 'primary' : 'secondary'} onClick={() => { setQueueMode('due'); setActiveIndex(0); setShowBack(false); setAlgorithmStepCount(0); }}>Due Cards</button>
-          <button className={queueMode === 'all' ? 'primary' : 'secondary'} onClick={() => { setQueueMode('all'); setActiveIndex(0); setShowBack(false); setAlgorithmStepCount(0); }}>All Cards</button>
-          <button className="secondary" onClick={onOpenImport}>Import</button>
+          <button className={queueMode === 'due' ? 'primary' : 'secondary'} onClick={() => selectQueueMode('due')}>Due Cards</button>
+          <button className={queueMode === 'all' ? 'primary' : 'secondary'} onClick={() => selectQueueMode('all')}>All Cards</button>
+          <button className="secondary" onClick={onOpenImport}>Card Input</button>
         </div>
       </div>
+
+      <section className="readiness-hero">
+        <MetricCard label="Cards total" value={allFlashcards.length} sub={`${dueFlashcards.length} due today`} />
+        <MetricCard label="Current queue" value={queue.length} sub={queueMode === 'due' ? 'due cards' : 'all cards'} />
+        <MetricCard label="Trial cards" value={trialCards.length} sub="trial recall pool" />
+        <MetricCard label="Weak cards" value={weakCards.length} sub="mastery <=2" />
+      </section>
 
       {!card ? (
         <section className="empty-state">
           <h3>沒有可複習的卡片</h3>
-          <p className="muted">先到 Flashcards → 產生 AI Card Prompt，貼到 ChatGPT 後再 Import JSON cards。</p>
-          <button className="primary" onClick={onOpenImport}>去匯入卡片</button>
+          <p className="muted">先到 Card Input 產生 AI card prompt 或匯入 JSON cards。</p>
+          <button className="primary" onClick={onOpenImport}>去輸入卡片</button>
         </section>
       ) : (
-        <section className="single-review-card">
-          <div className="question-top">
-            <div>
-              <span className="pill">{card.type || card.sourceType || 'Flashcard'}</span>
-              {card.clozeLabel && <span className="pill">{card.clozeLabel}</span>}
-              <span className="pill soft">{card.cancer}</span>
-              <span className="pill soft">{card.topic}</span>
-              {card.trial?.map((trial, index) => <span className="pill trial" key={`${trial}-${index}`}>{trial}</span>)}
-              {card.tags?.map((tag, index) => <span className="pill tag" key={`${tag}-${index}`}>{tag}</span>)}
-              {card.examValue >= 4 && <span className="priority high">EV{card.examValue}</span>}
-            </div>
-            <span className="priority">{activeIndex + 1}/{queue.length}{card.clozeTotal ? ` · ${card.clozeIndex}/${card.clozeTotal}` : ''} · M{card.mastery || 0}</span>
-          </div>
-          {editing ? (
-            <div className="flashcard-editor">
-              <label>Front<textarea value={draft.front} onChange={(e) => setDraft((prev) => ({ ...prev, front: e.target.value }))} /></label>
-              <label>Back<textarea value={draft.back} onChange={(e) => setDraft((prev) => ({ ...prev, back: e.target.value }))} /></label>
-              <div className="flashcard-editor-grid">
-                <label>Type<select value={draft.type} onChange={(e) => setDraft((prev) => ({ ...prev, type: e.target.value }))}>{FLASHCARD_TYPE_OPTIONS.map((type) => <option value={type} key={type}>{type}</option>)}</select></label>
-                <label>Cancer<input value={draft.cancer} onChange={(e) => setDraft((prev) => ({ ...prev, cancer: e.target.value }))} /></label>
-                <label>Topic<input value={draft.topic} onChange={(e) => setDraft((prev) => ({ ...prev, topic: e.target.value }))} /></label>
-                <label>Trial names<input value={draft.trial} onChange={(e) => setDraft((prev) => ({ ...prev, trial: e.target.value }))} placeholder="PACIFIC, KEYNOTE-671" /></label>
-                <label>Exam value<input type="number" min="1" max="5" value={draft.examValue} onChange={(e) => setDraft((prev) => ({ ...prev, examValue: e.target.value }))} /></label>
-                <label>Error type<select value={draft.errorType} onChange={(e) => setDraft((prev) => ({ ...prev, errorType: e.target.value }))}>{ERROR_TYPE_OPTIONS.map((errorType) => <option value={errorType} key={errorType}>{errorType}</option>)}</select></label>
+        <section className="card-review-workspace">
+          <aside className="card-review-queue" aria-label="Card queue">
+            {queue.map((item, index) => (
+              <button
+                type="button"
+                key={item.id}
+                className={index === activeIndex ? 'active' : ''}
+                onClick={() => setActiveIndex(index)}
+              >
+                <strong>{item.topic || item.type || 'Flashcard'}</strong>
+                <span>{item.cancer || 'Unsorted'} · {formatReviewDueLabel(item.nextReviewDate || TODAY)}</span>
+              </button>
+            ))}
+          </aside>
+
+          <div className="single-review-card">
+            <div className="question-top">
+              <div>
+                <span className="pill">{card.type || card.sourceType || 'Flashcard'}</span>
+                {card.clozeLabel && <span className="pill">{card.clozeLabel}</span>}
+                <span className="pill soft">{card.cancer}</span>
+                <span className="pill soft">{card.topic}</span>
+                {card.trial?.map((trial, index) => <span className="pill trial" key={`${trial}-${index}`}>{trial}</span>)}
+                {card.tags?.map((tag, index) => <span className="pill tag" key={`${tag}-${index}`}>{tag}</span>)}
+                {card.examValue >= 4 && <span className="priority high">EV{card.examValue}</span>}
               </div>
-              <label>Tags<input value={draft.tags} onChange={(e) => setDraft((prev) => ({ ...prev, tags: e.target.value }))} placeholder="trial, endpoint, NSCLC" /></label>
-              <div className="inline-actions review-actions">
-                <button className="primary" onClick={saveEdit}>儲存修改</button>
-                <button className="secondary" onClick={() => setEditing(false)}>取消</button>
-                <button className="danger" onClick={deleteCard}>刪除 Card</button>
-              </div>
+              <span className="priority">{activeIndex + 1}/{queue.length}{card.clozeTotal ? ` · ${card.clozeIndex}/${card.clozeTotal}` : ''} · M{card.mastery || 0}</span>
             </div>
-          ) : (
-            <>
-              <pre className="flashcard-front large">{renderClozeText(getFlashcardFrontText(card), showBack, card.clozeNumber)}</pre>
-              {showBack && hasAlgorithmSteps ? (
-                <div className="flashcard-back large algorithm-answer">
-                  <ol>
-                    {algorithmSteps.slice(0, algorithmStepCount).map((step, index) => (
-                      <li key={`${step}-${index}`}>{step}</li>
-                    ))}
-                  </ol>
+            {editing ? (
+              <div className="flashcard-editor">
+                <label>Front<textarea value={draft.front} onChange={(e) => setDraft((prev) => ({ ...prev, front: e.target.value }))} /></label>
+                <label>Back<textarea value={draft.back} onChange={(e) => setDraft((prev) => ({ ...prev, back: e.target.value }))} /></label>
+                <div className="flashcard-editor-grid">
+                  <label>Type<select value={draft.type} onChange={(e) => setDraft((prev) => ({ ...prev, type: e.target.value }))}>{FLASHCARD_TYPE_OPTIONS.map((type) => <option value={type} key={type}>{type}</option>)}</select></label>
+                  <label>Cancer<input value={draft.cancer} onChange={(e) => setDraft((prev) => ({ ...prev, cancer: e.target.value }))} /></label>
+                  <label>Topic<input value={draft.topic} onChange={(e) => setDraft((prev) => ({ ...prev, topic: e.target.value }))} /></label>
+                  <label>Trial names<input value={draft.trial} onChange={(e) => setDraft((prev) => ({ ...prev, trial: e.target.value }))} placeholder="PACIFIC, KEYNOTE-671" /></label>
+                  <label>Exam value<input type="number" min="1" max="5" value={draft.examValue} onChange={(e) => setDraft((prev) => ({ ...prev, examValue: e.target.value }))} /></label>
+                  <label>Error type<select value={draft.errorType} onChange={(e) => setDraft((prev) => ({ ...prev, errorType: e.target.value }))}>{ERROR_TYPE_OPTIONS.map((errorType) => <option value={errorType} key={errorType}>{errorType}</option>)}</select></label>
                 </div>
-              ) : showBack && <pre className="flashcard-back large">{card.back || '已顯示克漏字答案。'}</pre>}
-              <div className="inline-actions review-actions">
-                <button className="secondary" onClick={toggleAnswer}>{showBack ? 'Hide Answer' : 'Show Answer'}</button>
-                {showBack && hasAlgorithmSteps && algorithmStepCount < algorithmSteps.length && (
-                  <button className="secondary" onClick={revealNextAlgorithmStep}>下一步</button>
-                )}
-                <button className="secondary" onClick={() => { setDraft(makeFlashcardEditDraft(card)); setEditing(true); }}>修改</button>
-                <button className="danger" onClick={deleteCard}>刪除</button>
-                {Object.keys(FLASHCARD_RATINGS).map((rating) => (
-                  <FlashcardRatingButton
-                    key={rating}
-                    rating={rating}
-                    card={card}
-                    disabled={!canRateCard}
-                    onClick={() => rateCard(rating)}
-                  />
-                ))}
+                <label>Tags<input value={draft.tags} onChange={(e) => setDraft((prev) => ({ ...prev, tags: e.target.value }))} placeholder="trial, endpoint, NSCLC" /></label>
+                <div className="inline-actions review-actions">
+                  <button className="primary" onClick={saveEdit}>儲存修改</button>
+                  <button className="secondary" onClick={() => setEditing(false)}>取消</button>
+                  <button className="danger" onClick={deleteCard}>刪除 Card</button>
+                </div>
               </div>
-              <div className="stats-line">next review {formatReviewDueLabel(card.nextReviewDate || TODAY)} · attempts {card.attempts || 0} · correct {card.correct || 0} / wrong {card.wrong || 0}</div>
-            </>
-          )}
+            ) : (
+              <>
+                <pre className="flashcard-front large">{renderClozeText(getFlashcardFrontText(card), showBack, card.clozeNumber)}</pre>
+                {showBack && hasAlgorithmSteps ? (
+                  <div className="flashcard-back large algorithm-answer">
+                    <ol>
+                      {algorithmSteps.slice(0, algorithmStepCount).map((step, index) => (
+                        <li key={`${step}-${index}`}>{step}</li>
+                      ))}
+                    </ol>
+                  </div>
+                ) : showBack && <pre className="flashcard-back large">{card.back || '已顯示克漏字答案。'}</pre>}
+                <div className="inline-actions review-actions">
+                  <button className="secondary" onClick={toggleAnswer}>{showBack ? 'Hide Answer' : 'Show Answer'}</button>
+                  {showBack && hasAlgorithmSteps && algorithmStepCount < algorithmSteps.length && (
+                    <button className="secondary" onClick={revealNextAlgorithmStep}>下一步</button>
+                  )}
+                  <button className="secondary" onClick={() => { setDraft(makeFlashcardEditDraft(card)); setEditing(true); }}>修改</button>
+                  <button className="danger" onClick={deleteCard}>刪除</button>
+                  {Object.keys(FLASHCARD_RATINGS).map((rating) => (
+                    <FlashcardRatingButton
+                      key={rating}
+                      rating={rating}
+                      card={card}
+                      disabled={!canRateCard}
+                      onClick={() => rateCard(rating)}
+                    />
+                  ))}
+                </div>
+                <div className="stats-line">next review {formatReviewDueLabel(card.nextReviewDate || TODAY)} · attempts {card.attempts || 0} · correct {card.correct || 0} / wrong {card.wrong || 0}</div>
+              </>
+            )}
+          </div>
         </section>
       )}
     </main>
@@ -8052,7 +7869,7 @@ export default function App() {
       )}
 
       <nav className="tabs">
-        {[['quest', 'Quest'], ['stats', 'Stats'], ['readiness', 'Board Readiness'], ['mock', 'Mock Exam'], ['critical', 'Critical Errors'], ['flashcards', 'Flashcards'], ['flashcard-review', 'Card Review'], ['today', 'Daily Practice'], ['review', 'Review Queue'], ['questions', 'Question Manager'], ['analytics', 'Analytics'], ['plan', '100-Day Plan'], ['sync', 'Cloud Sync'], ['settings', 'Settings']].map(([key, label]) => (
+        {[['quest', 'Quest'], ['stats', 'Stats'], ['readiness', 'Board Readiness'], ['mock', 'Mock Exam'], ['critical', 'Critical Errors'], ['flashcards', 'Card Input'], ['flashcard-review', 'Card Review / Edit'], ['today', 'Daily Practice'], ['review', 'Review Queue'], ['questions', 'Question Manager'], ['analytics', 'Analytics'], ['plan', '100-Day Plan'], ['sync', 'Cloud Sync'], ['settings', 'Settings']].map(([key, label]) => (
           <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>
         ))}
       </nav>
@@ -8148,11 +7965,9 @@ export default function App() {
           allFlashcards={allFlashcards}
           dueFlashcards={dueFlashcards}
           weakQuestions={weakQuestions}
-          onReviewCard={reviewFlashcard}
           onCreateTrialCard={createTrialCard}
           onImportFlashcards={importFlashcards}
-          onUpdateFlashcard={updateFlashcard}
-          onDeleteFlashcard={deleteFlashcard}
+          onOpenReview={() => setTab('flashcard-review')}
         />
       )}
 
