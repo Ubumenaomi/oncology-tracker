@@ -4147,6 +4147,18 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
 
       {open && (
         <>
+          {question.questionFigures?.length > 0 && (
+            <div className="question-figures">
+              <div className="figure-grid">
+                {question.questionFigures.map((src, index) => (
+                  <a key={src} href={src} target="_blank" rel="noreferrer" className="figure-card">
+                    <img src={src} alt={`${question.id} question figure ${index + 1}`} />
+                    <span>Question Figure {index + 1}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="options">
             {Object.entries(question.options || {}).map(([key, value]) => {
               const showCorrect = revealed && answerIsSingleChoice && key === String(correctAnswer).trim().toUpperCase();

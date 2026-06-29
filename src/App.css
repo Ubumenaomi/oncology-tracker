@@ -804,6 +804,7 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.5; }
 }
 
 
+.question-figures,
 .explanation-figures {
   margin-top: 16px;
   padding: 14px;
