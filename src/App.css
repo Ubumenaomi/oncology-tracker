@@ -193,9 +193,109 @@ h3 { margin: 0 0 8px; }
 .metric-value { font-size: 34px; font-weight: 850; margin-top: 4px; }
 .metric-sub { color: var(--muted); font-size: 13px; }
 
-.tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 18px 0; }
-.tabs button { border: 1px solid var(--line); background: var(--panel); color: var(--muted); padding: 10px 14px; border-radius: 999px; font-weight: 750; --tap-color: rgba(37, 99, 235, 0.22); }
-.tabs button.active { background: #0f172a; color: white; border-color: #0f172a; }
+.tabs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 18px 0;
+}
+
+.grouped-tabs {
+  position: relative;
+  z-index: 20;
+}
+
+.tabs button,
+.nav-menu summary {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-weight: 800;
+  --tap-color: rgba(37, 99, 235, 0.22);
+}
+
+.nav-home,
+.nav-menu summary {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.tabs button.active,
+.nav-menu.active summary {
+  background: #0f172a;
+  color: white;
+  border-color: #0f172a;
+}
+
+.nav-menu {
+  position: relative;
+}
+
+.nav-menu summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.nav-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.nav-menu[open] summary,
+.nav-menu summary:hover {
+  border-color: #94a3b8;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+.nav-menu[open] .nav-chevron {
+  transform: rotate(180deg);
+}
+
+.nav-chevron {
+  transition: transform 140ms ease;
+}
+
+.nav-menu-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: max-content;
+  min-width: 240px;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.16);
+}
+
+.nav-menu-panel button {
+  width: 100%;
+  justify-content: flex-start;
+  border-radius: 12px;
+  border: 0;
+  background: transparent;
+  color: #475569;
+  padding: 11px 12px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.nav-menu-panel button:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.nav-menu-panel button.active {
+  background: #0f172a;
+  color: white;
+}
 
 .question-bank-status {
   border: 1px solid #bfdbfe;
@@ -784,6 +884,25 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.5; }
   .note-reader-panel { max-height: calc(100vh - 24px); }
   .note-reader-layout textarea { min-height: 42vh; }
   .table-row { grid-template-columns: 1.2fr 0.6fr 0.8fr 0.7fr 0.8fr; font-size: 13px; }
+  .tabs {
+    align-items: stretch;
+  }
+  .nav-home,
+  .nav-menu {
+    flex: 1 1 190px;
+  }
+  .nav-menu summary {
+    width: 100%;
+    justify-content: center;
+  }
+  .nav-menu-panel {
+    position: static;
+    width: 100%;
+    min-width: 0;
+    margin-top: 8px;
+    border-radius: 16px;
+    box-shadow: none;
+  }
 }
 
 @media (max-width: 560px) {
@@ -799,6 +918,13 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.5; }
   .practice-mode.compact { min-width: 0; width: 100%; }
   .practice-mode-options { flex-wrap: wrap; }
   .practice-mode-options button { flex: 1 1 88px; }
+  .nav-home,
+  .nav-menu {
+    flex-basis: 100%;
+  }
+  .nav-home {
+    justify-content: center;
+  }
   .primary, .secondary, .good, .bad, .danger, .file-button, .sound-test-button { width: 100%; }
   input, select, textarea { font-size: 16px; }
 }

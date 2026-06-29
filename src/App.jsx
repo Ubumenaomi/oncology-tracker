@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
+import { AlertTriangle, BarChart3, ChevronDown, ClipboardList, Home, Settings2 } from 'lucide-react';
 import './App.css';
 import { QUESTION_BANK_TOTAL, QUESTION_YEARS, cancerCategories } from './data/questionBankMeta.js';
 import { buildFlashcardTags } from './data/taxonomy.js';
@@ -38,6 +39,50 @@ const STORAGE_SLICE_KEYS = {
   flashcardStats: `${STORAGE_KEY}.flashcardStats.v3`,
   game: `${STORAGE_KEY}.game.v3`,
 };
+
+const NAV_GROUPS = [
+  {
+    id: 'practice',
+    label: 'Practice',
+    Icon: ClipboardList,
+    items: [
+      ['today', 'Daily Practice'],
+      ['mock', 'Mock Exam'],
+      ['flashcard-review', 'Card Review / Edit'],
+      ['flashcards', 'Card Input'],
+      ['plan', '100-Day Plan'],
+    ],
+  },
+  {
+    id: 'analysis',
+    label: 'Analysis',
+    Icon: BarChart3,
+    items: [
+      ['stats', 'Stats'],
+      ['analytics', 'Analytics'],
+      ['readiness', 'Board Readiness'],
+    ],
+  },
+  {
+    id: 'tools',
+    label: 'Tools',
+    Icon: Settings2,
+    items: [
+      ['settings', 'Settings'],
+      ['sync', 'Cloud Sync'],
+      ['questions', 'Question Manager'],
+    ],
+  },
+  {
+    id: 'review',
+    label: 'Review',
+    Icon: AlertTriangle,
+    items: [
+      ['critical', 'Critical Errors'],
+      ['review', 'Review Queue'],
+    ],
+  },
+];
 const EMPTY_ARRAY = Object.freeze([]);
 const QUESTION_MANAGER_PAGE_SIZE = 50;
 const QUESTION_YEAR_LOADERS = {
@@ -7880,10 +7925,38 @@ export default function App() {
         </section>
       )}
 
-      <nav className="tabs">
-        {[['quest', 'Quest'], ['stats', 'Stats'], ['readiness', 'Board Readiness'], ['mock', 'Mock Exam'], ['critical', 'Critical Errors'], ['flashcards', 'Card Input'], ['flashcard-review', 'Card Review / Edit'], ['today', 'Daily Practice'], ['review', 'Review Queue'], ['questions', 'Question Manager'], ['analytics', 'Analytics'], ['plan', '100-Day Plan'], ['sync', 'Cloud Sync'], ['settings', 'Settings']].map(([key, label]) => (
-          <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>
-        ))}
+      <nav className="tabs grouped-tabs" aria-label="Main navigation">
+        <button className={`nav-home ${tab === 'quest' ? 'active' : ''}`} type="button" onClick={() => setTab('quest')}>
+          <Home size={17} strokeWidth={2.4} />
+          <span>Quest</span>
+        </button>
+        {NAV_GROUPS.map(({ id, label, Icon, items }) => {
+          const active = items.some(([key]) => tab === key);
+          return (
+            <details className={`nav-menu ${active ? 'active' : ''}`} key={id}>
+              <summary>
+                <Icon size={17} strokeWidth={2.4} />
+                <span>{label}</span>
+                <ChevronDown className="nav-chevron" size={16} strokeWidth={2.6} />
+              </summary>
+              <div className="nav-menu-panel">
+                {items.map(([key, itemLabel]) => (
+                  <button
+                    key={key}
+                    className={tab === key ? 'active' : ''}
+                    type="button"
+                    onClick={(event) => {
+                      setTab(key);
+                      event.currentTarget.closest('details')?.removeAttribute('open');
+                    }}
+                  >
+                    {itemLabel}
+                  </button>
+                ))}
+              </div>
+            </details>
+          );
+        })}
       </nav>
 
       {(questionBankLoading || questionBankError || !questionBankReady) && (
