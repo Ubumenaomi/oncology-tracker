@@ -3739,7 +3739,9 @@ function NewsPanel({ fallbackItems, planTasks, defaultTaskId }) {
           <div className="news-ticker-window">
             <div className="news-ticker-track">
               {[...tickerItems, ...tickerItems].map((item, index) => (
-                <span className="news-ticker-item" key={`${item.id}-ticker-${index}`}>{item.title}</span>
+                <a className="news-ticker-item" href={item.url} target="_blank" rel="noreferrer" key={`${item.id}-ticker-${index}`}>
+                  {item.title}
+                </a>
               ))}
             </div>
           </div>
@@ -3802,13 +3804,13 @@ function NewsPanel({ fallbackItems, planTasks, defaultTaskId }) {
               const meta = [...(item.cancerTypes || []), ...(item.tags || []), ...(item.treatments || [])].slice(0, 4);
               const keyTerms = [...(item.genes || []), ...(item.drugs || [])].slice(0, 4);
               return (
-                <article className="news-card" key={item.id}>
+                <a className="news-card news-card-link" href={item.url} target="_blank" rel="noreferrer" key={item.id}>
                   <div className="news-meta-line">
                     {meta.map((label) => <em key={`${item.id}-card-${label}`}>{label}</em>)}
                   </div>
                   <h3>{item.title}</h3>
                   {keyTerms.length > 0 && <p>{keyTerms.join(' / ')}</p>}
-                </article>
+                </a>
               );
             })}
           </section>
@@ -3818,11 +3820,11 @@ function NewsPanel({ fallbackItems, planTasks, defaultTaskId }) {
           <aside className="news-rail" aria-label="自動滾動速報">
             <div className="news-rail-stack">
               {briefItems.map((item, index) => (
-                <article className="news-brief" key={`${item.id}-brief-${index}`}>
+                <a className="news-brief news-brief-link" href={item.url} target="_blank" rel="noreferrer" key={`${item.id}-brief-${index}`}>
                   <div className="news-brief-date">{formatNewsDate(item.publishedAt)}</div>
                   <h3>{item.title}</h3>
                   <p>{[...(item.cancerTypes || []), ...(item.tags || []), ...(item.treatments || []), ...(item.drugs || [])].slice(0, 5).join(' / ')}</p>
-                </article>
+                </a>
               ))}
             </div>
           </aside>
