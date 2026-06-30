@@ -102,6 +102,7 @@ const questionYearLoadPromises = new Map();
 let questionBank = [];
 let BANK_QUESTION_BY_ID = new Map();
 const ERROR_TYPE_OPTIONS = [
+  'Not studied yet',
   'Knowledge gap',
   'Misread question',
   'Trial confusion',
@@ -113,10 +114,15 @@ const ERROR_TYPE_OPTIONS = [
 ];
 
 const ERROR_TYPE_REMEDIATION = {
+  'Not studied yet': {
+    task: 'Cloze Card',
+    cardType: 'Cloze Card',
+    action: '這題是尚未讀過的知識，先補 guideline 或講義核心段落，再做成一張最小可測的核心概念卡。',
+  },
   'Knowledge gap': {
     task: 'Cloze Card',
     cardType: 'Cloze Card',
-    action: '回 guideline 與核心表格，把缺口整理成 cutoff、eligibility、endpoint 或關鍵事實填空卡。',
+    action: '這題是讀過但沒掌握的缺口，回 guideline 與核心表格，把缺口整理成 cutoff、eligibility、endpoint 或關鍵事實填空卡。',
   },
   'Trial confusion': {
     task: 'Trial Card',
@@ -198,7 +204,7 @@ const FLASHCARD_SCHEMA_PROMPT = `每張卡必須包含：
 - trial: array
 - tags: array
 - examValue: 1-5
-- errorType: 從 Knowledge gap, Misread question, Trial confusion, Biomarker cutoff, Treatment sequence, Toxicity, Guideline outdated, Overconfidence 選一個
+- errorType: 從 Not studied yet, Knowledge gap, Misread question, Trial confusion, Biomarker cutoff, Treatment sequence, Toxicity, Guideline outdated, Overconfidence 選一個
 
 製卡規則：
 1. 不要把整個題目題幹直接變成 front。
