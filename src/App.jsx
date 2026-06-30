@@ -1,8 +1,15 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { AlertTriangle, BarChart3, ChevronDown, ClipboardList, Home, Settings2 } from 'lucide-react';
+import { AlertTriangle, BarChart3, ChevronDown, ClipboardList, ExternalLink, Home, Newspaper, Settings2 } from 'lucide-react';
 import './App.css';
 import { QUESTION_BANK_TOTAL, QUESTION_YEARS, cancerCategories } from './data/questionBankMeta.js';
 import { buildFlashcardTags } from './data/taxonomy.js';
+import { notionNewsItems } from './data/notionNews.js';
+import {
+  buildNotionNewsQuery,
+  getNotionNewsCriteriaForTask,
+  hasCriteriaMatches,
+  rankNotionNewsItems,
+} from './data/notionNewsMatching.js';
 import {
   auth,
   db,
@@ -58,6 +65,7 @@ const NAV_GROUPS = [
     label: 'Analysis',
     Icon: BarChart3,
     items: [
+      ['news', 'NEWS'],
       ['stats', 'Stats'],
       ['analytics', 'Analytics'],
       ['readiness', 'Board Readiness'],
@@ -3569,6 +3577,190 @@ function MetricCard({ label, value, sub }) {
       <div className="metric-value">{value}</div>
       {sub && <div className="metric-sub">{sub}</div>}
     </div>
+  );
+}
+
+function formatNewsDate(value) {
+  return new Intl.DateTimeFormat('zh-TW', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date(value));
+}
+
+function NewsPanel({ fallbackItems, planTasks, defaultTaskId }) {
+  const [selectedTaskId, setSelectedTaskId] = useState(defaultTaskId || 1);
+  const [liveNews, setLiveNews] = useState({ items: [], status: 'idle', error: '', fetchedAt: null, source: 'cached' });
+  const selectedTask = planTasks.find((task) => Number(task.id) === Number(selectedTaskId)) || planTasks[0];
+  const criteria = useMemo(() => getNotionNewsCriteriaForTask(selectedTask), [selectedTask]);
+  const cachedItems = useMemo(() => rankNotionNewsItems(fallbackItems, criteria), [fallbackItems, criteria]);
+  const sortedItems = liveNews.status === 'ready' ? liveNews.items : cachedItems;
+  const latestDate = sortedItems[0]?.publishedAt;
+  const usingCached = liveNews.status !== 'ready';
+  const topicCounts = sortedItems.reduce((acc, item) => {
+    (item.cancerTypes || []).forEach((label) => {
+      acc[label] = (acc[label] || 0) + 1;
+    });
+    return acc;
+  }, {});
+  const topTopics = Object.entries(topicCounts)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 5);
+  const criteriaGroups = [
+    ['Cancer type', criteria.cancerTypes],
+    ['tag', criteria.tags],
+    ['治療', criteria.treatments],
+    ['drug', criteria.drugs],
+  ].filter(([, values]) => values.length > 0);
+
+  useEffect(() => {
+    if (defaultTaskId) setSelectedTaskId(defaultTaskId);
+  }, [defaultTaskId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLiveNews((prev) => ({ ...prev, status: 'loading', error: '' }));
+    fetch(buildNotionNewsQuery(selectedTask, criteria))
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.message || payload.error || 'Notion NEWS 載入失敗');
+        return payload;
+      })
+      .then((payload) => {
+        if (cancelled) return;
+        setLiveNews({
+          items: rankNotionNewsItems(payload.items || [], criteria),
+          status: 'ready',
+          error: '',
+          fetchedAt: payload.fetchedAt || null,
+          source: payload.source || 'live',
+        });
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setLiveNews({
+          items: [],
+          status: 'error',
+          error: error.message || 'Notion NEWS 載入失敗，已顯示 cached snapshot。',
+          fetchedAt: null,
+          source: 'cached',
+        });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedTask, criteria]);
+
+  return (
+    <main className="panel news-panel">
+      <div className="section-head">
+        <div>
+          <div className="eyebrow dark">Notion NEWS</div>
+          <h2>NEWS</h2>
+          <p className="muted">依 Day task 的 Notion 屬性集合抓筆記：Cancer type → tag → 治療 → drug，命中越前面排越前。</p>
+        </div>
+        <div className="news-summary">
+          <span>{sortedItems.length} notes · {usingCached ? 'cached' : 'live'}</span>
+          <strong>{latestDate ? formatNewsDate(latestDate) : '-'}</strong>
+          <em>{liveNews.status === 'loading' ? 'loading Notion' : 'latest update'}</em>
+        </div>
+      </div>
+
+      <section className="news-controls" aria-label="NEWS day selector">
+        <label>
+          <span>Day</span>
+          <select value={selectedTask?.id || 1} onChange={(event) => setSelectedTaskId(Number(event.target.value))}>
+            {planTasks.map((task) => (
+              <option key={task.id} value={task.id}>{task.day} · {task.topic}</option>
+            ))}
+          </select>
+        </label>
+        <div className="news-selected-task">
+          <strong>{selectedTask?.day} · {selectedTask?.topic}</strong>
+          <span>{selectedTask?.details}</span>
+        </div>
+      </section>
+
+      <section className="news-criteria-strip" aria-label="Notion NEWS query criteria">
+        {criteriaGroups.map(([label, values]) => (
+          <div className="news-criteria-group" key={label}>
+            <span>{label}</span>
+            {values.map((value) => <em key={`${label}-${value}`}>{value}</em>)}
+          </div>
+        ))}
+      </section>
+
+      {usingCached && (
+        <div className="news-status-line">
+          {liveNews.status === 'loading'
+            ? '正在讀取 Notion，即時資料載入前先顯示 cached snapshot。'
+            : liveNews.error || '目前顯示 cached snapshot。'}
+        </div>
+      )}
+
+      <section className="news-topic-strip" aria-label="Top NEWS topics">
+        {topTopics.map(([topic, count]) => (
+          <span className="news-topic-chip" key={topic}>
+            {topic}
+            <strong>{count}</strong>
+          </span>
+        ))}
+      </section>
+
+      <section className="news-list">
+        {sortedItems.map((item) => {
+          const meta = [
+            ...(item.cancerTypes || []),
+            ...(item.subtypes || []),
+            ...(item.tags || []),
+            ...(item.treatments || []),
+          ];
+          const keyTerms = [...(item.genes || []), ...(item.drugs || [])].slice(0, 8);
+          const matchLabels = [
+            ...(item.match?.cancerTypes || []),
+            ...(item.match?.tags || []),
+            ...(item.match?.treatments || []),
+            ...(item.match?.drugs || []),
+          ];
+          return (
+            <article className={hasCriteriaMatches(item) ? 'news-item matched' : 'news-item'} key={item.id}>
+              <div className="news-date">
+                <strong>{formatNewsDate(item.publishedAt).slice(0, 5)}</strong>
+                <span>{formatNewsDate(item.publishedAt).slice(6)}</span>
+              </div>
+              <div className="news-body">
+                <div className="news-meta-line">
+                  <span>{item.source}</span>
+                  {meta.slice(0, 5).map((label) => (
+                    <em key={`${item.id}-${label}`}>{label}</em>
+                  ))}
+                </div>
+                <h3>{item.title}</h3>
+                {matchLabels.length > 0 && (
+                  <div className="news-match-line">
+                    <span>matched</span>
+                    {matchLabels.map((label) => <em key={`${item.id}-match-${label}`}>{label}</em>)}
+                  </div>
+                )}
+                {keyTerms.length > 0 && (
+                  <div className="news-keywords">
+                    {keyTerms.map((label) => (
+                      <span className="pill tag" key={`${item.id}-${label}`}>{label}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <a className="news-open-link" href={item.url} target="_blank" rel="noreferrer" aria-label={`Open ${item.title} in Notion`}>
+                <Newspaper size={17} strokeWidth={2.3} />
+                <ExternalLink size={15} strokeWidth={2.4} />
+              </a>
+            </article>
+          );
+        })}
+      </section>
+    </main>
   );
 }
 
@@ -7996,6 +8188,10 @@ export default function App() {
 
       {tab === 'stats' && (
         <StatsDashboard stats={statsDashboard} />
+      )}
+
+      {tab === 'news' && (
+        <NewsPanel fallbackItems={notionNewsItems} planTasks={studyPlan100} defaultTaskId={questTask.id} />
       )}
 
       {tab === 'readiness' && (
