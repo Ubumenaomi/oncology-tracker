@@ -1203,6 +1203,77 @@ function removeCompletedActiveFocusSession(focusTimer, focusSessions = []) {
   return normalizedTimer;
 }
 
+function getStatAttemptScore(stat = {}) {
+  return (Number(stat.attempts) || 0) + ((stat.answerHistory || []).length / 100);
+}
+
+function mergeQuestionStats(cloudStats = {}, localStats = {}) {
+  const merged = { ...(cloudStats || {}) };
+  Object.entries(localStats || {}).forEach(([id, localStat]) => {
+    const cloudStat = merged[id];
+    if (!cloudStat) {
+      merged[id] = localStat;
+      return;
+    }
+
+    const localScore = getStatAttemptScore(localStat);
+    const cloudScore = getStatAttemptScore(cloudStat);
+    const primary = localScore >= cloudScore ? localStat : cloudStat;
+    const secondary = primary === localStat ? cloudStat : localStat;
+    merged[id] = {
+      ...secondary,
+      ...primary,
+      attempts: Math.max(Number(localStat.attempts) || 0, Number(cloudStat.attempts) || 0),
+      correct: Math.max(Number(localStat.correct) || 0, Number(cloudStat.correct) || 0),
+      wrong: Math.max(Number(localStat.wrong) || 0, Number(cloudStat.wrong) || 0),
+      answerHistory: [
+        ...(cloudStat.answerHistory || []),
+        ...(localStat.answerHistory || []),
+      ].filter((event, index, events) => {
+        const key = [
+          event?.date,
+          event?.mode,
+          event?.questionId,
+          event?.selected,
+          event?.rating,
+          event?.isCorrect,
+        ].join('|');
+        return events.findIndex((candidate) => [
+          candidate?.date,
+          candidate?.mode,
+          candidate?.questionId,
+          candidate?.selected,
+          candidate?.rating,
+          candidate?.isCorrect,
+        ].join('|') === key) === index;
+      }).slice(-50),
+      confidenceHistory: [
+        ...(cloudStat.confidenceHistory || []),
+        ...(localStat.confidenceHistory || []),
+      ].slice(-50),
+      timeHistory: [
+        ...(cloudStat.timeHistory || []),
+        ...(localStat.timeHistory || []),
+      ].slice(-50),
+      errorTypes: [...new Set([
+        ...(cloudStat.errorTypes || []),
+        ...(localStat.errorTypes || []),
+      ])].slice(-20),
+      remediationTasks: [
+        ...(cloudStat.remediationTasks || []),
+        ...(localStat.remediationTasks || []),
+      ].filter((task, index, tasks) => {
+        const key = [task?.date, task?.questionId, task?.errorType, task?.task].join('|');
+        return tasks.findIndex((candidate) => [candidate?.date, candidate?.questionId, candidate?.errorType, candidate?.task].join('|') === key) === index;
+      }).slice(0, 20),
+      bookmarked: Boolean(localStat.bookmarked || cloudStat.bookmarked),
+      wrongNotes: localStat.wrongNotes || cloudStat.wrongNotes || '',
+      explanation: localStat.explanation || cloudStat.explanation || '',
+    };
+  });
+  return merged;
+}
+
 function mergeCloudState(localState, cloudState) {
   if (!cloudState) return normalizeState({ ...defaultState, ...localState });
   const deletedFlashcardIds = {
@@ -1227,10 +1298,7 @@ function mergeCloudState(localState, cloudState) {
     },
     focusSessions: mergedFocusSessions,
     focusTimer: removeCompletedActiveFocusSession(mergeFocusTimer(cloudState.focusTimer, localState.focusTimer), mergedFocusSessions),
-    stats: {
-      ...(cloudState.stats || {}),
-      ...(localState.stats || {}),
-    },
+    stats: mergeQuestionStats(cloudState.stats, localState.stats),
     settings: {
       ...defaultState.settings,
       ...(cloudState.settings || {}),
@@ -2710,9 +2778,6 @@ function getHighValueCardsCreatedToday(state, date = TODAY) {
 }
 
 function hasDailyPracticeRating(state, id, date = TODAY) {
-  const draft = state.sessions?.[date]?.practiceDrafts?.[id] || {};
-  if (draft.rated) return true;
-
   const stat = getStat(state, id);
   return (stat.answerHistory || []).some((event) => (
     event?.date === date
