@@ -2844,7 +2844,7 @@ function buildFullPlanItemProgress(task, checked) {
   };
 }
 
-function updateDailyQuestMemoryProgress(state, date, task, practiceDone, cardId, rating) {
+function updateDailyQuestMemoryProgress(state, date, task, practiceDone, cardId, rating = 'Read') {
   const current = getDailyQuestProgress(state, date, task, practiceDone);
   const nextRatings = { ...(current.recallRatings || {}), [cardId]: rating };
   const reviewedCount = Object.keys(nextRatings).length;
@@ -5615,7 +5615,7 @@ function QuestPanel({
       key: 'memory',
       title: 'Memory Star',
       done: progress.memoryDone,
-      text: '完成今日 5 張 topic / due flashcards。',
+      text: '確認讀過今日 5 張 Top Recall。',
       action: null,
       actionText: '',
     },
@@ -5733,8 +5733,8 @@ function QuestPanel({
       <section className="subsection quest-memory-section">
         <div className="section-head compact">
           <div>
-            <h3>Memory Star｜Topic Recall / Flashcard Review</h3>
-            <p className="muted">今日可繼續評分；切到日期時，用同一區塊回看過去紀錄。</p>
+            <h3>Memory Star｜Top Recall</h3>
+            <p className="muted">用自己的判斷讀過今日重點，確認 5 張即可拿 Memory Star；切到日期時可回看紀錄。</p>
           </div>
           <span className="priority">{selectedMemoryView === 'today' ? 'Today' : 'History'}</span>
         </div>
@@ -5749,7 +5749,7 @@ function QuestPanel({
             }}
           >
             <span>今日</span>
-            <strong>{recallCards.length} cards · {progress.stars}/3 stars</strong>
+            <strong>{recallCards.length} recalls · {progress.stars}/3 stars</strong>
           </button>
           {reviewHistory.map((item) => (
             <button
@@ -5762,7 +5762,7 @@ function QuestPanel({
               }}
             >
               <span>{item.date}</span>
-              <strong>{item.reviewedCount} cards · {item.stars}/3 stars</strong>
+              <strong>{item.reviewedCount} recalls · {item.stars}/3 stars</strong>
               <em>{item.taskLabel}</em>
             </button>
           ))}
@@ -5771,26 +5771,21 @@ function QuestPanel({
         {selectedMemoryView === 'today' ? (
           <div className="recall-grid">
             {recallCards.map((card) => {
-              const rating = progress.recallRatings?.[card.id];
+              const confirmed = Boolean(progress.recallRatings?.[card.id]);
               const open = openRecallId === card.id;
               return (
-                <article className={rating ? 'recall-card done' : 'recall-card'} key={card.id}>
+                <article className={confirmed ? 'recall-card done' : 'recall-card'} key={card.id}>
                   <div className="question-top">
                     <span className="pill">{card.type}</span>
-                    {rating && <span className="priority high">{rating}</span>}
+                    {confirmed && <span className="priority high">已讀</span>}
                   </div>
                   <strong>{card.front}</strong>
                   {open && <p className="recall-back">{card.back}</p>}
                   <div className="inline-actions">
-                    <button className="secondary" onClick={() => setOpenRecallId(open ? '' : card.id)}>{open ? '收合' : '翻卡'}</button>
-                    {Object.keys(FLASHCARD_RATINGS).map((ratingOption) => (
-                      <FlashcardRatingButton
-                        key={ratingOption}
-                        rating={ratingOption}
-                        card={card}
-                        onClick={() => onMarkRecall(card, ratingOption)}
-                      />
-                    ))}
+                    <button className="secondary" onClick={() => setOpenRecallId(open ? '' : card.id)}>{open ? '收合' : '看內容'}</button>
+                    <button className="good recall-confirm-button" disabled={confirmed} onClick={() => onMarkRecall(card)}>
+                      {confirmed ? '已確認讀過' : '確認讀過'}
+                    </button>
                   </div>
                 </article>
               );
@@ -5802,7 +5797,7 @@ function QuestPanel({
               <div>
                 <span className="pill">{selectedHistory.cancer}</span>
                 <strong>{selectedHistory.taskLabel}</strong>
-                <p>{selectedHistory.date} · {selectedHistory.reviewedCount} 張已評分</p>
+                <p>{selectedHistory.date} · {selectedHistory.reviewedCount} 張已讀</p>
               </div>
               <div className="quest-history-stars" aria-label="Quest stars">
                 {['Practice', 'Memory', 'Mastery'].map((label, index) => {
@@ -5813,7 +5808,7 @@ function QuestPanel({
             </div>
 
             {selectedHistory.recallRows.length === 0 ? (
-              <p className="muted">這一天有星星進度，但沒有留下單張卡片評分。</p>
+              <p className="muted">這一天有星星進度，但沒有留下單張 recall 紀錄。</p>
             ) : (
               <div className="quest-history-cards">
                 {selectedHistory.recallRows.map((card) => {
@@ -5822,7 +5817,7 @@ function QuestPanel({
                     <article className="quest-history-card" key={card.id}>
                       <div className="question-top">
                         <span className="pill">{card.type}</span>
-                        <span className="priority high">{card.rating}</span>
+                        <span className="priority high">{card.rating === 'Read' ? '已讀' : card.rating}</span>
                       </div>
                       <strong>{card.front}</strong>
                       {open && <p className="recall-back">{card.back || '這張卡目前沒有背面內容。'}</p>}
@@ -7506,65 +7501,19 @@ export default function App() {
     }, ['game']);
   };
 
-  const markQuestRecall = (card, rating) => {
+  const markQuestRecall = (card) => {
     const cardId = typeof card === 'string' ? card : card.id;
-    const baseCardId = getFlashcardBaseId(cardId);
-    const isPersistentCard = typeof card !== 'string' && card.sourceType !== 'topic-recall' && normalizeFlashcards(state.flashcards)[baseCardId];
-    const rule = FLASHCARD_RATINGS[rating] || FLASHCARD_RATINGS.Good;
-    playResultFeedback(rating === 'Again' ? 'wrong' : 'correct');
+    playResultFeedback('correct');
     updateState((prev) => {
-      const next = updateDailyQuestMemoryProgress(prev, TODAY, questTask, todayCompleted, cardId, rating);
-
-      if (!isPersistentCard) {
-        return {
-          ...prev,
-          dailyQuestProgress: {
-            ...(prev.dailyQuestProgress || {}),
-            [TODAY]: writeDailyQuestTask(prev, TODAY, questTask.id, next),
-          },
-        };
-      }
-
-      const cards = normalizeFlashcards(prev.flashcards);
-      const persistedCard = cards[baseCardId];
-      const previousStats = prev.flashcardStats?.[cardId] || prev.flashcardStats?.[baseCardId] || makeFlashcardStats(persistedCard);
-      const isWrong = rating === 'Again';
-      const schedule = getReviewSchedulePreview(rating, previousStats);
-      const mastery = Math.max(0, Math.min(5, (previousStats.mastery ?? persistedCard.mastery ?? 0) + rule.masteryDelta));
+      const next = updateDailyQuestMemoryProgress(prev, TODAY, questTask, todayCompleted, cardId, 'Read');
       return {
         ...prev,
-        flashcards: {
-          ...cards,
-          [baseCardId]: {
-            ...persistedCard,
-            difficulty: rating === 'Again' ? Math.min(5, (persistedCard.difficulty || 3) + 0.5) : persistedCard.difficulty || 3,
-            updatedAt: new Date().toISOString(),
-            lastRating: rating,
-          },
-        },
-        flashcardStats: {
-          ...(prev.flashcardStats || {}),
-          [cardId]: {
-            ...previousStats,
-            id: cardId,
-            baseId: baseCardId,
-            attempts: (previousStats.attempts || 0) + 1,
-            correct: (previousStats.correct || 0) + (isWrong ? 0 : 1),
-            wrong: (previousStats.wrong || 0) + (isWrong ? 1 : 0),
-            lastRating: rating,
-            lastReviewedAt: TODAY,
-            intervalDays: schedule.intervalDays,
-            nextReviewDate: schedule.nextReviewDate,
-            mastery,
-            updatedAt: new Date().toISOString(),
-          },
-        },
         dailyQuestProgress: {
           ...(prev.dailyQuestProgress || {}),
           [TODAY]: writeDailyQuestTask(prev, TODAY, questTask.id, next),
         },
       };
-    }, isPersistentCard ? ['flashcards', 'flashcardStats', 'quest'] : ['quest']);
+    }, ['quest']);
   };
 
   const setQuestBossResult = (bossId, passed) => {
