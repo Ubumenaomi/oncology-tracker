@@ -214,7 +214,7 @@ const FLASHCARD_SCHEMA_PROMPT = `每張卡必須包含：
 5. Cloze Card 必須針對 cutoff、duration、endpoint、dose、eligibility。
 6. Cloze Card 使用 Anki cloze 格式，例如 {{c1::50%}}；不同 c-number 會分成不同複習卡，同一 c-number 會在同一次複習一起遮擋。
 7. Trap Card 不做特殊互動，視為 Basic card；必須指出常見錯誤敘述為何錯。
-8. 不可輸出 Core Table Card、Exam Trap Card、Toxicity Card、Guideline Update Card 或其他舊 type；這些一律改寫成上面四種新版卡。
+8. 不可輸出 Trial Card / Algorithm Card / Cloze Card / Trap Card 以外的 type；請把所有補救內容歸入上面四種新版卡。
 9. 醫學名詞與藥名保留英文，其餘用繁體中文。
 10. back 要 concise，但要足夠讓我考前複習。
 
@@ -3616,29 +3616,6 @@ function getQuickReadinessMetrics(state) {
   };
 }
 
-function buildAiPrompt(state) {
-  const weak = getQuestionPool(state)
-    .map((q) => ({ q: getQuestionWithOverride(q.id, state), stat: getStat(state, q.id) }))
-    .filter(({ q, stat }) => q && (stat.wrong > 0 || stat.bookmarked))
-    .sort((a, b) => wrongRate(b.stat) - wrongRate(a.stat) || b.stat.wrong - a.stat.wrong)
-    .slice(0, 15);
-
-  return `你是一位 hematology-oncology board exam coach。請根據以下腫瘤內科專科醫師考題練習紀錄，幫我做 AI review。\n\n要求輸出：\n1. 弱點總結\n2. 高錯誤率癌別與 trial\n3. 每個弱點的補救讀書任務，需依 error type 指派 Trial Card / Cloze Card / Algorithm Card / Toxicity comparison / guideline update 等\n4. 10 題 fellow-level MCQ 題目\n5. 3 題 oral board style question\n6. 明天應該優先複習的題目與主題\n\n我的錯題/標記題：\n${weak.map(({ q, stat }) => {
-    const errorType = stat.lastErrorType || stat.errorTypes?.[stat.errorTypes.length - 1] || 'none';
-    const remediation = stat.lastRemediationTask?.task || (errorType !== 'none' ? getRemediationForErrorType(errorType).task : 'none');
-    const taxonomy = [
-      q.tags?.cancerType,
-      q.tags?.stage,
-      q.tags?.clinicalSetting,
-      q.tags?.treatmentModality,
-      q.tags?.evidenceType,
-      q.tags?.questionType,
-      ...(q.tags?.biomarker || []),
-    ].filter(Boolean).join(' / ') || 'uncategorized';
-    return `- ${q.id} | ${q.cancer} | ${q.topic} | taxonomy: ${taxonomy} | wrong rate ${wrongRate(stat)}% | attempts ${stat.attempts} | error type: ${errorType} | repair: ${remediation} | trials: ${(q.trials || []).join(', ') || 'none'} | note: ${stat.wrongNotes || 'none'} | stem: ${q.stem}`;
-  }).join('\n')}`;
-}
-
 function MetricCard({ label, value, sub }) {
   return (
     <div className="metric-card">
@@ -6592,7 +6569,6 @@ export default function App() {
   const [bankCancer, setBankCancer] = useState('All');
   const [bankYear, setBankYear] = useState(DEFAULT_QUESTION_MANAGER_YEAR);
   const [editingQuestionId, setEditingQuestionId] = useState(null);
-  const [aiPromptOpen, setAiPromptOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [syncStatus, setSyncStatus] = useState('尚未登入，資料目前只存在這台裝置。');
   const [syncError, setSyncError] = useState('');
@@ -6618,15 +6594,14 @@ export default function App() {
     [todaySession?.questionIds]
   );
   const requestedQuestionYears = useMemo(() => {
-    if (aiPromptOpen) return preferredQuestionYears;
     if (tab === 'questions') {
       if (bankYear === 'Custom') return EMPTY_ARRAY;
       return bankYear === 'All' ? QUESTION_YEARS : normalizeQuestionYearList([bankYear]);
     }
     if (tab === 'today' || tab === 'quest') return todaySessionQuestionYears;
-    if (['review', 'analytics', 'readiness', 'critical', 'plan'].includes(tab)) return preferredQuestionYears;
+    if (['review', 'analytics', 'readiness', 'critical', 'plan', 'flashcards'].includes(tab)) return preferredQuestionYears;
     return EMPTY_ARRAY;
-  }, [aiPromptOpen, bankYear, preferredQuestionYears, tab, todaySessionQuestionYears]);
+  }, [bankYear, preferredQuestionYears, tab, todaySessionQuestionYears]);
   const requestedQuestionYearKey = requestedQuestionYears.join(',');
   const questionBankReady = requestedQuestionYears.length === 0 || areQuestionYearsLoaded(requestedQuestionYears);
 
@@ -8130,7 +8105,6 @@ export default function App() {
           <button className="primary" disabled={isCreatingPractice} onClick={() => createTodaySession()}>
             {isCreatingPractice ? '產生中...' : '產生今日 Daily Practice'}
           </button>
-          <button className="secondary" onClick={() => setAiPromptOpen(!aiPromptOpen)}>AI Review Prompt</button>
         </div>
       </header>
 
@@ -8199,14 +8173,6 @@ export default function App() {
           ))}
         </div>
       </section>
-
-      {aiPromptOpen && (
-        <section className="panel">
-          <div className="panel-title">AI Review Prompt</div>
-          <p className="muted">複製到 ChatGPT / OpenAI API，即可根據錯題產生弱點分析、MCQ、oral board 題。</p>
-          <textarea className="prompt-box" readOnly value={buildAiPrompt(state)} />
-        </section>
-      )}
 
       <nav className="tabs grouped-tabs" aria-label="Main navigation">
         <button className={`nav-home ${tab === 'quest' ? 'active' : ''}`} type="button" onClick={() => setTab('quest')}>
