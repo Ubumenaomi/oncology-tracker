@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { AlertTriangle, BarChart3, ChevronDown, ClipboardList, ExternalLink, Home, Newspaper, Settings2 } from 'lucide-react';
+import { AlertTriangle, BarChart3, ChevronDown, ClipboardList, Home, Newspaper, Settings2 } from 'lucide-react';
 import './App.css';
 import { QUESTION_BANK_TOTAL, QUESTION_YEARS, cancerCategories } from './data/questionBankMeta.js';
 import { buildFlashcardTags } from './data/taxonomy.js';
@@ -7,7 +7,6 @@ import { notionNewsItems } from './data/notionNews.js';
 import {
   buildNotionNewsQuery,
   getNotionNewsCriteriaForTask,
-  hasCriteriaMatches,
   rankNotionNewsItems,
 } from './data/notionNewsMatching.js';
 import {
@@ -65,7 +64,6 @@ const NAV_GROUPS = [
     label: 'Analysis',
     Icon: BarChart3,
     items: [
-      ['news', 'NEWS'],
       ['stats', 'Stats'],
       ['analytics', 'Analytics'],
       ['readiness', 'Board Readiness'],
@@ -3614,6 +3612,11 @@ function NewsPanel({ fallbackItems, planTasks, defaultTaskId }) {
     ['治療', criteria.treatments],
     ['drug', criteria.drugs],
   ].filter(([, values]) => values.length > 0);
+  const leadItem = sortedItems[0];
+  const cardItems = sortedItems.slice(1, 5);
+  const briefItemsBase = sortedItems.slice(5, 11);
+  const briefItems = briefItemsBase.length > 0 ? [...briefItemsBase, ...briefItemsBase] : [];
+  const tickerItems = sortedItems.slice(0, 6);
 
   useEffect(() => {
     if (defaultTaskId) setSelectedTaskId(defaultTaskId);
@@ -3630,6 +3633,9 @@ function NewsPanel({ fallbackItems, planTasks, defaultTaskId }) {
       })
       .then((payload) => {
         if (cancelled) return;
+        if (!Array.isArray(payload.items) || payload.items.length === 0) {
+          throw new Error('Notion NEWS 目前沒有回傳筆記，已顯示 cached snapshot。');
+        }
         setLiveNews({
           items: rankNotionNewsItems(payload.items || [], criteria),
           status: 'ready',
@@ -3655,17 +3661,13 @@ function NewsPanel({ fallbackItems, planTasks, defaultTaskId }) {
 
   return (
     <main className="panel news-panel">
-      <div className="section-head">
-        <div>
-          <div className="eyebrow dark">Notion NEWS</div>
-          <h2>NEWS</h2>
-          <p className="muted">依 Day task 的 Notion 屬性集合抓筆記：Cancer type → tag → 治療 → drug，命中越前面排越前。</p>
+      <div className="news-masthead">
+        <div className="news-kicker">
+          <span>腫專考古每日整理速報</span>
+          <span>{sortedItems.length} notes · {usingCached ? 'cached' : 'live'} · {latestDate ? formatNewsDate(latestDate) : '-'}</span>
         </div>
-        <div className="news-summary">
-          <span>{sortedItems.length} notes · {usingCached ? 'cached' : 'live'}</span>
-          <strong>{latestDate ? formatNewsDate(latestDate) : '-'}</strong>
-          <em>{liveNews.status === 'loading' ? 'loading Notion' : 'latest update'}</em>
-        </div>
+        <h2>Oncology Review Times</h2>
+        <p>每天從 Fellow training 抓 Notion 筆記，依 Day task 屬性集合排序成新聞首頁。</p>
       </div>
 
       <section className="news-controls" aria-label="NEWS day selector">
@@ -3682,6 +3684,19 @@ function NewsPanel({ fallbackItems, planTasks, defaultTaskId }) {
           <span>{selectedTask?.details}</span>
         </div>
       </section>
+
+      {tickerItems.length > 0 && (
+        <section className="news-ticker" aria-label="今日重點跑馬燈">
+          <div className="news-ticker-label">Breaking</div>
+          <div className="news-ticker-window">
+            <div className="news-ticker-track">
+              {[...tickerItems, ...tickerItems].map((item, index) => (
+                <span className="news-ticker-item" key={`${item.id}-ticker-${index}`}>{item.title}</span>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="news-criteria-strip" aria-label="Notion NEWS query criteria">
         {criteriaGroups.map(([label, values]) => (
@@ -3709,56 +3724,61 @@ function NewsPanel({ fallbackItems, planTasks, defaultTaskId }) {
         ))}
       </section>
 
-      <section className="news-list">
-        {sortedItems.map((item) => {
-          const meta = [
-            ...(item.cancerTypes || []),
-            ...(item.subtypes || []),
-            ...(item.tags || []),
-            ...(item.treatments || []),
-          ];
-          const keyTerms = [...(item.genes || []), ...(item.drugs || [])].slice(0, 8);
-          const matchLabels = [
-            ...(item.match?.cancerTypes || []),
-            ...(item.match?.tags || []),
-            ...(item.match?.treatments || []),
-            ...(item.match?.drugs || []),
-          ];
-          return (
-            <article className={hasCriteriaMatches(item) ? 'news-item matched' : 'news-item'} key={item.id}>
-              <div className="news-date">
-                <strong>{formatNewsDate(item.publishedAt).slice(0, 5)}</strong>
-                <span>{formatNewsDate(item.publishedAt).slice(6)}</span>
+      <section className="news-front-page" aria-label="NEWS front page">
+        <div className="news-front-main">
+          {leadItem && (
+            <article className="news-lead-story">
+              <div className="news-meta-line">
+                <span>{leadItem.source}</span>
+                {[...(leadItem.cancerTypes || []), ...(leadItem.tags || []), ...(leadItem.treatments || [])].slice(0, 5).map((label) => (
+                  <em key={`${leadItem.id}-lead-${label}`}>{label}</em>
+                ))}
               </div>
-              <div className="news-body">
-                <div className="news-meta-line">
-                  <span>{item.source}</span>
-                  {meta.slice(0, 5).map((label) => (
-                    <em key={`${item.id}-${label}`}>{label}</em>
+              <h3>{leadItem.title}</h3>
+              <p>{selectedTask?.details}</p>
+              {leadItem.match && (
+                <div className="news-match-line">
+                  <span>matched</span>
+                  {[...(leadItem.match.cancerTypes || []), ...(leadItem.match.tags || []), ...(leadItem.match.treatments || []), ...(leadItem.match.drugs || [])].map((label) => (
+                    <em key={`${leadItem.id}-lead-match-${label}`}>{label}</em>
                   ))}
                 </div>
-                <h3>{item.title}</h3>
-                {matchLabels.length > 0 && (
-                  <div className="news-match-line">
-                    <span>matched</span>
-                    {matchLabels.map((label) => <em key={`${item.id}-match-${label}`}>{label}</em>)}
-                  </div>
-                )}
-                {keyTerms.length > 0 && (
-                  <div className="news-keywords">
-                    {keyTerms.map((label) => (
-                      <span className="pill tag" key={`${item.id}-${label}`}>{label}</span>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <a className="news-open-link" href={item.url} target="_blank" rel="noreferrer" aria-label={`Open ${item.title} in Notion`}>
-                <Newspaper size={17} strokeWidth={2.3} />
-                <ExternalLink size={15} strokeWidth={2.4} />
-              </a>
+              )}
+              <a className="news-read-link" href={leadItem.url} target="_blank" rel="noreferrer">開啟 Notion 筆記</a>
             </article>
-          );
-        })}
+          )}
+
+          <div className="news-section-title">Today's Cards</div>
+          <section className="news-card-grid" aria-label="今日整理卡片">
+            {cardItems.map((item) => {
+              const meta = [...(item.cancerTypes || []), ...(item.tags || []), ...(item.treatments || [])].slice(0, 4);
+              const keyTerms = [...(item.genes || []), ...(item.drugs || [])].slice(0, 4);
+              return (
+                <article className="news-card" key={item.id}>
+                  <div className="news-meta-line">
+                    {meta.map((label) => <em key={`${item.id}-card-${label}`}>{label}</em>)}
+                  </div>
+                  <h3>{item.title}</h3>
+                  {keyTerms.length > 0 && <p>{keyTerms.join(' / ')}</p>}
+                </article>
+              );
+            })}
+          </section>
+        </div>
+
+        {briefItems.length > 0 && (
+          <aside className="news-rail" aria-label="自動滾動速報">
+            <div className="news-rail-stack">
+              {briefItems.map((item, index) => (
+                <article className="news-brief" key={`${item.id}-brief-${index}`}>
+                  <div className="news-brief-date">{formatNewsDate(item.publishedAt)}</div>
+                  <h3>{item.title}</h3>
+                  <p>{[...(item.cancerTypes || []), ...(item.tags || []), ...(item.treatments || []), ...(item.drugs || [])].slice(0, 5).join(' / ')}</p>
+                </article>
+              ))}
+            </div>
+          </aside>
+        )}
       </section>
     </main>
   );
@@ -8121,6 +8141,10 @@ export default function App() {
         <button className={`nav-home ${tab === 'quest' ? 'active' : ''}`} type="button" onClick={() => setTab('quest')}>
           <Home size={17} strokeWidth={2.4} />
           <span>Quest</span>
+        </button>
+        <button className={`nav-news ${tab === 'news' ? 'active' : ''}`} type="button" onClick={() => setTab('news')}>
+          <Newspaper size={17} strokeWidth={2.4} />
+          <span>NEWS</span>
         </button>
         {NAV_GROUPS.map(({ id, label, Icon, items }) => {
           const active = items.some(([key]) => tab === key);
