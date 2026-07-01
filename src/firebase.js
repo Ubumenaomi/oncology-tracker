@@ -8,8 +8,10 @@ import {
 } from "firebase/auth";
 import {
   getFirestore,
+  collection,
   doc,
   getDoc,
+  getDocs,
   setDoc,
   onSnapshot,
   serverTimestamp,
@@ -60,8 +62,10 @@ export {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
+  collection,
   doc,
   getDoc,
+  getDocs,
   setDoc,
   onSnapshot,
   serverTimestamp,
