@@ -1387,11 +1387,11 @@ function getCloudDocRef(uid) {
 }
 
 function getCloudSliceDocRef(uid, sliceName) {
-  return doc(db, 'oncologyTrackerUsers', uid, 'appStateSlices', sliceName);
+  return doc(db, 'oncologyTrackerUsers', uid, 'appState', 'slices', 'items', sliceName);
 }
 
 function getCloudSlicesCollectionRef(uid) {
-  return collection(db, 'oncologyTrackerUsers', uid, 'appStateSlices');
+  return collection(db, 'oncologyTrackerUsers', uid, 'appState', 'slices', 'items');
 }
 
 function makeCloudMeta(state, syncedAt = new Date().toISOString()) {
