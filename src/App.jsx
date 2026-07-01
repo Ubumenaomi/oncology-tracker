@@ -47,7 +47,8 @@ const STORAGE_SLICE_KEYS = {
   flashcardStats: `${STORAGE_KEY}.flashcardStats.v3`,
   game: `${STORAGE_KEY}.game.v3`,
 };
-const CLOUD_STORAGE_VERSION = 2;
+const CLOUD_STORAGE_VERSION = 3;
+const CLOUD_SLICE_CHUNK_SIZE = 250000;
 const CLOUD_SLICE_NAMES = Object.freeze(Object.keys(STORAGE_SLICE_KEYS));
 
 const NAV_GROUPS = [
@@ -1394,6 +1395,14 @@ function getCloudSlicesCollectionRef(uid) {
   return collection(db, 'oncologyTrackerUsers', uid, 'appState', 'slices', 'items');
 }
 
+function getCloudSliceChunkDocRef(uid, sliceName, chunkIndex) {
+  return doc(db, 'oncologyTrackerUsers', uid, 'appState', 'slices', 'items', sliceName, 'chunks', `chunk-${String(chunkIndex).padStart(4, '0')}`);
+}
+
+function getCloudSliceChunksCollectionRef(uid, sliceName) {
+  return collection(db, 'oncologyTrackerUsers', uid, 'appState', 'slices', 'items', sliceName, 'chunks');
+}
+
 function makeCloudMeta(state, syncedAt = new Date().toISOString()) {
   return {
     ...(state.cloudMeta || {}),
@@ -1410,6 +1419,33 @@ function makeCloudIndexPayload(state, syncedAt = new Date().toISOString()) {
     cloudMeta: makeCloudMeta(state, syncedAt),
     serverUpdatedAt: serverTimestamp(),
   };
+}
+
+function splitCloudSlicePayload(payload) {
+  const serialized = JSON.stringify(payload);
+  const chunks = [];
+  for (let index = 0; index < serialized.length; index += CLOUD_SLICE_CHUNK_SIZE) {
+    chunks.push(serialized.slice(index, index + CLOUD_SLICE_CHUNK_SIZE));
+  }
+  return chunks.length ? chunks : ['{}'];
+}
+
+async function readChunkedCloudSlice(uid, sliceName, sliceMeta = {}) {
+  const chunkSnapshot = await getDocs(getCloudSliceChunksCollectionRef(uid, sliceName));
+  const chunks = [];
+  const chunkCount = Math.max(0, Number(sliceMeta.chunkCount) || 0);
+  chunkSnapshot.forEach((chunkDoc) => {
+    const data = chunkDoc.data();
+    const index = Number.isFinite(Number(data?.index)) ? Number(data.index) : Number(String(chunkDoc.id).replace('chunk-', ''));
+    if (Number.isInteger(index) && (!chunkCount || index < chunkCount)) {
+      chunks[index] = data?.payload || '';
+    }
+  });
+  try {
+    return JSON.parse(chunks.slice(0, chunkCount || chunks.length).join(''));
+  } catch {
+    return {};
+  }
 }
 
 function hydrateStateFromCloudSlices(sliceMap = {}) {
@@ -1452,18 +1488,21 @@ async function readCloudState(uid, mainSnapshot = null) {
   const snap = mainSnapshot || await getDoc(getCloudDocRef(uid));
   if (!snap.exists()) return null;
   const mainData = snap.data();
-  if (mainData?.cloudStorageVersion !== CLOUD_STORAGE_VERSION) {
+  if ((Number(mainData?.cloudStorageVersion) || 0) < 2) {
     return normalizeState(mainData);
   }
 
   const sliceSnapshot = await getDocs(getCloudSlicesCollectionRef(uid));
-  const sliceMap = {};
-  sliceSnapshot.forEach((sliceDoc) => {
-    if (CLOUD_SLICE_NAMES.includes(sliceDoc.id)) {
+  const sliceEntries = await Promise.all(sliceSnapshot.docs
+    .filter((sliceDoc) => CLOUD_SLICE_NAMES.includes(sliceDoc.id))
+    .map(async (sliceDoc) => {
       const data = sliceDoc.data();
-      sliceMap[sliceDoc.id] = data?.payload || data;
-    }
-  });
+      const payload = data?.storageMode === 'jsonChunks'
+        ? await readChunkedCloudSlice(uid, sliceDoc.id, data)
+        : data?.payload || data;
+      return [sliceDoc.id, payload];
+    }));
+  const sliceMap = Object.fromEntries(sliceEntries);
   const hydrated = hydrateStateFromCloudSlices(sliceMap);
   return normalizeState({
     ...hydrated,
@@ -1480,14 +1519,25 @@ async function writeCloudState(uid, state, syncedAt = new Date().toISOString()) 
     cloudMeta: makeCloudMeta(state, syncedAt),
   });
   const slices = buildStorageSlices(normalized);
-  await Promise.all(Object.entries(slices).map(([sliceName, payload]) => (
-    setDoc(getCloudSliceDocRef(uid, sliceName), {
-      payload,
+  await Promise.all(Object.entries(slices).map(async ([sliceName, payload]) => {
+    const chunks = splitCloudSlicePayload(payload);
+    await Promise.all(chunks.map((chunkPayload, index) => (
+      setDoc(getCloudSliceChunkDocRef(uid, sliceName, index), {
+        index,
+        payload: chunkPayload,
+        updatedAt: syncedAt,
+        serverUpdatedAt: serverTimestamp(),
+      })
+    )));
+    await setDoc(getCloudSliceDocRef(uid, sliceName), {
+      storageMode: 'jsonChunks',
+      chunkCount: chunks.length,
       storageVersion: STORAGE_VERSION,
+      cloudStorageVersion: CLOUD_STORAGE_VERSION,
       updatedAt: syncedAt,
       serverUpdatedAt: serverTimestamp(),
-    })
-  )));
+    });
+  }));
   await setDoc(getCloudDocRef(uid), makeCloudIndexPayload(normalized, syncedAt));
   return normalized;
 }
