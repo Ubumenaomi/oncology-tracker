@@ -17,8 +17,10 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
+  collection,
   doc,
   getDoc,
+  getDocs,
   setDoc,
   onSnapshot,
   serverTimestamp,
@@ -45,6 +47,8 @@ const STORAGE_SLICE_KEYS = {
   flashcardStats: `${STORAGE_KEY}.flashcardStats.v3`,
   game: `${STORAGE_KEY}.game.v3`,
 };
+const CLOUD_STORAGE_VERSION = 2;
+const CLOUD_SLICE_NAMES = Object.freeze(Object.keys(STORAGE_SLICE_KEYS));
 
 const NAV_GROUPS = [
   {
@@ -1382,16 +1386,110 @@ function getCloudDocRef(uid) {
   return doc(db, 'oncologyTrackerUsers', uid, 'appState', 'main');
 }
 
-function makeCloudPayload(state, syncedAt = new Date().toISOString()) {
+function getCloudSliceDocRef(uid, sliceName) {
+  return doc(db, 'oncologyTrackerUsers', uid, 'appStateSlices', sliceName);
+}
+
+function getCloudSlicesCollectionRef(uid) {
+  return collection(db, 'oncologyTrackerUsers', uid, 'appStateSlices');
+}
+
+function makeCloudMeta(state, syncedAt = new Date().toISOString()) {
   return {
-    ...state,
-    cloudMeta: {
-      ...(state.cloudMeta || {}),
-      updatedAt: syncedAt,
-      device: navigator.userAgent,
-    },
+    ...(state.cloudMeta || {}),
+    updatedAt: syncedAt,
+    device: navigator.userAgent,
+  };
+}
+
+function makeCloudIndexPayload(state, syncedAt = new Date().toISOString()) {
+  return {
+    cloudStorageVersion: CLOUD_STORAGE_VERSION,
+    storageVersion: STORAGE_VERSION,
+    sliceNames: CLOUD_SLICE_NAMES,
+    cloudMeta: makeCloudMeta(state, syncedAt),
     serverUpdatedAt: serverTimestamp(),
   };
+}
+
+function hydrateStateFromCloudSlices(sliceMap = {}) {
+  const app = sliceMap.app || {};
+  const activity = sliceMap.activity || {};
+  const sessions = sliceMap.sessions || {};
+  const progress = sliceMap.progress || {};
+  const quest = sliceMap.quest || {};
+  const questionRecords = sliceMap.questionRecords || {};
+  const questionEdits = sliceMap.questionEdits || {};
+  const flashcardSlice = sliceMap.flashcards || {};
+  const flashcardStatsSlice = sliceMap.flashcardStats || {};
+  const game = sliceMap.game || {};
+
+  return normalizeState({
+    ...defaultState,
+    settings: app.settings ?? defaultState.settings,
+    cloudMeta: app.cloudMeta ?? defaultState.cloudMeta,
+    focusSessions: activity.focusSessions ?? defaultState.focusSessions,
+    mockExams: activity.mockExams ?? defaultState.mockExams,
+    focusTimer: activity.focusTimer ?? defaultState.focusTimer,
+    sessions: sessions.sessions ?? defaultState.sessions,
+    planProgress: progress.planProgress ?? defaultState.planProgress,
+    planItemProgress: progress.planItemProgress ?? defaultState.planItemProgress,
+    dailyQuestProgress: quest.dailyQuestProgress ?? defaultState.dailyQuestProgress,
+    bossProgress: quest.bossProgress ?? defaultState.bossProgress,
+    stats: questionRecords.stats ?? defaultState.stats,
+    questionOverrides: questionEdits.questionOverrides ?? defaultState.questionOverrides,
+    customQuestions: questionEdits.customQuestions ?? defaultState.customQuestions,
+    deletedQuestionIds: questionEdits.deletedQuestionIds ?? defaultState.deletedQuestionIds,
+    flashcards: flashcardSlice.flashcards ?? defaultState.flashcards,
+    flashcardStats: flashcardStatsSlice.flashcardStats ?? flashcardSlice.flashcardStats ?? defaultState.flashcardStats,
+    deletedFlashcardIds: flashcardStatsSlice.deletedFlashcardIds ?? flashcardSlice.deletedFlashcardIds ?? defaultState.deletedFlashcardIds,
+    game: game.game ?? defaultState.game,
+    player: game.player ?? defaultState.player,
+  });
+}
+
+async function readCloudState(uid, mainSnapshot = null) {
+  const snap = mainSnapshot || await getDoc(getCloudDocRef(uid));
+  if (!snap.exists()) return null;
+  const mainData = snap.data();
+  if (mainData?.cloudStorageVersion !== CLOUD_STORAGE_VERSION) {
+    return normalizeState(mainData);
+  }
+
+  const sliceSnapshot = await getDocs(getCloudSlicesCollectionRef(uid));
+  const sliceMap = {};
+  sliceSnapshot.forEach((sliceDoc) => {
+    if (CLOUD_SLICE_NAMES.includes(sliceDoc.id)) {
+      const data = sliceDoc.data();
+      sliceMap[sliceDoc.id] = data?.payload || data;
+    }
+  });
+  const hydrated = hydrateStateFromCloudSlices(sliceMap);
+  return normalizeState({
+    ...hydrated,
+    cloudMeta: {
+      ...(hydrated.cloudMeta || {}),
+      ...(mainData.cloudMeta || {}),
+    },
+  });
+}
+
+async function writeCloudState(uid, state, syncedAt = new Date().toISOString()) {
+  const normalized = normalizeState({
+    ...state,
+    cloudMeta: makeCloudMeta(state, syncedAt),
+  });
+  const slices = buildStorageSlices(normalized);
+  await Promise.all(Object.entries(slices).map(([sliceName, payload]) => (
+    setDoc(getCloudSliceDocRef(uid, sliceName), {
+      payload,
+      storageVersion: STORAGE_VERSION,
+      updatedAt: syncedAt,
+      serverUpdatedAt: serverTimestamp(),
+    })
+  )));
+  await setDoc(getCloudDocRef(uid), makeCloudIndexPayload(normalized, syncedAt));
+  return normalized;
 }
 
 function getCloudSyncSignature(state) {
@@ -6719,16 +6817,17 @@ export default function App() {
 
       setSyncStatus('已登入，正在讀取雲端資料...');
       try {
-        const ref = getCloudDocRef(firebaseUser.uid);
-        const snap = await getDoc(ref);
+        const cloudState = await readCloudState(firebaseUser.uid);
 
-        if (snap.exists()) {
-          const merged = mergeCloudState(loadState(), snap.data());
-          lastSyncedSignatureRef.current = getCloudSyncSignature(merged);
+        if (cloudState) {
+          const merged = mergeCloudState(loadState(), cloudState);
+          const syncedAt = new Date().toISOString();
+          const syncedState = await writeCloudState(firebaseUser.uid, merged, syncedAt);
+          lastSyncedSignatureRef.current = getCloudSyncSignature(syncedState);
           isApplyingCloudStateRef.current = true;
           setIsApplyingCloudState(true);
-          setState(merged);
-          saveState(merged);
+          setState(syncedState);
+          saveState(syncedState);
           setTimeout(() => {
             isApplyingCloudStateRef.current = false;
             setIsApplyingCloudState(false);
@@ -6747,7 +6846,7 @@ export default function App() {
           });
           saveState(nextState);
           lastSyncedSignatureRef.current = getCloudSyncSignature(nextState);
-          await setDoc(ref, makeCloudPayload(nextState, syncedAt), { merge: true });
+          await writeCloudState(firebaseUser.uid, nextState, syncedAt);
           setSyncStatus('已建立雲端資料，之後會即時同步。');
         }
       } catch (error) {
@@ -6763,27 +6862,32 @@ export default function App() {
     if (!user) return undefined;
 
     const ref = getCloudDocRef(user.uid);
-    const unsubscribeSnapshot = onSnapshot(ref, (snapshot) => {
+    const unsubscribeSnapshot = onSnapshot(ref, async (snapshot) => {
       if (!snapshot.exists()) return;
       if (isApplyingCloudStateRef.current) return;
 
-      const cloudState = snapshot.data();
-      const localState = loadState();
-      const cloudUpdatedAt = cloudState?.cloudMeta?.updatedAt;
-      const localUpdatedAt = localState?.cloudMeta?.updatedAt;
+      try {
+        const cloudState = await readCloudState(user.uid, snapshot);
+        const localState = loadState();
+        const cloudUpdatedAt = cloudState?.cloudMeta?.updatedAt;
+        const localUpdatedAt = localState?.cloudMeta?.updatedAt;
 
-      if (cloudUpdatedAt && cloudUpdatedAt !== localUpdatedAt) {
-        const merged = mergeCloudState(localState, cloudState);
-        lastSyncedSignatureRef.current = getCloudSyncSignature(merged);
-        isApplyingCloudStateRef.current = true;
-        setIsApplyingCloudState(true);
-        setState(merged);
-        saveState(merged);
-        setTimeout(() => {
-          isApplyingCloudStateRef.current = false;
-          setIsApplyingCloudState(false);
-        }, 500);
-        setSyncStatus('已接收其他裝置的更新。');
+        if (cloudUpdatedAt && cloudUpdatedAt !== localUpdatedAt) {
+          const merged = mergeCloudState(localState, cloudState);
+          lastSyncedSignatureRef.current = getCloudSyncSignature(merged);
+          isApplyingCloudStateRef.current = true;
+          setIsApplyingCloudState(true);
+          setState(merged);
+          saveState(merged);
+          setTimeout(() => {
+            isApplyingCloudStateRef.current = false;
+            setIsApplyingCloudState(false);
+          }, 500);
+          setSyncStatus('已接收其他裝置的更新。');
+        }
+      } catch (error) {
+        setSyncError(getFirebaseErrorMessage(error));
+        setSyncStatus('即時同步讀取失敗。');
       }
     }, (error) => {
       setSyncError(getFirebaseErrorMessage(error));
@@ -6810,8 +6914,8 @@ export default function App() {
           },
         };
         saveState(nextState, ['app']);
-        lastSyncedSignatureRef.current = stateSignature;
-        await setDoc(getCloudDocRef(user.uid), makeCloudPayload(nextState, syncedAt), { merge: true });
+        const syncedState = await writeCloudState(user.uid, nextState, syncedAt);
+        lastSyncedSignatureRef.current = getCloudSyncSignature(syncedState);
         setSyncStatus(`已同步到雲端：${new Date().toLocaleString()}`);
       } catch (error) {
         lastSyncedSignatureRef.current = '';
@@ -7165,7 +7269,7 @@ export default function App() {
       });
       saveState(nextState);
       lastSyncedSignatureRef.current = getCloudSyncSignature(nextState);
-      await setDoc(getCloudDocRef(user.uid), makeCloudPayload(nextState, syncedAt), { merge: true });
+      await writeCloudState(user.uid, nextState, syncedAt);
       setSyncStatus('已把本機資料上傳到雲端。');
     } catch (error) {
       setSyncError(getFirebaseErrorMessage(error));
@@ -7177,12 +7281,12 @@ export default function App() {
     if (!user) return;
     setSyncError('');
     try {
-      const snap = await getDoc(getCloudDocRef(user.uid));
-      if (!snap.exists()) {
+      const cloudState = await readCloudState(user.uid);
+      if (!cloudState) {
         setSyncStatus('雲端目前沒有資料。');
         return;
       }
-      const merged = mergeCloudState(defaultState, snap.data());
+      const merged = mergeCloudState(defaultState, cloudState);
       lastSyncedSignatureRef.current = getCloudSyncSignature(merged);
       isApplyingCloudStateRef.current = true;
       setIsApplyingCloudState(true);
@@ -7953,12 +8057,12 @@ export default function App() {
     }
 
     try {
-      lastSyncedSignatureRef.current = getCloudSyncSignature(nextState);
-      await setDoc(getCloudDocRef(user.uid), makeCloudPayload(nextState, updatedAt));
+      const syncedState = await writeCloudState(user.uid, nextState, updatedAt);
+      lastSyncedSignatureRef.current = getCloudSyncSignature(syncedState);
       setSyncStatus('已重新開始 100-Day Plan，並重設完成度與 XP。');
     } catch (error) {
       lastSyncedSignatureRef.current = '';
-      setSyncError(error.message);
+      setSyncError(getFirebaseErrorMessage(error));
       setSyncStatus('已重設本機完成度；雲端同步失敗，請稍後再試。');
     }
   };
