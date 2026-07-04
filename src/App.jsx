@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { AlertTriangle, BarChart3, ChevronDown, ClipboardList, Home, Newspaper, Settings2 } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bell, ChevronDown, ClipboardList, Dumbbell, Home, Newspaper, Settings2 } from 'lucide-react';
 import './App.css';
 import { QUESTION_BANK_TOTAL, QUESTION_YEARS, cancerCategories } from './data/questionBankMeta.js';
 import { buildFlashcardTags } from './data/taxonomy.js';
@@ -559,6 +559,14 @@ function makeCustomQuestionId() {
 
 const TODAY = formatLocalDate(new Date());
 
+const DEFAULT_WORKOUT_REMINDER = {
+  enabled: false,
+  time: '19:30',
+  minutes: 20,
+  completedDates: {},
+  lastNotifiedDate: '',
+};
+
 const EXAM_DATE = {
   year: 2026,
   monthIndex: 9,
@@ -646,6 +654,7 @@ const defaultState = {
     preferredYears: QUESTION_YEARS,
     questionYearVersion: QUESTION_YEAR_KEY,
     preferredCancers: [],
+    workoutReminder: DEFAULT_WORKOUT_REMINDER,
   },
   planProgress: {},
   planItemProgress: {},
@@ -1894,6 +1903,11 @@ function mergePlayerState(cloudPlayer = {}, localPlayer = {}, cloudGame = {}, lo
 
 function normalizeState(state) {
   const stateSettings = state?.settings || {};
+  const workoutReminder = {
+    ...DEFAULT_WORKOUT_REMINDER,
+    ...(stateSettings.workoutReminder || {}),
+    completedDates: stateSettings.workoutReminder?.completedDates || {},
+  };
   const rawPreferredYears = Array.isArray(stateSettings.preferredYears)
     ? stateSettings.preferredYears.map((year) => Number(year)).filter((year) => Number.isFinite(year))
     : defaultState.settings.preferredYears;
@@ -1933,6 +1947,7 @@ function normalizeState(state) {
       preferredYears,
       questionYearVersion: QUESTION_YEAR_KEY,
       practiceMode: PRACTICE_MODES[stateSettings.practiceMode] ? stateSettings.practiceMode : 'standard',
+      workoutReminder,
     },
     planItemProgress: normalizePlanItemProgress(state?.planItemProgress),
     dailyQuestProgress: state?.dailyQuestProgress || {},
@@ -1948,6 +1963,50 @@ function normalizeState(state) {
     game: { ...game, xp, level: xpLevel(xp), streak: player.streak, badges: player.badges },
     player,
   };
+}
+
+function getWorkoutReminder(settings = {}) {
+  return {
+    ...DEFAULT_WORKOUT_REMINDER,
+    ...(settings.workoutReminder || {}),
+    completedDates: settings.workoutReminder?.completedDates || {},
+  };
+}
+
+function timeToMinutes(time = DEFAULT_WORKOUT_REMINDER.time) {
+  const [hours = 0, minutes = 0] = String(time).split(':').map((value) => Number(value));
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return timeToMinutes(DEFAULT_WORKOUT_REMINDER.time);
+  return Math.max(0, Math.min(1439, hours * 60 + minutes));
+}
+
+function getWorkoutStatus(settings = {}, date = TODAY, now = new Date()) {
+  const reminder = getWorkoutReminder(settings);
+  const completedToday = Boolean(reminder.completedDates?.[date]);
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const due = reminder.enabled && !completedToday && currentMinutes >= timeToMinutes(reminder.time);
+  const lastCompletedDate = Object.keys(reminder.completedDates || {})
+    .filter((completedDate) => reminder.completedDates[completedDate])
+    .sort()
+    .pop() || '';
+
+  return {
+    reminder,
+    completedToday,
+    due,
+    notifiedToday: reminder.lastNotifiedDate === date,
+    lastCompletedDate,
+    streak: getWorkoutStreak(reminder.completedDates, date),
+  };
+}
+
+function getWorkoutStreak(completedDates = {}, date = TODAY) {
+  let streak = 0;
+  const cursor = new Date(`${date}T00:00:00`);
+  while (completedDates[formatLocalDate(cursor)]) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
 }
 
 function daysBetween(fromDate, toDate) {
@@ -2360,6 +2419,7 @@ function emptyStat() {
     userAnswer: null,
     correctAnswer: null,
 
+    ungradedAttempts: 0,
     confidenceHistory: [],
     answerHistory: [],
     timeHistory: [],
@@ -4319,6 +4379,12 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
   );
   const [notesExpanded, setNotesExpanded] = useState(false);
   const [feedback, setFeedback] = useState('');
+  const [recordedThisAttempt, setRecordedThisAttempt] = useState(false);
+  const latestStatRef = useRef(stat);
+
+  useEffect(() => {
+    latestStatRef.current = stat;
+  }, [stat]);
 
   useEffect(() => {
     const nextAnswer = stat.correctAnswer || question.answer || '';
@@ -4345,6 +4411,8 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
 
     setNotesExpanded(false);
     setFeedback('');
+    setRecordedThisAttempt(false);
+    latestStatRef.current = stat;
     // Local answer state should reset only when the rendered question changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [question.id]);
@@ -4399,8 +4467,19 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
     Object.keys(FLASHCARD_RATINGS).map((rating) => [rating, getReviewSchedulePreview(rating, stat)])
   );
   const hasRecordedCurrentPracticeAttempt = practiceMode && (
-    (stat.answerHistory || []).some((event) => event?.date === TODAY && event?.mode === 'daily' && event?.questionId === question.id)
+    recordedThisAttempt
+    || (stat.answerHistory || []).some((event) => event?.date === TODAY && event?.mode === 'daily' && event?.questionId === question.id)
     || (practiceDraft?.rated && stat.lastAttemptAt === TODAY && (stat.attempts || 0) > 0)
+  );
+  const hasRecordedCurrentAnswer = recordedThisAttempt || (
+    practiceMode
+      ? (stat.answerHistory || []).some((event) => event?.date === TODAY && event?.mode === 'daily' && event?.questionId === question.id)
+      : stat.lastAttemptAt === TODAY && Boolean(stat.lastResult)
+  );
+  const hasRecordedCurrentWrongAttempt = !isCorrectSelection && (
+    recordedThisAttempt
+    || practiceDraft?.rated
+    || (stat.lastAttemptAt === TODAY && stat.lastResult === 'wrong' && (stat.attempts || 0) > 0)
   );
 
   const recordRating = (rating, { countAttempt = true, allowMissingErrorType = false } = {}) => {
@@ -4409,7 +4488,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
       return false;
     }
 
-    const previous = stat;
+    const previous = latestStatRef.current || stat;
     const newAttempts = (previous.attempts || 0) + (countAttempt ? 1 : 0);
     // Determine correctness by comparing selected option to correctAnswer
     const isCorrect = answerIsSingleChoice && selected === String(correctAnswer).trim().toUpperCase();
@@ -4439,7 +4518,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
     const interval = nextIntervalByRating(rating, previous);
     const normalizedConfidence = Number(confidence) || 3;
     const wasPreviouslyWrong = (previous.wrong || 0) > 0;
-    const remediation = isCorrect ? null : getRemediationForErrorType(errorType);
+    const remediation = !isCorrect && errorType ? getRemediationForErrorType(errorType) : null;
     const remediationEvent = remediation ? {
       date: TODAY,
       questionId: question.id,
@@ -4464,7 +4543,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
       remediationCardType: remediation?.cardType || '',
     };
 
-    onUpdateStat(question.id, {
+    const nextStat = {
       ...previous,
       attempts: newAttempts,
       correct: newCorrect,
@@ -4491,7 +4570,11 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
       errorTypes: isCorrect || !errorType || (previous.errorTypes || []).at(-1) === errorType ? (previous.errorTypes || []) : [...(previous.errorTypes || []), errorType].slice(-20),
       lastRemediationTask: remediationEvent || previous.lastRemediationTask || null,
       remediationTasks: remediationEvent ? [remediationEvent, ...(previous.remediationTasks || [])].slice(0, 20) : (previous.remediationTasks || []),
-    });
+    };
+
+    latestStatRef.current = nextStat;
+    onUpdateStat(question.id, nextStat);
+    if (countAttempt) setRecordedThisAttempt(true);
 
     setFeedback(!isCorrect && !errorType
       ? `已記錄錯誤 1 次，請選擇 Error type 完成補救任務。預設下次複習 ${interval} 天後。`
@@ -4501,6 +4584,54 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
     if (practiceMode && onPracticeChange) {
       onPracticeChange({ rated: true, rating });
     }
+    return true;
+  };
+
+  const recordUngradedAttempt = () => {
+    if (practiceMode && hasRecordedCurrentPracticeAttempt) {
+      setFeedback('此題已記錄作答，跳過重複紀錄。');
+      return false;
+    }
+
+    const previous = latestStatRef.current || stat;
+    const normalizedConfidence = Number(confidence) || 3;
+    const answerEvent = {
+      date: TODAY,
+      mode: practiceMode ? 'daily' : 'review',
+      questionId: question.id,
+      cancer: question.cancer,
+      topic: question.topic,
+      selected: selected || null,
+      correctAnswer: null,
+      isCorrect: null,
+      confidence: normalizedConfidence,
+      rating: 'Ungraded',
+      errorType: '',
+      remediationTask: '',
+      remediationCardType: '',
+    };
+    const nextStat = {
+      ...previous,
+      ungradedAttempts: (previous.ungradedAttempts || 0) + 1,
+      lastResult: 'ungraded',
+      lastRating: 'Ungraded',
+      lastAttemptAt: TODAY,
+      userAnswer: selected || previous.userAnswer || null,
+      correctAnswer: correctAnswer || previous.correctAnswer || question.answer || null,
+      explanation,
+      wrongNotes,
+      lastConfidence: normalizedConfidence,
+      confidenceHistory: [...(previous.confidenceHistory || []), normalizedConfidence].slice(-50),
+      answerHistory: [...(previous.answerHistory || []), answerEvent].slice(-50),
+    };
+
+    latestStatRef.current = nextStat;
+    onUpdateStat(question.id, nextStat);
+    setRecordedThisAttempt(true);
+    if (practiceMode && onPracticeChange) {
+      onPracticeChange({ rated: true, rating: 'Ungraded' });
+    }
+    setFeedback('已記錄作答；此題尚未設定正解，所以不列入 correct / wrong。');
     return true;
   };
 
@@ -4523,9 +4654,12 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
       return;
     }
 
-    setFeedback(answerIsSingleChoice
-      ? '答錯。請先選擇 Error type，再按 Again / Hard / Good / Easy 記錄錯題。'
-      : '已顯示詳解。');
+    if (answerIsSingleChoice) {
+      recordRating('Again', { allowMissingErrorType: true });
+      return;
+    }
+
+    recordUngradedAttempt();
   };
 
   const saveNote = () => {
@@ -4545,7 +4679,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
 
   const updateRecordedErrorType = (nextErrorType) => {
     setErrorType(nextErrorType);
-    if (!practiceDraft?.rated || !nextErrorType || isCorrectSelection) return;
+    if (!hasRecordedCurrentWrongAttempt || !nextErrorType || isCorrectSelection) return;
 
     const remediation = getRemediationForErrorType(nextErrorType);
     const remediationEvent = {
@@ -4557,13 +4691,17 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
       action: remediation.action,
     };
 
-    onUpdateStat(question.id, {
-      ...stat,
+    const baseStat = latestStatRef.current || stat;
+    const nextStat = {
+      ...baseStat,
       lastErrorType: nextErrorType,
-      errorTypes: (stat.errorTypes || []).at(-1) === nextErrorType ? (stat.errorTypes || []) : [...(stat.errorTypes || []), nextErrorType].slice(-20),
+      errorTypes: (baseStat.errorTypes || []).at(-1) === nextErrorType ? (baseStat.errorTypes || []) : [...(baseStat.errorTypes || []), nextErrorType].slice(-20),
       lastRemediationTask: remediationEvent,
-      remediationTasks: [remediationEvent, ...(stat.remediationTasks || [])].slice(0, 20),
-    });
+      remediationTasks: [remediationEvent, ...(baseStat.remediationTasks || [])].slice(0, 20),
+    };
+
+    latestStatRef.current = nextStat;
+    onUpdateStat(question.id, nextStat);
     onPracticeChange?.({ errorType: nextErrorType });
     setFeedback(`已補上錯因：${nextErrorType}。補救任務：${remediation.task}`);
   };
@@ -4685,7 +4823,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                     <option value={5}>5 非常確定</option>
                   </select>
                 </label>
-                {!isCorrectSelection && (
+                {!isCorrectSelection && answerIsSingleChoice && (
                   <label>
                     Error type
                     <select value={errorType} onChange={(e) => updateRecordedErrorType(e.target.value)}>
@@ -4694,7 +4832,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                     </select>
                   </label>
                 )}
-                {!isCorrectSelection && selectedErrorRemediation && (
+                {!isCorrectSelection && answerIsSingleChoice && selectedErrorRemediation && (
                   <div className="remediation-preview">
                     <strong>{selectedErrorRemediation.task}</strong>
                     <span>{selectedErrorRemediation.action}</span>
@@ -4706,40 +4844,46 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                     {[0, 1, 2, 3, 4, 5].map((x) => <option key={x} value={x}>{x}</option>)}
                   </select>
                 </label>
-                <div className="rating-buttons">
-                  <button
-                    className="rating-button again"
-                    title={`Again（重複）：重新學習，下次 ${ratingSchedulePreviews.Again.dueLabel}`}
-                    onClick={() => recordRating('Again', { countAttempt: !hasRecordedCurrentPracticeAttempt })}
-                  >
-                    🔁 Again
-                    <div className="rating-sub">重學 · {ratingSchedulePreviews.Again.shortLabel}</div>
+                {answerIsSingleChoice ? (
+                  <div className="rating-buttons">
+                    <button
+                      className="rating-button again"
+                      title={`Again（重複）：重新學習，下次 ${ratingSchedulePreviews.Again.dueLabel}`}
+                      onClick={() => recordRating('Again', { countAttempt: !hasRecordedCurrentPracticeAttempt })}
+                    >
+                      🔁 Again
+                      <div className="rating-sub">重學 · {ratingSchedulePreviews.Again.shortLabel}</div>
+                    </button>
+                    <button
+                      className="rating-button hard"
+                      title={`Hard（難）：答對但不穩，下次 ${ratingSchedulePreviews.Hard.dueLabel}`}
+                      onClick={() => recordRating('Hard', { countAttempt: !hasRecordedCurrentPracticeAttempt })}
+                    >
+                      🟠 Hard
+                      <div className="rating-sub">偏難 · {ratingSchedulePreviews.Hard.shortLabel}</div>
+                    </button>
+                    <button
+                      className="rating-button good"
+                      title={`Good（好）：正常答對，下次 ${ratingSchedulePreviews.Good.dueLabel}`}
+                      onClick={() => recordRating('Good', { countAttempt: !hasRecordedCurrentPracticeAttempt })}
+                    >
+                      ✅ Good
+                      <div className="rating-sub">正常 · {ratingSchedulePreviews.Good.shortLabel}</div>
+                    </button>
+                    <button
+                      className="rating-button easy"
+                      title={`Easy（非常熟）：秒答且熟悉，下次 ${ratingSchedulePreviews.Easy.dueLabel}`}
+                      onClick={() => recordRating('Easy', { countAttempt: !hasRecordedCurrentPracticeAttempt })}
+                    >
+                      ✨ Easy
+                      <div className="rating-sub">熟悉 · {ratingSchedulePreviews.Easy.shortLabel}</div>
+                    </button>
+                  </div>
+                ) : (
+                  <button className="primary" disabled={hasRecordedCurrentAnswer} onClick={recordUngradedAttempt}>
+                    {hasRecordedCurrentAnswer ? '已記錄未判分作答' : '記錄未判分作答'}
                   </button>
-                  <button
-                    className="rating-button hard"
-                    title={`Hard（難）：答對但不穩，下次 ${ratingSchedulePreviews.Hard.dueLabel}`}
-                    onClick={() => recordRating('Hard', { countAttempt: !hasRecordedCurrentPracticeAttempt })}
-                  >
-                    🟠 Hard
-                    <div className="rating-sub">偏難 · {ratingSchedulePreviews.Hard.shortLabel}</div>
-                  </button>
-                  <button
-                    className="rating-button good"
-                    title={`Good（好）：正常答對，下次 ${ratingSchedulePreviews.Good.dueLabel}`}
-                    onClick={() => recordRating('Good', { countAttempt: !hasRecordedCurrentPracticeAttempt })}
-                  >
-                    ✅ Good
-                    <div className="rating-sub">正常 · {ratingSchedulePreviews.Good.shortLabel}</div>
-                  </button>
-                  <button
-                    className="rating-button easy"
-                    title={`Easy（非常熟）：秒答且熟悉，下次 ${ratingSchedulePreviews.Easy.dueLabel}`}
-                    onClick={() => recordRating('Easy', { countAttempt: !hasRecordedCurrentPracticeAttempt })}
-                  >
-                    ✨ Easy
-                    <div className="rating-sub">熟悉 · {ratingSchedulePreviews.Easy.shortLabel}</div>
-                  </button>
-                </div>
+                )}
                 <button className="secondary" onClick={saveNote}>儲存詳解/筆記</button>
                 {practiceMode && (
                   <button className="secondary" onClick={() => setNotesExpanded(true)}>放大閱讀/編輯</button>
@@ -4825,7 +4969,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
       )}
 
       <div className="stats-line">
-        attempts {stat.attempts} · correct {stat.correct} · wrong {stat.wrong} · wrong rate {wrongRate(stat)}% · high-confidence wrong {stat.highConfidenceWrong || 0} · next review {stat.nextReviewDate || 'not scheduled'}
+        attempts {stat.attempts} · correct {stat.correct} · wrong {stat.wrong} · ungraded {stat.ungradedAttempts || 0} · wrong rate {wrongRate(stat)}% · high-confidence wrong {stat.highConfidenceWrong || 0} · next review {stat.nextReviewDate || 'not scheduled'}
         {stat.lastErrorType && <> · last error {stat.lastErrorType}</>}
         {stat.lastRemediationTask?.task && <> · repair {stat.lastRemediationTask.task}</>}
       </div>
@@ -6014,6 +6158,60 @@ function QuestPanel({
   );
 }
 
+function WorkoutReminderCard({
+  status,
+  permission,
+  onEnable,
+  onDisable,
+  onMarkDone,
+  onTest,
+  onOpenSettings,
+}) {
+  const permissionText = permission === 'granted'
+    ? 'desktop alarm ready'
+    : permission === 'denied'
+      ? 'browser notifications blocked'
+      : permission === 'unsupported'
+        ? 'browser notification unsupported'
+        : 'needs permission';
+  const cardClass = [
+    'workout-reminder-card',
+    status.completedToday ? 'done' : '',
+    status.due ? 'due' : '',
+  ].filter(Boolean).join(' ');
+
+  return (
+    <section className={cardClass} aria-label="Workout reminder">
+      <div className="workout-reminder-main">
+        <div className="workout-reminder-icon" aria-hidden="true">
+          <Dumbbell size={22} strokeWidth={2.6} />
+        </div>
+        <div>
+          <span>{status.reminder.enabled ? `每天 ${status.reminder.time}` : 'Workout Nudge'}</span>
+          <strong>{status.completedToday ? '今天已動起來' : status.due ? '該起身運動了' : `${status.reminder.minutes} 分鐘運動任務`}</strong>
+          <em>連續 {status.streak} 天 · {permissionText}</em>
+        </div>
+      </div>
+      <div className="workout-reminder-actions">
+        {status.reminder.enabled ? (
+          <button className="secondary icon-button-text" type="button" onClick={onDisable}>
+            <Bell size={16} strokeWidth={2.4} />
+            <span>關閉</span>
+          </button>
+        ) : (
+          <button className="primary icon-button-text" type="button" onClick={onEnable} disabled={permission === 'unsupported' || permission === 'denied'}>
+            <Bell size={16} strokeWidth={2.4} />
+            <span>啟用</span>
+          </button>
+        )}
+        <button className="secondary" type="button" onClick={onOpenSettings}>設定</button>
+        <button className="secondary" type="button" onClick={onTest} disabled={permission === 'unsupported' || permission === 'denied'}>測試</button>
+        <button className="good" type="button" onClick={onMarkDone} disabled={status.completedToday}>完成運動</button>
+      </div>
+    </section>
+  );
+}
+
 function FlashcardsPanel({
   state,
   allFlashcards,
@@ -6725,6 +6923,9 @@ export default function App() {
   const [practicePage, setPracticePage] = useState(0);
   const [practicePageMessage, setPracticePageMessage] = useState('');
   const [focusTick, setFocusTick] = useState(() => Date.now());
+  const [notificationPermission, setNotificationPermission] = useState(() => (
+    typeof Notification === 'undefined' ? 'unsupported' : Notification.permission
+  ));
   const focusTimer = normalizeFocusTimer(state.focusTimer);
   const activeFocusSession = focusTimer.activeSession;
   const focusStartedAt = activeFocusSession?.startedAt || null;
@@ -6853,6 +7054,14 @@ export default function App() {
     const timer = window.setInterval(() => setFocusTick(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, [focusStartedAt]);
+
+  useEffect(() => {
+    if (typeof Notification === 'undefined') {
+      setNotificationPermission('unsupported');
+      return;
+    }
+    setNotificationPermission(Notification.permission);
+  }, []);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -6991,6 +7200,44 @@ export default function App() {
     queueStorageSlices(sliceNames);
     setState((prev) => normalizeState(typeof updater === 'function' ? updater(prev) : updater));
   };
+
+  useEffect(() => {
+    const checkWorkoutReminder = () => {
+      if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+      const status = getWorkoutStatus(latestStateRef.current.settings, TODAY, new Date());
+      if (!status.due || status.notifiedToday) return;
+
+      const notification = new Notification('Workout quest is waiting', {
+        body: `${status.reminder.minutes} min movement break. Keep the streak alive.`,
+        icon: '/app-icon-192.png',
+        tag: 'oncology-tracker-workout',
+        renotify: true,
+      });
+      notification.onclick = () => {
+        window.focus();
+        setTab('quest');
+        notification.close();
+      };
+      playTaskCompletionFeedback();
+      if (dirtyStorageSlicesRef.current !== null) {
+        dirtyStorageSlicesRef.current.add('app');
+      }
+      setState((prev) => normalizeState({
+        ...prev,
+        settings: {
+          ...prev.settings,
+          workoutReminder: {
+            ...getWorkoutReminder(prev.settings),
+            lastNotifiedDate: TODAY,
+          },
+        },
+      }));
+    };
+
+    checkWorkoutReminder();
+    const timer = window.setInterval(checkWorkoutReminder, 30000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const startFocusSession = () => {
     const now = new Date().toISOString();
@@ -7398,6 +7645,7 @@ export default function App() {
     () => buildFocusLeaderboard(leaderboardFocusMinutes, leaderboardElapsedSeconds),
     [leaderboardFocusMinutes, leaderboardElapsedSeconds]
   );
+  const workoutStatus = getWorkoutStatus(state.settings, TODAY, new Date(focusTick));
   const currentPracticePage = Math.min(practicePage, Math.max(0, Math.ceil(todayQuestions.length / PRACTICE_PAGE_SIZE) - 1));
   const visibleTodayQuestions = todayQuestions.slice(currentPracticePage * PRACTICE_PAGE_SIZE, (currentPracticePage + 1) * PRACTICE_PAGE_SIZE);
   const totalPracticePages = Math.ceil(todayPracticeConfig.total / PRACTICE_PAGE_SIZE);
@@ -8133,6 +8381,72 @@ export default function App() {
     updateState((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } }), ['app']);
   };
 
+  const updateWorkoutReminder = (patch) => {
+    updateState((prev) => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        workoutReminder: {
+          ...getWorkoutReminder(prev.settings),
+          ...patch,
+        },
+      },
+    }), ['app']);
+  };
+
+  const requestWorkoutPermission = async () => {
+    if (typeof Notification === 'undefined') {
+      setNotificationPermission('unsupported');
+      return 'unsupported';
+    }
+    const permission = await Notification.requestPermission();
+    setNotificationPermission(permission);
+    return permission;
+  };
+
+  const enableWorkoutReminder = async () => {
+    const permission = notificationPermission === 'granted'
+      ? 'granted'
+      : await requestWorkoutPermission();
+    if (permission === 'granted') {
+      updateWorkoutReminder({ enabled: true });
+    }
+  };
+
+  const sendWorkoutTestNotification = async () => {
+    const permission = notificationPermission === 'granted'
+      ? 'granted'
+      : await requestWorkoutPermission();
+    if (permission !== 'granted') return;
+    const reminder = getWorkoutReminder(state.settings);
+    new Notification('Workout quest test', {
+      body: `${reminder.minutes} min movement break reminder is ready.`,
+      icon: '/app-icon-192.png',
+      tag: 'oncology-tracker-workout-test',
+    });
+    playTaskCompletionFeedback();
+  };
+
+  const markWorkoutDone = () => {
+    playTaskCompletionFeedback();
+    updateState((prev) => {
+      const reminder = getWorkoutReminder(prev.settings);
+      return {
+        ...prev,
+        settings: {
+          ...prev.settings,
+          workoutReminder: {
+            ...reminder,
+            completedDates: {
+              ...(reminder.completedDates || {}),
+              [TODAY]: { completedAt: new Date().toISOString(), minutes: reminder.minutes },
+            },
+          },
+        },
+      };
+    }, ['app']);
+  };
+
   const setPracticeMode = (practiceMode) => {
     const modeConfig = getPracticeModeConfig(practiceMode);
     updateState((prev) => {
@@ -8266,6 +8580,15 @@ export default function App() {
             )}
           </div>
         </section>
+        <WorkoutReminderCard
+          status={workoutStatus}
+          permission={notificationPermission}
+          onEnable={enableWorkoutReminder}
+          onDisable={() => updateWorkoutReminder({ enabled: false })}
+          onMarkDone={markWorkoutDone}
+          onTest={sendWorkoutTestNotification}
+          onOpenSettings={() => setTab('settings')}
+        />
         <FocusMarquee />
         <StudyLeaderboard rows={focusLeaderboardRows} />
         <div className="mission-actions">
@@ -8831,6 +9154,52 @@ export default function App() {
               <div className="settings-card-title">Practice Mode</div>
               <PracticeModeSelector value={selectedPracticeMode} onChange={setPracticeMode} />
               <span className="muted">目前模式會產生 {selectedPracticeConfig.total} 題，完成後獎勵 {selectedPracticeConfig.xp} XP。</span>
+            </section>
+            <section className="settings-card">
+              <div className="settings-card-title">Workout Nudge</div>
+              <label className="settings-toggle">
+                <input
+                  type="checkbox"
+                  checked={workoutStatus.reminder.enabled}
+                  disabled={notificationPermission === 'unsupported' || notificationPermission === 'denied'}
+                  onChange={(event) => {
+                    if (event.target.checked) {
+                      enableWorkoutReminder();
+                      return;
+                    }
+                    updateWorkoutReminder({ enabled: false });
+                  }}
+                />
+                <span>像 Duolingo 一樣每天提醒我運動</span>
+              </label>
+              <div className="settings-inline-fields">
+                <label>
+                  <span>提醒時間</span>
+                  <input
+                    type="time"
+                    value={workoutStatus.reminder.time}
+                    onChange={(event) => updateWorkoutReminder({ time: event.target.value, lastNotifiedDate: '' })}
+                  />
+                </label>
+                <label>
+                  <span>運動分鐘</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="180"
+                    value={workoutStatus.reminder.minutes}
+                    onChange={(event) => updateWorkoutReminder({ minutes: Math.max(1, Number(event.target.value) || DEFAULT_WORKOUT_REMINDER.minutes) })}
+                  />
+                </label>
+              </div>
+              <span className="muted">桌面通知需要網站保持開啟；iPhone 系統鬧鐘要另外做 iOS app 或 Shortcuts。</span>
+              <div className="settings-actions">
+                <button className="secondary icon-button-text" type="button" onClick={requestWorkoutPermission} disabled={notificationPermission === 'granted' || notificationPermission === 'unsupported'}>
+                  <Bell size={16} strokeWidth={2.4} />
+                  <span>{notificationPermission === 'granted' ? '已允許通知' : '允許桌面通知'}</span>
+                </button>
+                <button className="secondary" type="button" onClick={sendWorkoutTestNotification} disabled={notificationPermission === 'unsupported' || notificationPermission === 'denied'}>測試提醒</button>
+              </div>
             </section>
             <section className="settings-card">
               <div className="settings-card-title">年份篩選</div>
