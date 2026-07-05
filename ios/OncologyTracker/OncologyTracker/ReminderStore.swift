@@ -39,17 +39,17 @@ final class ReminderStore: ObservableObject {
     var authorizationText: String {
         switch authorizationStatus {
         case .authorized:
-            return "Notifications allowed"
+            return "已允許"
         case .denied:
-            return "Notifications blocked in iOS Settings"
+            return "已在 iOS 設定中封鎖"
         case .notDetermined:
-            return "Permission not requested"
+            return "尚未詢問"
         case .provisional:
-            return "Notifications provisionally allowed"
+            return "暫時允許"
         case .ephemeral:
-            return "Notifications temporarily allowed"
+            return "暫時允許"
         @unknown default:
-            return "Notification status unknown"
+            return "未知"
         }
     }
 
@@ -86,7 +86,7 @@ final class ReminderStore: ObservableObject {
         guard allowed else {
             isEnabled = false
             persist()
-            statusMessage = "iOS did not allow notifications."
+            statusMessage = "iOS 尚未允許通知。"
             return
         }
 
@@ -102,15 +102,15 @@ final class ReminderStore: ObservableObject {
         }
 
         guard authorizationStatus == .authorized || authorizationStatus == .provisional else {
-            statusMessage = "Allow notifications before sending a test."
+            statusMessage = "請先允許通知，再測試提醒。"
             return
         }
 
         do {
             try await NotificationScheduler.shared.sendTestReminder(workoutMinutes: workoutMinutes)
-            statusMessage = "Test reminder scheduled for 5 seconds from now."
+            statusMessage = "測試提醒已排程，5 秒後會送出。"
         } catch {
-            statusMessage = "Could not schedule test reminder: \(error.localizedDescription)"
+            statusMessage = "無法排程測試提醒：\(error.localizedDescription)"
         }
     }
 
@@ -128,7 +128,7 @@ final class ReminderStore: ObservableObject {
         guard isEnabled else {
             NotificationScheduler.shared.cancelDailyReminder()
             pendingReminder = nil
-            statusMessage = "Workout reminder is off."
+            statusMessage = "運動提醒已關閉。"
             return
         }
 
@@ -138,7 +138,7 @@ final class ReminderStore: ObservableObject {
             if !allowed {
                 isEnabled = false
                 persist()
-                statusMessage = "iOS did not allow notifications."
+                statusMessage = "iOS 尚未允許通知。"
                 return
             }
         }
@@ -148,7 +148,7 @@ final class ReminderStore: ObservableObject {
             persist()
             NotificationScheduler.shared.cancelDailyReminder()
             pendingReminder = nil
-            statusMessage = "Notifications are blocked in iOS Settings."
+            statusMessage = "通知已在 iOS 設定中封鎖。"
             return
         }
 
@@ -162,9 +162,9 @@ final class ReminderStore: ObservableObject {
                 workoutMinutes: workoutMinutes
             )
             await refreshPendingReminder()
-            statusMessage = "Daily workout reminder scheduled for \(reminderTimeText)."
+            statusMessage = "每日運動提醒已設定在 \(reminderTimeText)。"
         } catch {
-            statusMessage = "Could not schedule reminder: \(error.localizedDescription)"
+            statusMessage = "無法排程提醒：\(error.localizedDescription)"
         }
     }
 

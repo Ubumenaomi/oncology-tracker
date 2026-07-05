@@ -15,6 +15,7 @@ struct WebTrackerView: UIViewRepresentable {
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true
+        webView.customUserAgent = "OncologyNativeIOS"
         webView.load(URLRequest(url: model.homeURL))
         return webView
     }

@@ -45,8 +45,8 @@ final class NotificationScheduler {
         center.removePendingNotificationRequests(withIdentifiers: [dailyReminderIdentifier])
 
         let content = UNMutableNotificationContent()
-        content.title = "Workout quest is waiting"
-        content.body = "\(workoutMinutes) min movement break. Keep the streak alive."
+        content.title = "運動提醒時間到了"
+        content.body = "起身運動 \(workoutMinutes) 分鐘，保持連續紀錄。"
         content.sound = .default
         content.categoryIdentifier = "workout"
 
@@ -63,8 +63,8 @@ final class NotificationScheduler {
         center.removePendingNotificationRequests(withIdentifiers: [testReminderIdentifier])
 
         let content = UNMutableNotificationContent()
-        content.title = "Workout quest is waiting"
-        content.body = "\(workoutMinutes) min movement break. Keep the streak alive."
+        content.title = "運動提醒時間到了"
+        content.body = "起身運動 \(workoutMinutes) 分鐘，保持連續紀錄。"
         content.sound = .default
 
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)

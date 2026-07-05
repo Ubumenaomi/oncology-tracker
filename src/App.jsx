@@ -567,6 +567,15 @@ const DEFAULT_WORKOUT_REMINDER = {
   lastNotifiedDate: '',
 };
 
+function isNativeIosShell() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('nativeApp') === 'ios' || navigator.userAgent.includes('OncologyNativeIOS');
+  } catch {
+    return false;
+  }
+}
+
 const EXAM_DATE = {
   year: 2026,
   monthIndex: 9,
@@ -6901,6 +6910,7 @@ function MockExamPanel({ state, onFinishMock, onEnsureQuestionYears }) {
 }
 
 export default function App() {
+  const nativeIosShell = useMemo(() => isNativeIosShell(), []);
   const [state, setState] = useState(loadState);
   const [questionBankVersion, setQuestionBankVersion] = useState(0);
   const [questionBankLoading, setQuestionBankLoading] = useState(false);
@@ -7202,6 +7212,8 @@ export default function App() {
   };
 
   useEffect(() => {
+    if (nativeIosShell) return undefined;
+
     const checkWorkoutReminder = () => {
       if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
       const status = getWorkoutStatus(latestStateRef.current.settings, TODAY, new Date());
@@ -7237,7 +7249,7 @@ export default function App() {
     checkWorkoutReminder();
     const timer = window.setInterval(checkWorkoutReminder, 30000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [nativeIosShell]);
 
   const startFocusSession = () => {
     const now = new Date().toISOString();
@@ -8580,15 +8592,17 @@ export default function App() {
             )}
           </div>
         </section>
-        <WorkoutReminderCard
-          status={workoutStatus}
-          permission={notificationPermission}
-          onEnable={enableWorkoutReminder}
-          onDisable={() => updateWorkoutReminder({ enabled: false })}
-          onMarkDone={markWorkoutDone}
-          onTest={sendWorkoutTestNotification}
-          onOpenSettings={() => setTab('settings')}
-        />
+        {!nativeIosShell && (
+          <WorkoutReminderCard
+            status={workoutStatus}
+            permission={notificationPermission}
+            onEnable={enableWorkoutReminder}
+            onDisable={() => updateWorkoutReminder({ enabled: false })}
+            onMarkDone={markWorkoutDone}
+            onTest={sendWorkoutTestNotification}
+            onOpenSettings={() => setTab('settings')}
+          />
+        )}
         <FocusMarquee />
         <StudyLeaderboard rows={focusLeaderboardRows} />
         <div className="mission-actions">
@@ -9155,52 +9169,54 @@ export default function App() {
               <PracticeModeSelector value={selectedPracticeMode} onChange={setPracticeMode} />
               <span className="muted">目前模式會產生 {selectedPracticeConfig.total} 題，完成後獎勵 {selectedPracticeConfig.xp} XP。</span>
             </section>
-            <section className="settings-card">
-              <div className="settings-card-title">Workout Nudge</div>
-              <label className="settings-toggle">
-                <input
-                  type="checkbox"
-                  checked={workoutStatus.reminder.enabled}
-                  disabled={notificationPermission === 'unsupported' || notificationPermission === 'denied'}
-                  onChange={(event) => {
-                    if (event.target.checked) {
-                      enableWorkoutReminder();
-                      return;
-                    }
-                    updateWorkoutReminder({ enabled: false });
-                  }}
-                />
-                <span>像 Duolingo 一樣每天提醒我運動</span>
-              </label>
-              <div className="settings-inline-fields">
-                <label>
-                  <span>提醒時間</span>
+            {!nativeIosShell && (
+              <section className="settings-card">
+                <div className="settings-card-title">Workout Nudge</div>
+                <label className="settings-toggle">
                   <input
-                    type="time"
-                    value={workoutStatus.reminder.time}
-                    onChange={(event) => updateWorkoutReminder({ time: event.target.value, lastNotifiedDate: '' })}
+                    type="checkbox"
+                    checked={workoutStatus.reminder.enabled}
+                    disabled={notificationPermission === 'unsupported' || notificationPermission === 'denied'}
+                    onChange={(event) => {
+                      if (event.target.checked) {
+                        enableWorkoutReminder();
+                        return;
+                      }
+                      updateWorkoutReminder({ enabled: false });
+                    }}
                   />
+                  <span>像 Duolingo 一樣每天提醒我運動</span>
                 </label>
-                <label>
-                  <span>運動分鐘</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max="180"
-                    value={workoutStatus.reminder.minutes}
-                    onChange={(event) => updateWorkoutReminder({ minutes: Math.max(1, Number(event.target.value) || DEFAULT_WORKOUT_REMINDER.minutes) })}
-                  />
-                </label>
-              </div>
-              <span className="muted">桌面通知需要網站保持開啟；iPhone 系統鬧鐘要另外做 iOS app 或 Shortcuts。</span>
-              <div className="settings-actions">
-                <button className="secondary icon-button-text" type="button" onClick={requestWorkoutPermission} disabled={notificationPermission === 'granted' || notificationPermission === 'unsupported'}>
-                  <Bell size={16} strokeWidth={2.4} />
-                  <span>{notificationPermission === 'granted' ? '已允許通知' : '允許桌面通知'}</span>
-                </button>
-                <button className="secondary" type="button" onClick={sendWorkoutTestNotification} disabled={notificationPermission === 'unsupported' || notificationPermission === 'denied'}>測試提醒</button>
-              </div>
-            </section>
+                <div className="settings-inline-fields">
+                  <label>
+                    <span>提醒時間</span>
+                    <input
+                      type="time"
+                      value={workoutStatus.reminder.time}
+                      onChange={(event) => updateWorkoutReminder({ time: event.target.value, lastNotifiedDate: '' })}
+                    />
+                  </label>
+                  <label>
+                    <span>運動分鐘</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="180"
+                      value={workoutStatus.reminder.minutes}
+                      onChange={(event) => updateWorkoutReminder({ minutes: Math.max(1, Number(event.target.value) || DEFAULT_WORKOUT_REMINDER.minutes) })}
+                    />
+                  </label>
+                </div>
+                <span className="muted">桌面通知需要網站保持開啟；iPhone 系統鬧鐘要另外做 iOS app 或 Shortcuts。</span>
+                <div className="settings-actions">
+                  <button className="secondary icon-button-text" type="button" onClick={requestWorkoutPermission} disabled={notificationPermission === 'granted' || notificationPermission === 'unsupported'}>
+                    <Bell size={16} strokeWidth={2.4} />
+                    <span>{notificationPermission === 'granted' ? '已允許通知' : '允許桌面通知'}</span>
+                  </button>
+                  <button className="secondary" type="button" onClick={sendWorkoutTestNotification} disabled={notificationPermission === 'unsupported' || notificationPermission === 'denied'}>測試提醒</button>
+                </div>
+              </section>
+            )}
             <section className="settings-card">
               <div className="settings-card-title">年份篩選</div>
               <div className="check-row">

@@ -2,7 +2,7 @@ import Foundation
 
 @MainActor
 final class WebViewModel: ObservableObject {
-    let homeURL = URL(string: "https://oncology-tracker.vercel.app/")!
+    let homeURL = URL(string: "https://oncology-tracker.vercel.app/?nativeApp=ios")!
 
     @Published var currentURL: URL?
     @Published var isLoading = false
