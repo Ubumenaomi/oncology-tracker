@@ -129,49 +129,49 @@ const ERROR_TYPE_OPTIONS = [
 
 const ERROR_TYPE_REMEDIATION = {
   'Not studied yet': {
-    task: 'Cloze Card',
+    task: '補核心知識',
     cardType: 'Cloze Card',
-    action: '這題是尚未讀過的知識，先補 guideline 或講義核心段落，再做成一張最小可測的核心概念卡。',
+    action: '先讀 guideline 或講義核心段落，回到這題用一句話寫下「這題在考什麼」，再重做一次。',
   },
   'Knowledge gap': {
-    task: 'Cloze Card',
+    task: '補概念缺口',
     cardType: 'Cloze Card',
-    action: '這題是讀過但沒掌握的缺口，回 guideline 與核心表格，把缺口整理成 cutoff、eligibility、endpoint 或關鍵事實填空卡。',
+    action: '回 guideline 與核心表格，抓出漏掉的 cutoff、eligibility、endpoint 或關鍵事實，寫成一條訂正重點後重測。',
   },
   'Trial confusion': {
-    task: 'Trial Card',
+    task: '釐清 trial 對照',
     cardType: 'Trial Card',
-    action: '建立或複習 Trial Card：population、intervention、endpoint、OS/PFS 與適用情境。',
+    action: '把 population、intervention、endpoint、OS/PFS 與適用情境對照清楚，再回題目判斷為什麼原選項錯。',
   },
   'Biomarker cutoff': {
-    task: 'Cloze Card',
+    task: '校正 cutoff / threshold',
     cardType: 'Cloze Card',
-    action: '把 cutoff、threshold、duration 或數字做成填空卡。',
+    action: '把 cutoff、threshold、duration 或數字來源查清楚，寫下正確門檻與常混淆門檻。',
   },
   'Treatment sequence': {
-    task: 'Algorithm Card',
+    task: '重排治療順序',
     cardType: 'Algorithm Card',
-    action: '把一線/二線/維持/術前術後順序整理成流程卡。',
+    action: '把一線、二線、維持、術前術後或 progression 後的順序排一次，確認這題卡在哪一個節點。',
   },
   'Misread question': {
-    task: 'Trap Card',
+    task: '訂正審題陷阱',
     cardType: 'Trap Card',
     action: '補一條審題提醒：否定詞、例外條件、疾病期別、line of therapy。',
   },
   Toxicity: {
-    task: 'Trap Card',
+    task: '整理毒性判斷',
     cardType: 'Trap Card',
-    action: '整理 AE、contraindication、dose hold/discontinue 的常見錯選陷阱。',
+    action: '對照 AE、contraindication、dose hold/discontinue 規則，寫下這題最容易誤判的毒性點。',
   },
   'Guideline outdated': {
-    task: 'Algorithm Card',
+    task: '更新 guideline 差異',
     cardType: 'Algorithm Card',
-    action: '標記需更新 NCCN / ESMO / ASCO，補成新舊標準差異與治療順序流程卡。',
+    action: '確認 NCCN / ESMO / ASCO 的新版標準，寫下新舊差異與會影響答案的治療節點。',
   },
   Overconfidence: {
-    task: 'Trap Card',
+    task: '拆解高信心錯誤',
     cardType: 'Trap Card',
-    action: '回看為什麼很有把握卻錯，寫成陷阱提醒與重測題。',
+    action: '回看為什麼很有把握卻錯，記下錯誤直覺、真正線索與下次要停下來檢查的點。',
   },
 };
 
@@ -1995,9 +1995,9 @@ function wrongRate(stat) {
 
 function getRemediationForErrorType(errorType) {
   return ERROR_TYPE_REMEDIATION[errorType] || {
-    task: 'Targeted correction task',
+    task: '完成針對性訂正',
     cardType: 'Trap Card',
-    action: '把錯因整理成一張可重測的補救卡。',
+    action: '回到題目確認錯因，寫下正確判斷線索與下次避免同錯的提醒。',
   };
 }
 
@@ -4059,7 +4059,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
     const newWrong = previous.wrong + (countAttempt && !isCorrect ? 1 : 0);
 
     if (!isCorrect && !errorType && !allowMissingErrorType) {
-      setFeedback('答錯題必須先選擇 Error type，才能送出評分並排入補救任務。');
+      setFeedback('答錯題必須先選擇 Error type，才能送出評分並排入訂正清單。');
       return false;
     }
 
@@ -4140,8 +4140,8 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
     if (countAttempt) setRecordedThisAttempt(true);
 
     setFeedback(!isCorrect && !errorType
-      ? `已記錄錯誤 1 次，請選擇 Error type 完成補救任務。預設下次複習 ${interval} 天後。`
-      : `紀錄：${rating}，下次複習 ${interval} 天後${remediation ? `。補救任務：${remediation.task}` : ''}`);
+      ? `已記錄錯誤 1 次，請選擇 Error type 完成訂正。預設下次複習 ${interval} 天後。`
+      : `紀錄：${rating}，下次複習 ${interval} 天後${remediation ? `。訂正重點：${remediation.task}` : ''}`);
 
     // Mark practiceDraft as rated so UI/logic won't double-record
     if (practiceMode && onPracticeChange) {
@@ -4266,7 +4266,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
     latestStatRef.current = nextStat;
     onUpdateStat(question.id, nextStat);
     onPracticeChange?.({ errorType: nextErrorType });
-    setFeedback(`已補上錯因：${nextErrorType}。補救任務：${remediation.task}`);
+    setFeedback(`已補上錯因：${nextErrorType}。訂正重點：${remediation.task}`);
   };
 
   return (
@@ -5811,8 +5811,9 @@ Wrong rate: ${wrongRate(stat)}%
 Mastery: ${stat.mastery}
 Bookmarked: ${stat.bookmarked ? 'yes' : 'no'}
 Last error type: ${errorType}
-Recommended remediation: ${stat.lastRemediationTask?.task || remediation?.task || 'none'}
-Recommended card type: ${stat.lastRemediationTask?.cardType || remediation?.cardType || 'none'}
+Correction focus: ${remediation?.task || 'none'}
+Correction action: ${remediation?.action || 'none'}
+Optional card type if this becomes a card later: ${remediation?.cardType || 'none'}
 
 Stem:
 ${q.stem || ''}
@@ -5839,7 +5840,7 @@ ${stat.wrongNotes || ''}
 
 ${FLASHCARD_SCHEMA_PROMPT}
 
-請優先抽出可轉移的 decision rule，不要把「題目放正面、選項放背面」。每題產生 2–4 張卡，必須只在 Trial Card / Algorithm Card / Cloze Card / Trap Card 四種新版卡中選 type。若來源資料有 Recommended card type，至少產生一張該 type 的卡；其餘再依內容補 pivotal trial、treatment sequencing、cutoff/duration/endpoint、常見錯選項。
+請優先抽出可轉移的 decision rule，不要把「題目放正面、選項放背面」。每題產生 2–4 張卡，必須只在 Trial Card / Algorithm Card / Cloze Card / Trap Card 四種新版卡中選 type。若來源資料有 Optional card type，至少產生一張該 type 的卡；其餘再依內容補 pivotal trial、treatment sequencing、cutoff/duration/endpoint、常見錯選項。
 
 以下是錯題與 due questions 來源資料：
 
@@ -7513,11 +7514,12 @@ export default function App() {
   const remediationQueue = useMemo(() => needsDueReview ? weakQuestions
     .map(({ q, stat }) => {
       const errorType = stat.lastErrorType || stat.errorTypes?.[stat.errorTypes.length - 1] || '';
-      const remediation = stat.lastRemediationTask || (errorType ? {
+      if (!errorType) return null;
+      const remediation = {
         errorType,
         ...getRemediationForErrorType(errorType),
-      } : null);
-      return remediation ? { q, stat, remediation } : null;
+      };
+      return { q, stat, remediation };
     })
     .filter(Boolean)
     .sort((a, b) => wrongRate(b.stat) - wrongRate(a.stat) || b.stat.wrong - a.stat.wrong) : EMPTY_ARRAY, [needsDueReview, weakQuestions]);
@@ -8224,10 +8226,10 @@ export default function App() {
       {tab === 'review' && (
         <main className="panel">
           <h2>Review Queue</h2>
-          <p className="muted">優先順序：錯因補救任務 → 今日到期 → 錯誤率 ≥50% → 已標記題目 → 未練新題。</p>
+          <p className="muted">優先順序：錯因訂正 → 今日到期 → 錯誤率 ≥50% → 已標記題目 → 未練新題。</p>
           <div className="subsection">
-            <h3>錯因補救任務</h3>
-            {remediationQueue.length === 0 ? <p className="muted">答錯並選擇 Error type 後，這裡會自動排入 Trial Card、Cloze Card、Algorithm Card 等補救任務。</p> : remediationQueue.slice(0, 20).map(({ q, stat, remediation }) => (
+            <h3>錯因訂正</h3>
+            {remediationQueue.length === 0 ? <p className="muted">答錯並選擇 Error type 後，這裡會自動排入訂正清單；先修正判斷，再決定要不要整理成卡片。</p> : remediationQueue.slice(0, 20).map(({ q, stat, remediation }) => (
               <div className={isReviewQueueItemComplete(q.id) ? 'remediation-row done' : 'remediation-row'} key={`${q.id}-${remediation.errorType || remediation.task}`}>
                 <div>
                   <strong>{q.id}</strong> · {q.cancer} · {q.topic} · wrong rate {wrongRate(stat)}%
@@ -8235,14 +8237,14 @@ export default function App() {
                   <span>{remediation.action}</span>
                 </div>
                 <div className="review-queue-actions">
-                  <span className="pill tag">{remediation.cardType}</span>
+                  <span className="optional-card-hint">後續可整理：{remediation.cardType}</span>
                   <button
                     className={isReviewQueueItemComplete(q.id) ? 'tiny good' : 'tiny'}
                     type="button"
                     disabled={isReviewQueueItemComplete(q.id)}
                     onClick={() => markReviewQueueComplete(q.id)}
                   >
-                    {isReviewQueueItemComplete(q.id) ? '已完成' : '完成複習'}
+                    {isReviewQueueItemComplete(q.id) ? '已訂正' : '完成訂正'}
                   </button>
                 </div>
               </div>
