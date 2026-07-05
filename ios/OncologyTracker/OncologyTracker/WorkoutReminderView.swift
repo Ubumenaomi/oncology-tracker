@@ -8,16 +8,16 @@ struct WorkoutReminderView: View {
         Form {
             Section {
                 VStack(alignment: .leading, spacing: 8) {
-                    Label("Workout quest", systemImage: "flame.fill")
+                    Label("讀書任務", systemImage: "flame.fill")
                         .font(.headline)
                         .foregroundStyle(.orange)
-                    Text(reminderStore.isEnabled ? "Daily reminder active at \(reminderStore.reminderTimeText)." : "Turn on a daily iPhone reminder for movement breaks.")
+                    Text(reminderStore.isEnabled ? "每日讀書提醒已設定在 \(reminderStore.reminderTimeText)。" : "開啟 iPhone 原生通知，每天提醒自己念書、寫題目，保持連勝。")
                         .foregroundStyle(.secondary)
                 }
                 .padding(.vertical, 4)
             }
 
-            Section("Daily Reminder") {
+            Section("每日提醒") {
                 Toggle(isOn: Binding(
                     get: { reminderStore.isEnabled },
                     set: { enabled in
@@ -30,11 +30,11 @@ struct WorkoutReminderView: View {
                         }
                     }
                 )) {
-                    Text("Enable reminder")
+                    Text("啟用提醒")
                 }
 
                 DatePicker(
-                    "Reminder time",
+                    "提醒時間",
                     selection: Binding(
                         get: { reminderStore.reminderDate },
                         set: { reminderStore.setReminderDate($0) }
@@ -46,20 +46,20 @@ struct WorkoutReminderView: View {
                     get: { reminderStore.workoutMinutes },
                     set: { reminderStore.setWorkoutMinutes($0) }
                 ), in: 1...180) {
-                    Text("\(reminderStore.workoutMinutes) min movement break")
+                    Text("讀書/寫題時間：\(reminderStore.workoutMinutes) 分鐘")
                 }
             }
 
-            Section("Notification") {
-                LabeledContent("Permission", value: reminderStore.authorizationText)
+            Section("通知狀態") {
+                LabeledContent("通知權限", value: reminderStore.authorizationText)
 
                 if let pendingReminder = reminderStore.pendingReminder {
-                    LabeledContent("Scheduled", value: pendingReminder.timeText)
+                    LabeledContent("已排程", value: pendingReminder.timeText)
                     Text(pendingReminder.body)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 } else {
-                    LabeledContent("Scheduled", value: "None")
+                    LabeledContent("已排程", value: "尚未設定")
                 }
 
                 Button {
@@ -67,7 +67,7 @@ struct WorkoutReminderView: View {
                         await reminderStore.requestPermissionAndEnable()
                     }
                 } label: {
-                    Label("Allow notifications", systemImage: "bell.badge")
+                    Label("允許通知", systemImage: "bell.badge")
                 }
 
                 Button {
@@ -75,7 +75,7 @@ struct WorkoutReminderView: View {
                         await reminderStore.sendTestReminder()
                     }
                 } label: {
-                    Label("Send test in 5 seconds", systemImage: "paperplane.fill")
+                    Label("5 秒後測試通知", systemImage: "paperplane.fill")
                 }
             }
 
@@ -87,7 +87,7 @@ struct WorkoutReminderView: View {
                 }
             }
         }
-        .navigationTitle("Workout Reminder")
+        .navigationTitle("Study Reminder")
         .task {
             await reminderStore.refreshAuthorizationStatus()
             await reminderStore.refreshPendingReminder()

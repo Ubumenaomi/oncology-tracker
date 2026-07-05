@@ -15,7 +15,7 @@ struct ContentView: View {
             NavigationStack {
                 WorkoutReminderView()
             }
-            .tabItem { Label("Workout", systemImage: "figure.strengthtraining.traditional") }
+            .tabItem { Label("Study", systemImage: "book.closed.fill") }
             .tag(AppTab.workout)
 
             NavigationStack {
