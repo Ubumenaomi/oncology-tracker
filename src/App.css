@@ -1177,6 +1177,13 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.5; }
   gap: 8px;
   min-width: 140px;
 }
+.optional-card-hint {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: right;
+  width: 100%;
+}
 .review-queue-card {
   border: 1px solid var(--line);
   border-radius: 18px;
