@@ -1778,6 +1778,84 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.5; }
   margin: 0 0 24px;
 }
 
+.plan-recovery-card {
+  border: 1px solid rgba(20, 184, 166, 0.28);
+  border-radius: 18px;
+  background: linear-gradient(180deg, #f8fffd 0%, #eefaf7 100%);
+  padding: 16px;
+  margin: 0 0 24px;
+}
+
+.plan-recovery-card.behind {
+  border-color: rgba(245, 158, 11, 0.34);
+  background: linear-gradient(180deg, #fffdf5 0%, #fff7e6 100%);
+}
+
+.plan-recovery-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.plan-recovery-head h3 {
+  margin: 2px 0 6px;
+}
+
+.plan-recovery-head p,
+.recovery-actions p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.recovery-score {
+  min-width: 132px;
+  text-align: right;
+}
+
+.recovery-score strong {
+  display: block;
+  font-size: 30px;
+  line-height: 1;
+}
+
+.recovery-score span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.recovery-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.recovery-actions > div {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 12px;
+}
+
+.recovery-actions span,
+.eyebrow {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.recovery-actions strong {
+  display: block;
+  margin: 4px 0 6px;
+}
+
 .plan-progress-panel .progress-bar + .plan-cancer-head {
   margin-top: 16px;
 }
@@ -2799,6 +2877,19 @@ button:disabled {
   }
 
   .plan-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-recovery-head {
+    flex-direction: column;
+  }
+
+  .recovery-score {
+    min-width: 0;
+    text-align: left;
+  }
+
+  .recovery-actions {
     grid-template-columns: 1fr;
   }
 

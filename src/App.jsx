@@ -2480,6 +2480,63 @@ function getTodayPlanTask(state) {
   return studyPlan100.find((task) => !getPlanProgressValue(state.planProgress, task)) || studyPlan100[studyPlan100.length - 1];
 }
 
+function getPlanActivityStartDate(state, date = TODAY) {
+  const resetDate = String(state?.cloudMeta?.planResetAt || '').slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(resetDate)) return resetDate;
+
+  const questDates = Object.keys(state?.dailyQuestProgress || {}).filter((key) => /^\d{4}-\d{2}-\d{2}$/.test(key));
+  const sessionDates = Object.values(state?.sessions || {})
+    .map((session) => session?.date)
+    .filter((key) => /^\d{4}-\d{2}-\d{2}$/.test(key));
+  const dates = [...questDates, ...sessionDates].sort();
+  return dates[0] || date;
+}
+
+function getPlanRecoveryStatus(state, planProgress = {}, date = TODAY) {
+  const total = studyPlan100.length;
+  const completed = studyPlan100.filter((task) => getPlanProgressValue(planProgress, task)).length;
+  const uncompleted = studyPlan100.filter((task) => !getPlanProgressValue(planProgress, task));
+  const startDate = getPlanActivityStartDate(state, date);
+  const elapsedDays = Math.max(1, daysBetween(startDate, date) + 1);
+  const expectedCompleted = Math.min(total, elapsedDays);
+  const behindDays = Math.max(0, expectedCompleted - completed);
+  const nextTask = uncompleted[0] || studyPlan100[studyPlan100.length - 1];
+  const recoveryWindow = uncompleted.slice(1, Math.max(2, Math.min(uncompleted.length, behindDays + 5)));
+  const catchUpTask = recoveryWindow.find((task) => task.priority === 'High' || task.highYieldWeight >= 4 || task.goldenTrials?.length)
+    || recoveryWindow[0]
+    || nextTask;
+  const deferrableTask = uncompleted.find((task) => task.priority !== 'High' && (task.highYieldWeight || 3) <= 2 && task !== nextTask)
+    || null;
+  const mode = behindDays === 0
+    ? 'On pace'
+    : behindDays <= 3
+      ? 'Mini recovery'
+      : behindDays <= 7
+        ? 'Catch-up block'
+        : 'Plan rebuild';
+  const guidance = behindDays === 0
+    ? '維持今日主線，Review Queue 清到不累就好。'
+    : behindDays <= 3
+      ? '今天只加一個 15-25 分鐘 mini catch-up，不把兩天硬塞回一天。'
+      : behindDays <= 7
+        ? '接下來 3 天每天補一個高權重小任務，低權重背景先延後。'
+        : '建議保留高權重主線，另外安排正式 catch-up day 重新配速。';
+
+  return {
+    startDate,
+    elapsedDays,
+    expectedCompleted,
+    completed,
+    behindDays,
+    mode,
+    guidance,
+    nextTask,
+    catchUpTask,
+    deferrableTask,
+    recoveryPercent: expectedCompleted ? Math.min(100, Math.round((completed / expectedCompleted) * 100)) : 100,
+  };
+}
+
 function getDailyQuestBucket(state, date = TODAY) {
   const saved = state.dailyQuestProgress?.[date] || {};
   if (saved.tasks) return saved;
@@ -7653,6 +7710,8 @@ export default function App() {
     };
   }, [planProgress]);
 
+  const planRecovery = useMemo(() => getPlanRecoveryStatus(state, planProgress), [state, planProgress]);
+
   const statsDashboardState = useMemo(() => ({
     ...defaultState,
     stats: state.stats,
@@ -8393,9 +8452,42 @@ export default function App() {
             <MetricCard label="總完成率" value={`${planSummary.percent}%`} sub={`${planSummary.completed}/${planSummary.total} tasks`} />
             <MetricCard label="Golden trial 完成率" value={`${planSummary.goldenPercent}%`} sub={`${planSummary.goldenCompleted}/${planSummary.goldenTotal} trial tasks`} />
             <MetricCard label="今日建議" value={`Day ${Math.min(planSummary.completed + 1, 100)}`} sub="照順序推進，錯題用 Review Queue 補強" />
+            <MetricCard label="Recovery" value={planRecovery.behindDays ? `落後 ${planRecovery.behindDays} 天` : 'On pace'} sub={planRecovery.mode} />
             <MetricCard label="Game level" value={`Lv ${state.game?.level || 1}`} sub={`${state.game?.xp || 0} XP`} />
             <MetricCard label="Boss defeated" value={(state.game?.defeatedBosses || []).length} sub={`${(state.game?.unlockedBosses || []).length} unlocked`} />
             <MetricCard label="Trial cards" value={trialCardTotal} sub="Trial Boss target 50" />
+          </section>
+
+          <section className={planRecovery.behindDays ? 'plan-recovery-card behind' : 'plan-recovery-card'} aria-label="Plan recovery">
+            <div className="plan-recovery-head">
+              <div>
+                <span className="eyebrow">Plan Recovery</span>
+                <h3>{planRecovery.mode}</h3>
+                <p>{planRecovery.guidance}</p>
+              </div>
+              <div className="recovery-score">
+                <strong>{planRecovery.recoveryPercent}%</strong>
+                <span>{planRecovery.completed}/{planRecovery.expectedCompleted} expected</span>
+              </div>
+            </div>
+            <div className="progress-bar"><span style={{ width: `${planRecovery.recoveryPercent}%` }} /></div>
+            <div className="recovery-actions">
+              <div>
+                <span>今日主線</span>
+                <strong>{planRecovery.nextTask?.day} · {planRecovery.nextTask?.topic}</strong>
+                <p>{planRecovery.nextTask?.details}</p>
+              </div>
+              <div>
+                <span>Mini catch-up</span>
+                <strong>{planRecovery.catchUpTask?.day} · {planRecovery.catchUpTask?.topic}</strong>
+                <p>{planRecovery.behindDays ? '只補 golden trial / focus tag / 錯題連結，不要求完整重讀。' : '沒有落後時，這格當作預備加速題。'}</p>
+              </div>
+              <div>
+                <span>可延後</span>
+                <strong>{planRecovery.deferrableTask ? `${planRecovery.deferrableTask.day} · ${planRecovery.deferrableTask.topic}` : '暫無低權重項目'}</strong>
+                <p>{planRecovery.deferrableTask ? '若今天能量不足，這類低權重背景先不要搶主線時間。' : '目前前方多為核心任務，先照順序穩穩推。'}</p>
+              </div>
+            </div>
           </section>
 
           <section className="plan-progress-panel" aria-label="100-Day Plan completion progress">
