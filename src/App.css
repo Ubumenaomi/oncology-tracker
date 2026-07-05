@@ -1446,16 +1446,6 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.5; }
     justify-content: center;
   }
   .primary, .secondary, .good, .bad, .danger, .file-button, .sound-test-button { width: 100%; }
-  .workout-reminder-card {
-    align-items: stretch;
-    flex-direction: column;
-  }
-  .workout-reminder-actions {
-    justify-content: stretch;
-  }
-  .workout-reminder-actions button {
-    flex: 1 1 130px;
-  }
   .settings-inline-fields {
     grid-template-columns: 1fr;
   }
@@ -3385,83 +3375,6 @@ button:disabled {
 .focus-timer-actions {
   display: flex;
   gap: 10px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.workout-reminder-card {
-  border: 1px solid #fed7aa;
-  border-radius: 18px;
-  padding: 14px 16px;
-  margin-bottom: 14px;
-  background: #fff7ed;
-  display: flex;
-  justify-content: space-between;
-  gap: 14px;
-  align-items: center;
-  min-width: 0;
-}
-
-.workout-reminder-card.due {
-  border-color: rgba(234, 88, 12, 0.42);
-  background: #ffedd5;
-}
-
-.workout-reminder-card.done {
-  border-color: rgba(21, 128, 61, 0.32);
-  background: #f0fdf4;
-}
-
-.workout-reminder-main {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  min-width: 0;
-}
-
-.workout-reminder-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  background: #ffffff;
-  color: #ea580c;
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-}
-
-.workout-reminder-card.done .workout-reminder-icon {
-  color: var(--good);
-}
-
-.workout-reminder-main > div:last-child {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.workout-reminder-main span,
-.workout-reminder-main em {
-  color: var(--muted);
-  font-size: 12px;
-  font-style: normal;
-  font-weight: 800;
-}
-
-.workout-reminder-main strong {
-  color: #7c2d12;
-  font-size: 18px;
-  line-height: 1.2;
-  overflow-wrap: anywhere;
-}
-
-.workout-reminder-card.done .workout-reminder-main strong {
-  color: #14532d;
-}
-
-.workout-reminder-actions {
-  display: flex;
-  gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
 }

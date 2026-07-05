@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { AlertTriangle, BarChart3, Bell, ChevronDown, ClipboardList, Home, Newspaper, Settings2 } from 'lucide-react';
+import { AlertTriangle, BarChart3, ChevronDown, ClipboardList, Home, Newspaper, Settings2 } from 'lucide-react';
 import './App.css';
 import { QUESTION_BANK_TOTAL, QUESTION_YEARS, cancerCategories } from './data/questionBankMeta.js';
 import { buildFlashcardTags } from './data/taxonomy.js';
@@ -566,15 +566,6 @@ const DEFAULT_WORKOUT_REMINDER = {
   completedDates: {},
   lastNotifiedDate: '',
 };
-
-function isNativeIosShell() {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('nativeApp') === 'ios' || navigator.userAgent.includes('OncologyNativeIOS');
-  } catch {
-    return false;
-  }
-}
 
 const EXAM_DATE = {
   year: 2026,
@@ -1972,50 +1963,6 @@ function normalizeState(state) {
     game: { ...game, xp, level: xpLevel(xp), streak: player.streak, badges: player.badges },
     player,
   };
-}
-
-function getWorkoutReminder(settings = {}) {
-  return {
-    ...DEFAULT_WORKOUT_REMINDER,
-    ...(settings.workoutReminder || {}),
-    completedDates: settings.workoutReminder?.completedDates || {},
-  };
-}
-
-function timeToMinutes(time = DEFAULT_WORKOUT_REMINDER.time) {
-  const [hours = 0, minutes = 0] = String(time).split(':').map((value) => Number(value));
-  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return timeToMinutes(DEFAULT_WORKOUT_REMINDER.time);
-  return Math.max(0, Math.min(1439, hours * 60 + minutes));
-}
-
-function getWorkoutStatus(settings = {}, date = TODAY, now = new Date()) {
-  const reminder = getWorkoutReminder(settings);
-  const completedToday = Boolean(reminder.completedDates?.[date]);
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-  const due = reminder.enabled && !completedToday && currentMinutes >= timeToMinutes(reminder.time);
-  const lastCompletedDate = Object.keys(reminder.completedDates || {})
-    .filter((completedDate) => reminder.completedDates[completedDate])
-    .sort()
-    .pop() || '';
-
-  return {
-    reminder,
-    completedToday,
-    due,
-    notifiedToday: reminder.lastNotifiedDate === date,
-    lastCompletedDate,
-    streak: getWorkoutStreak(reminder.completedDates, date),
-  };
-}
-
-function getWorkoutStreak(completedDates = {}, date = TODAY) {
-  let streak = 0;
-  const cursor = new Date(`${date}T00:00:00`);
-  while (completedDates[formatLocalDate(cursor)]) {
-    streak += 1;
-    cursor.setDate(cursor.getDate() - 1);
-  }
-  return streak;
 }
 
 function daysBetween(fromDate, toDate) {
@@ -6167,60 +6114,6 @@ function QuestPanel({
   );
 }
 
-function WorkoutReminderCard({
-  status,
-  permission,
-  onEnable,
-  onDisable,
-  onMarkDone,
-  onTest,
-  onOpenSettings,
-}) {
-  const permissionText = permission === 'granted'
-    ? 'desktop alarm ready'
-    : permission === 'denied'
-      ? 'browser notifications blocked'
-      : permission === 'unsupported'
-        ? 'browser notification unsupported'
-        : 'needs permission';
-  const cardClass = [
-    'workout-reminder-card',
-    status.completedToday ? 'done' : '',
-    status.due ? 'due' : '',
-  ].filter(Boolean).join(' ');
-
-  return (
-    <section className={cardClass} aria-label="Study reminder">
-      <div className="workout-reminder-main">
-        <div className="workout-reminder-icon" aria-hidden="true">
-          <ClipboardList size={22} strokeWidth={2.6} />
-        </div>
-        <div>
-          <span>{status.reminder.enabled ? `每天 ${status.reminder.time}` : 'Study Nudge'}</span>
-          <strong>{status.completedToday ? '今天已完成讀書任務' : status.due ? '該寫題目了' : `${status.reminder.minutes} 分鐘讀書任務`}</strong>
-          <em>連續 {status.streak} 天 · {permissionText}</em>
-        </div>
-      </div>
-      <div className="workout-reminder-actions">
-        {status.reminder.enabled ? (
-          <button className="secondary icon-button-text" type="button" onClick={onDisable}>
-            <Bell size={16} strokeWidth={2.4} />
-            <span>關閉</span>
-          </button>
-        ) : (
-          <button className="primary icon-button-text" type="button" onClick={onEnable} disabled={permission === 'unsupported' || permission === 'denied'}>
-            <Bell size={16} strokeWidth={2.4} />
-            <span>啟用</span>
-          </button>
-        )}
-        <button className="secondary" type="button" onClick={onOpenSettings}>設定</button>
-        <button className="secondary" type="button" onClick={onTest} disabled={permission === 'unsupported' || permission === 'denied'}>測試</button>
-        <button className="good" type="button" onClick={onMarkDone} disabled={status.completedToday}>完成讀書</button>
-      </div>
-    </section>
-  );
-}
-
 function FlashcardsPanel({
   state,
   allFlashcards,
@@ -6910,7 +6803,6 @@ function MockExamPanel({ state, onFinishMock, onEnsureQuestionYears }) {
 }
 
 export default function App() {
-  const nativeIosShell = useMemo(() => isNativeIosShell(), []);
   const [state, setState] = useState(loadState);
   const [questionBankVersion, setQuestionBankVersion] = useState(0);
   const [questionBankLoading, setQuestionBankLoading] = useState(false);
@@ -6933,9 +6825,6 @@ export default function App() {
   const [practicePage, setPracticePage] = useState(0);
   const [practicePageMessage, setPracticePageMessage] = useState('');
   const [focusTick, setFocusTick] = useState(() => Date.now());
-  const [notificationPermission, setNotificationPermission] = useState(() => (
-    typeof Notification === 'undefined' ? 'unsupported' : Notification.permission
-  ));
   const focusTimer = normalizeFocusTimer(state.focusTimer);
   const activeFocusSession = focusTimer.activeSession;
   const focusStartedAt = activeFocusSession?.startedAt || null;
@@ -7064,14 +6953,6 @@ export default function App() {
     const timer = window.setInterval(() => setFocusTick(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, [focusStartedAt]);
-
-  useEffect(() => {
-    if (typeof Notification === 'undefined') {
-      setNotificationPermission('unsupported');
-      return;
-    }
-    setNotificationPermission(Notification.permission);
-  }, []);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -7210,46 +7091,6 @@ export default function App() {
     queueStorageSlices(sliceNames);
     setState((prev) => normalizeState(typeof updater === 'function' ? updater(prev) : updater));
   };
-
-  useEffect(() => {
-    if (nativeIosShell) return undefined;
-
-    const checkWorkoutReminder = () => {
-      if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-      const status = getWorkoutStatus(latestStateRef.current.settings, TODAY, new Date());
-      if (!status.due || status.notifiedToday) return;
-
-      const notification = new Notification('今日讀書任務在等你', {
-        body: `寫題目 ${status.reminder.minutes} 分鐘，保持連勝。`,
-        icon: '/app-icon-192.png',
-        tag: 'oncology-tracker-workout',
-        renotify: true,
-      });
-      notification.onclick = () => {
-        window.focus();
-        setTab('quest');
-        notification.close();
-      };
-      playTaskCompletionFeedback();
-      if (dirtyStorageSlicesRef.current !== null) {
-        dirtyStorageSlicesRef.current.add('app');
-      }
-      setState((prev) => normalizeState({
-        ...prev,
-        settings: {
-          ...prev.settings,
-          workoutReminder: {
-            ...getWorkoutReminder(prev.settings),
-            lastNotifiedDate: TODAY,
-          },
-        },
-      }));
-    };
-
-    checkWorkoutReminder();
-    const timer = window.setInterval(checkWorkoutReminder, 30000);
-    return () => window.clearInterval(timer);
-  }, [nativeIosShell]);
 
   const startFocusSession = () => {
     const now = new Date().toISOString();
@@ -7657,7 +7498,6 @@ export default function App() {
     () => buildFocusLeaderboard(leaderboardFocusMinutes, leaderboardElapsedSeconds),
     [leaderboardFocusMinutes, leaderboardElapsedSeconds]
   );
-  const workoutStatus = getWorkoutStatus(state.settings, TODAY, new Date(focusTick));
   const currentPracticePage = Math.min(practicePage, Math.max(0, Math.ceil(todayQuestions.length / PRACTICE_PAGE_SIZE) - 1));
   const visibleTodayQuestions = todayQuestions.slice(currentPracticePage * PRACTICE_PAGE_SIZE, (currentPracticePage + 1) * PRACTICE_PAGE_SIZE);
   const totalPracticePages = Math.ceil(todayPracticeConfig.total / PRACTICE_PAGE_SIZE);
@@ -8393,72 +8233,6 @@ export default function App() {
     updateState((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } }), ['app']);
   };
 
-  const updateWorkoutReminder = (patch) => {
-    updateState((prev) => ({
-      ...prev,
-      settings: {
-        ...prev.settings,
-        workoutReminder: {
-          ...getWorkoutReminder(prev.settings),
-          ...patch,
-        },
-      },
-    }), ['app']);
-  };
-
-  const requestWorkoutPermission = async () => {
-    if (typeof Notification === 'undefined') {
-      setNotificationPermission('unsupported');
-      return 'unsupported';
-    }
-    const permission = await Notification.requestPermission();
-    setNotificationPermission(permission);
-    return permission;
-  };
-
-  const enableWorkoutReminder = async () => {
-    const permission = notificationPermission === 'granted'
-      ? 'granted'
-      : await requestWorkoutPermission();
-    if (permission === 'granted') {
-      updateWorkoutReminder({ enabled: true });
-    }
-  };
-
-  const sendWorkoutTestNotification = async () => {
-    const permission = notificationPermission === 'granted'
-      ? 'granted'
-      : await requestWorkoutPermission();
-    if (permission !== 'granted') return;
-    const reminder = getWorkoutReminder(state.settings);
-    new Notification('讀書提醒測試', {
-      body: `寫題目 ${reminder.minutes} 分鐘，保持連勝。`,
-      icon: '/app-icon-192.png',
-      tag: 'oncology-tracker-workout-test',
-    });
-    playTaskCompletionFeedback();
-  };
-
-  const markWorkoutDone = () => {
-    playTaskCompletionFeedback();
-    updateState((prev) => {
-      const reminder = getWorkoutReminder(prev.settings);
-      return {
-        ...prev,
-        settings: {
-          ...prev.settings,
-          workoutReminder: {
-            ...reminder,
-            completedDates: {
-              ...(reminder.completedDates || {}),
-              [TODAY]: { completedAt: new Date().toISOString(), minutes: reminder.minutes },
-            },
-          },
-        },
-      };
-    }, ['app']);
-  };
-
   const setPracticeMode = (practiceMode) => {
     const modeConfig = getPracticeModeConfig(practiceMode);
     updateState((prev) => {
@@ -8592,17 +8366,6 @@ export default function App() {
             )}
           </div>
         </section>
-        {!nativeIosShell && (
-          <WorkoutReminderCard
-            status={workoutStatus}
-            permission={notificationPermission}
-            onEnable={enableWorkoutReminder}
-            onDisable={() => updateWorkoutReminder({ enabled: false })}
-            onMarkDone={markWorkoutDone}
-            onTest={sendWorkoutTestNotification}
-            onOpenSettings={() => setTab('settings')}
-          />
-        )}
         <FocusMarquee />
         <StudyLeaderboard rows={focusLeaderboardRows} />
         <div className="mission-actions">
@@ -9169,54 +8932,6 @@ export default function App() {
               <PracticeModeSelector value={selectedPracticeMode} onChange={setPracticeMode} />
               <span className="muted">目前模式會產生 {selectedPracticeConfig.total} 題，完成後獎勵 {selectedPracticeConfig.xp} XP。</span>
             </section>
-            {!nativeIosShell && (
-              <section className="settings-card">
-                <div className="settings-card-title">Study Nudge</div>
-                <label className="settings-toggle">
-                  <input
-                    type="checkbox"
-                    checked={workoutStatus.reminder.enabled}
-                    disabled={notificationPermission === 'unsupported' || notificationPermission === 'denied'}
-                    onChange={(event) => {
-                      if (event.target.checked) {
-                        enableWorkoutReminder();
-                        return;
-                      }
-                      updateWorkoutReminder({ enabled: false });
-                    }}
-                  />
-                  <span>像 Duolingo 一樣每天提醒我念書、寫題目</span>
-                </label>
-                <div className="settings-inline-fields">
-                  <label>
-                    <span>提醒時間</span>
-                    <input
-                      type="time"
-                      value={workoutStatus.reminder.time}
-                      onChange={(event) => updateWorkoutReminder({ time: event.target.value, lastNotifiedDate: '' })}
-                    />
-                  </label>
-                  <label>
-                    <span>讀書/寫題分鐘</span>
-                    <input
-                      type="number"
-                      min="1"
-                      max="180"
-                      value={workoutStatus.reminder.minutes}
-                      onChange={(event) => updateWorkoutReminder({ minutes: Math.max(1, Number(event.target.value) || DEFAULT_WORKOUT_REMINDER.minutes) })}
-                    />
-                  </label>
-                </div>
-                <span className="muted">桌面通知需要網站保持開啟；iPhone 系統鬧鐘要另外做 iOS app 或 Shortcuts。</span>
-                <div className="settings-actions">
-                  <button className="secondary icon-button-text" type="button" onClick={requestWorkoutPermission} disabled={notificationPermission === 'granted' || notificationPermission === 'unsupported'}>
-                    <Bell size={16} strokeWidth={2.4} />
-                    <span>{notificationPermission === 'granted' ? '已允許通知' : '允許桌面通知'}</span>
-                  </button>
-                  <button className="secondary" type="button" onClick={sendWorkoutTestNotification} disabled={notificationPermission === 'unsupported' || notificationPermission === 'denied'}>測試提醒</button>
-                </div>
-              </section>
-            )}
             <section className="settings-card">
               <div className="settings-card-title">年份篩選</div>
               <div className="check-row">
