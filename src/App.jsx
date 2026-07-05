@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { AlertTriangle, BarChart3, Bell, ChevronDown, ClipboardList, Dumbbell, Home, Newspaper, Settings2 } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bell, ChevronDown, ClipboardList, Home, Newspaper, Settings2 } from 'lucide-react';
 import './App.css';
 import { QUESTION_BANK_TOTAL, QUESTION_YEARS, cancerCategories } from './data/questionBankMeta.js';
 import { buildFlashcardTags } from './data/taxonomy.js';
@@ -6190,14 +6190,14 @@ function WorkoutReminderCard({
   ].filter(Boolean).join(' ');
 
   return (
-    <section className={cardClass} aria-label="Workout reminder">
+    <section className={cardClass} aria-label="Study reminder">
       <div className="workout-reminder-main">
         <div className="workout-reminder-icon" aria-hidden="true">
-          <Dumbbell size={22} strokeWidth={2.6} />
+          <ClipboardList size={22} strokeWidth={2.6} />
         </div>
         <div>
-          <span>{status.reminder.enabled ? `每天 ${status.reminder.time}` : 'Workout Nudge'}</span>
-          <strong>{status.completedToday ? '今天已動起來' : status.due ? '該起身運動了' : `${status.reminder.minutes} 分鐘運動任務`}</strong>
+          <span>{status.reminder.enabled ? `每天 ${status.reminder.time}` : 'Study Nudge'}</span>
+          <strong>{status.completedToday ? '今天已完成讀書任務' : status.due ? '該寫題目了' : `${status.reminder.minutes} 分鐘讀書任務`}</strong>
           <em>連續 {status.streak} 天 · {permissionText}</em>
         </div>
       </div>
@@ -6215,7 +6215,7 @@ function WorkoutReminderCard({
         )}
         <button className="secondary" type="button" onClick={onOpenSettings}>設定</button>
         <button className="secondary" type="button" onClick={onTest} disabled={permission === 'unsupported' || permission === 'denied'}>測試</button>
-        <button className="good" type="button" onClick={onMarkDone} disabled={status.completedToday}>完成運動</button>
+        <button className="good" type="button" onClick={onMarkDone} disabled={status.completedToday}>完成讀書</button>
       </div>
     </section>
   );
@@ -7219,8 +7219,8 @@ export default function App() {
       const status = getWorkoutStatus(latestStateRef.current.settings, TODAY, new Date());
       if (!status.due || status.notifiedToday) return;
 
-      const notification = new Notification('Workout quest is waiting', {
-        body: `${status.reminder.minutes} min movement break. Keep the streak alive.`,
+      const notification = new Notification('今日讀書任務在等你', {
+        body: `寫題目 ${status.reminder.minutes} 分鐘，保持連勝。`,
         icon: '/app-icon-192.png',
         tag: 'oncology-tracker-workout',
         renotify: true,
@@ -8431,8 +8431,8 @@ export default function App() {
       : await requestWorkoutPermission();
     if (permission !== 'granted') return;
     const reminder = getWorkoutReminder(state.settings);
-    new Notification('Workout quest test', {
-      body: `${reminder.minutes} min movement break reminder is ready.`,
+    new Notification('讀書提醒測試', {
+      body: `寫題目 ${reminder.minutes} 分鐘，保持連勝。`,
       icon: '/app-icon-192.png',
       tag: 'oncology-tracker-workout-test',
     });
@@ -9171,7 +9171,7 @@ export default function App() {
             </section>
             {!nativeIosShell && (
               <section className="settings-card">
-                <div className="settings-card-title">Workout Nudge</div>
+                <div className="settings-card-title">Study Nudge</div>
                 <label className="settings-toggle">
                   <input
                     type="checkbox"
@@ -9185,7 +9185,7 @@ export default function App() {
                       updateWorkoutReminder({ enabled: false });
                     }}
                   />
-                  <span>像 Duolingo 一樣每天提醒我運動</span>
+                  <span>像 Duolingo 一樣每天提醒我念書、寫題目</span>
                 </label>
                 <div className="settings-inline-fields">
                   <label>
@@ -9197,7 +9197,7 @@ export default function App() {
                     />
                   </label>
                   <label>
-                    <span>運動分鐘</span>
+                    <span>讀書/寫題分鐘</span>
                     <input
                       type="number"
                       min="1"

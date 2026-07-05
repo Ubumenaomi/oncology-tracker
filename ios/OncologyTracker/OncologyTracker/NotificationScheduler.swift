@@ -41,14 +41,14 @@ final class NotificationScheduler {
         }
     }
 
-    func scheduleDailyReminder(hour: Int, minute: Int, workoutMinutes: Int) async throws {
+    func scheduleDailyReminder(hour: Int, minute: Int, studyMinutes: Int) async throws {
         center.removePendingNotificationRequests(withIdentifiers: [dailyReminderIdentifier])
 
         let content = UNMutableNotificationContent()
-        content.title = "運動提醒時間到了"
-        content.body = "起身運動 \(workoutMinutes) 分鐘，保持連續紀錄。"
+        content.title = "今日讀書任務在等你"
+        content.body = "寫題目 \(studyMinutes) 分鐘，保持連勝。"
         content.sound = .default
-        content.categoryIdentifier = "workout"
+        content.categoryIdentifier = "study"
 
         var dateComponents = DateComponents()
         dateComponents.hour = hour
@@ -59,12 +59,12 @@ final class NotificationScheduler {
         try await center.add(request)
     }
 
-    func sendTestReminder(workoutMinutes: Int) async throws {
+    func sendTestReminder(studyMinutes: Int) async throws {
         center.removePendingNotificationRequests(withIdentifiers: [testReminderIdentifier])
 
         let content = UNMutableNotificationContent()
-        content.title = "運動提醒時間到了"
-        content.body = "起身運動 \(workoutMinutes) 分鐘，保持連續紀錄。"
+        content.title = "今日讀書任務在等你"
+        content.body = "寫題目 \(studyMinutes) 分鐘，保持連勝。"
         content.sound = .default
 
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)

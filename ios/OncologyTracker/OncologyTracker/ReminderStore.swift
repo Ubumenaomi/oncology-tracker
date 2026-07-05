@@ -107,7 +107,7 @@ final class ReminderStore: ObservableObject {
         }
 
         do {
-            try await NotificationScheduler.shared.sendTestReminder(workoutMinutes: workoutMinutes)
+            try await NotificationScheduler.shared.sendTestReminder(studyMinutes: workoutMinutes)
             statusMessage = "測試提醒已排程，5 秒後會送出。"
         } catch {
             statusMessage = "無法排程測試提醒：\(error.localizedDescription)"
@@ -128,7 +128,7 @@ final class ReminderStore: ObservableObject {
         guard isEnabled else {
             NotificationScheduler.shared.cancelDailyReminder()
             pendingReminder = nil
-            statusMessage = "運動提醒已關閉。"
+            statusMessage = "讀書提醒已關閉。"
             return
         }
 
@@ -159,10 +159,10 @@ final class ReminderStore: ObservableObject {
             try await NotificationScheduler.shared.scheduleDailyReminder(
                 hour: hour,
                 minute: minute,
-                workoutMinutes: workoutMinutes
+                studyMinutes: workoutMinutes
             )
             await refreshPendingReminder()
-            statusMessage = "每日運動提醒已設定在 \(reminderTimeText)。"
+            statusMessage = "每日讀書提醒已設定在 \(reminderTimeText)。"
         } catch {
             statusMessage = "無法排程提醒：\(error.localizedDescription)"
         }

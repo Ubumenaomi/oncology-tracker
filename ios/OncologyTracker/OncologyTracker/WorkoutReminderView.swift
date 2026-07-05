@@ -8,10 +8,10 @@ struct WorkoutReminderView: View {
         Form {
             Section {
                 VStack(alignment: .leading, spacing: 8) {
-                    Label("運動任務", systemImage: "flame.fill")
+                    Label("讀書任務", systemImage: "flame.fill")
                         .font(.headline)
                         .foregroundStyle(.orange)
-                    Text(reminderStore.isEnabled ? "每日運動提醒已設定在 \(reminderStore.reminderTimeText)。" : "開啟 iPhone 原生通知，每天提醒自己起身運動。")
+                    Text(reminderStore.isEnabled ? "每日讀書提醒已設定在 \(reminderStore.reminderTimeText)。" : "開啟 iPhone 原生通知，每天提醒自己念書、寫題目，保持連勝。")
                         .foregroundStyle(.secondary)
                 }
                 .padding(.vertical, 4)
@@ -46,7 +46,7 @@ struct WorkoutReminderView: View {
                     get: { reminderStore.workoutMinutes },
                     set: { reminderStore.setWorkoutMinutes($0) }
                 ), in: 1...180) {
-                    Text("運動時間：\(reminderStore.workoutMinutes) 分鐘")
+                    Text("讀書/寫題時間：\(reminderStore.workoutMinutes) 分鐘")
                 }
             }
 
@@ -87,7 +87,7 @@ struct WorkoutReminderView: View {
                 }
             }
         }
-        .navigationTitle("Workout Reminder")
+        .navigationTitle("Study Reminder")
         .task {
             await reminderStore.refreshAuthorizationStatus()
             await reminderStore.refreshPendingReminder()
