@@ -10,6 +10,15 @@ import {
   rankNotionNewsItems,
 } from './data/notionNewsMatching.js';
 import {
+  HIGH_YIELD_TOPICS,
+  dailyCompletionCriteria,
+  getStudyPlanTaskById,
+  getStudyPlanTaskKey,
+  isPlanTaskComplete,
+  normalizePlanProgress,
+  studyPlan100,
+} from './data/studyPlan100.js';
+import {
   auth,
   db,
   firebaseConfigStatus,
@@ -425,126 +434,6 @@ function getPracticeModeConfig(mode) {
   return PRACTICE_MODES[mode] || PRACTICE_MODES.standard;
 }
 
-const HIGH_YIELD_TOPICS = [
-  {
-    id: 'lung-perioperative-io',
-    label: 'Lung perioperative IO',
-    cancer: 'Lung',
-    type: '每年高頻＋近年更新',
-    examFrequency: 5,
-    recentUpdate: 5,
-    aliases: ['perioperative', 'neoadjuvant', 'adjuvant', 'pembrolizumab', 'nivolumab', 'atezolizumab', 'checkmate 816', 'keynote-671', 'impower010'],
-  },
-  {
-    id: 'breast-adc',
-    label: 'Breast ADC',
-    cancer: 'Breast',
-    type: '每年高頻＋近年更新',
-    examFrequency: 5,
-    recentUpdate: 5,
-    aliases: ['adc', 't-dxd', 'trastuzumab deruxtecan', 'sacituzumab', 'her2-low', 'destiny-breast', 'trop2'],
-  },
-  {
-    id: 'gu-ev-pembro',
-    label: 'GU EV/pembro',
-    cancer: 'GU',
-    type: '每年高頻＋近年更新',
-    examFrequency: 5,
-    recentUpdate: 5,
-    aliases: ['enfortumab', 'ev', 'pembrolizumab', 'urothelial', 'ev-302', 'javelin', 'fgfr'],
-  },
-  {
-    id: 'gyn-io',
-    label: 'GYN IO',
-    cancer: 'GYN',
-    type: '每年高頻＋近年更新',
-    examFrequency: 5,
-    recentUpdate: 5,
-    aliases: ['endometrial', 'cervical', 'dmmr', 'pmmr', 'dostarlimab', 'pembrolizumab', 'keynote-a18', 'keynote-775', 'ruby'],
-  },
-  {
-    id: 'crc-algorithm',
-    label: 'CRC algorithm',
-    cancer: 'GI',
-    type: '常考 algorithm',
-    examFrequency: 4,
-    recentUpdate: 3,
-    aliases: ['crc', 'colon', 'rectal', 'ras', 'braf', 'msi', 'her2', 'anti-egfr', 'folfox', 'folfiri', 'tnt'],
-  },
-  {
-    id: 'hcc-algorithm',
-    label: 'HCC algorithm',
-    cancer: 'GI',
-    type: '常考 algorithm',
-    examFrequency: 4,
-    recentUpdate: 4,
-    aliases: ['hcc', 'atezo', 'bevacizumab', 'stride', 'himalaya', 'imbrave', 'durvalumab', 'tremelimumab'],
-  },
-  {
-    id: 'mcrpc-algorithm',
-    label: 'mCRPC',
-    cancer: 'GU',
-    type: '常考 algorithm',
-    examFrequency: 4,
-    recentUpdate: 4,
-    aliases: ['mcrpc', 'prostate', 'parpi', 'lu-177', 'psma', 'cabazitaxel', 'abiraterone', 'enzalutamide'],
-  },
-  {
-    id: 'rcc-algorithm',
-    label: 'RCC algorithm',
-    cancer: 'GU',
-    type: '常考 algorithm',
-    examFrequency: 4,
-    recentUpdate: 4,
-    aliases: ['rcc', 'renal', 'keynote-564', 'io/tki', 'checkmate-9er', 'clear', 'cabozantinib', 'lenvatinib'],
-  },
-  {
-    id: 'ici-toxicity',
-    label: 'ICI toxicity',
-    cancer: 'Supportive/Stats',
-    type: '支持性治療 / toxicity',
-    examFrequency: 3,
-    recentUpdate: 3,
-    aliases: ['ici', 'irae', 'pneumonitis', 'colitis', 'hepatitis', 'endocrine', 'myocarditis', 'toxicity'],
-  },
-  {
-    id: 'adc-ild',
-    label: 'ADC ILD',
-    cancer: 'Supportive/Stats',
-    type: '支持性治療 / toxicity',
-    examFrequency: 3,
-    recentUpdate: 5,
-    aliases: ['adc', 'ild', 'pneumonitis', 't-dxd', 'trastuzumab deruxtecan', 'enfortumab', 'sacituzumab'],
-  },
-  {
-    id: 'febrile-neutropenia',
-    label: 'Febrile neutropenia',
-    cancer: 'Supportive/Stats',
-    type: '支持性治療 / toxicity',
-    examFrequency: 3,
-    recentUpdate: 2,
-    aliases: ['febrile neutropenia', 'neutropenic fever', 'anc', 'mascc', 'g-csf', 'infection'],
-  },
-  {
-    id: 'rare-sarcoma-cup-hereditary',
-    label: 'Sarcoma / CUP / MEN / VHL',
-    cancer: 'Other',
-    type: '低頻但會考',
-    examFrequency: 2,
-    recentUpdate: 2,
-    aliases: ['sarcoma', 'cup', 'men', 'vhl', 'gist', 'net', 'thyroid', 'ihc', 'rare'],
-  },
-  {
-    id: 'epidemiology-background',
-    label: 'Epidemiology background',
-    cancer: 'Other',
-    type: '純背景知識',
-    examFrequency: 1,
-    recentUpdate: 1,
-    aliases: ['epidemiology', 'incidence', 'mortality', 'risk factor', 'screening'],
-  },
-];
-
 function formatLocalDate(date) {
   const d = date instanceof Date ? date : new Date(date);
   const y = d.getFullYear();
@@ -693,341 +582,6 @@ const defaultState = {
   },
 };
 
-const planModules = [
-  {
-    module: 'Lung',
-    cancer: 'Lung',
-    days: 13,
-    phase: 'Phase 1: High-frequency cancer progression',
-    bossUnlockContribution: 'Lung Boss',
-    tasks: [
-      ['NSCLC foundation', 'TNM, resectability, molecular testing, PD-L1 TPS, perioperative decision points', ['NCCN Algorithm'], ['algorithm', 'biomarker', 'NSCLC']],
-      ['EGFR early NSCLC', 'Adjuvant osimertinib, EGFR exon 19/L858R, postop chemotherapy role', ['ADAURA'], ['EGFR', 'adjuvant', 'targeted therapy']],
-      ['Unresectable stage III NSCLC', 'Definitive CCRT, durvalumab consolidation, PACIFIC eligibility and endpoints', ['PACIFIC'], ['CCRT', 'durvalumab', 'endpoint']],
-      ['Neoadjuvant chemo-IO', 'Resectable NSCLC, pCR/MPR/EFS definitions and trial traps', ['CheckMate 816'], ['neoadjuvant', 'ICI', 'endpoint']],
-      ['Perioperative pembrolizumab', 'Stage II-IIIB NSCLC, neoadjuvant pembrolizumab-chemo to adjuvant pembrolizumab', ['KEYNOTE-671'], ['perioperative', 'ICI', 'EFS']],
-      ['ALK/ROS1/RET/MET/NTRK', 'Driver-positive metastatic sequencing and resistance pattern recognition', ['CROWN', 'PROFILE', 'LIBRETTO'], ['biomarker', 'targeted therapy', 'sequencing']],
-      ['KRAS/HER2/BRAF/MET exon 14', 'Actionable mutations, drug names, eligibility, toxicity traps', ['CodeBreaK', 'DESTINY-Lung'], ['KRAS', 'HER2', 'biomarker']],
-      ['Metastatic ICI algorithms', 'PD-L1 high, chemo-IO, dual IO, contraindications, progression patterns', ['KEYNOTE-024', 'KEYNOTE-189', 'CheckMate-227'], ['metastatic', 'ICI', 'algorithm']],
-      ['SCLC limited stage', 'Concurrent chemoradiation, BID vs QD RT, PCI, CONVERT and CALGB 30610', ['CONVERT', 'CALGB 30610'], ['SCLC', 'radiation', 'trial']],
-      ['SCLC extensive stage', 'Platinum-etoposide plus ICI, maintenance, lurbinectedin, thoracic RT traps', ['IMpower133', 'CASPIAN'], ['SCLC', 'metastatic', 'ICI']],
-      ['Mesothelioma', 'First-line IO, histology, surgical controversies, TTFields and toxicity', ['CheckMate-743'], ['mesothelioma', 'ICI', 'rare']],
-      ['Lung toxicity drill', 'Pneumonitis, EGFR/ALK adverse effects, ADC ILD, radiation recall', ['Toxicity Review'], ['toxicity', 'ILD', 'TKI']],
-      ['Lung boss prep', '20-question Lung mixed bank: biomarkers, perioperative, SCLC, mesothelioma', ['Lung Boss'], ['boss', 'mixed mock', 'weakness repair']],
-    ],
-  },
-  {
-    module: 'Breast',
-    cancer: 'Breast',
-    days: 13,
-    phase: 'Phase 1: High-frequency cancer progression',
-    bossUnlockContribution: 'Breast Boss',
-    tasks: [
-      ['Early HR+/HER2- framework', 'Risk stratification, endocrine therapy, OFS, chemo decision', ['TAILORx', 'RxPONDER'], ['HR+', 'adjuvant', 'algorithm']],
-      ['Gene expression profile', 'Oncotype DX, MammaPrint, PAM50, EndoPredict, what each test can and cannot do', ['TAILORx', 'MINDACT'], ['biomarker', 'gene expression', 'adjuvant']],
-      ['Adjuvant CDK4/6', 'High-risk criteria, monarchE, NATALEE, duration, toxicity', ['monarchE', 'NATALEE'], ['CDK4/6', 'adjuvant', 'toxicity']],
-      ['HER2+ early disease', 'Neoadjuvant HP-chemo, residual disease, adjuvant T-DM1', ['KATHERINE', 'APHINITY'], ['HER2', 'neoadjuvant', 'ADC']],
-      ['TNBC neoadjuvant IO', 'KEYNOTE-522 population, pCR/EFS, adjuvant pembrolizumab continuation', ['KEYNOTE-522'], ['TNBC', 'ICI', 'neoadjuvant']],
-      ['gBRCA and PARPi', 'OlympiA eligibility, TNBC/luminal high-risk definitions, iDFS/OS', ['OlympiA'], ['PARPi', 'BRCA', 'adjuvant']],
-      ['Metastatic HR+/HER2-', 'Endocrine-CDK4/6 sequencing, ESR1, PIK3CA, AKT pathway choices', ['PALOMA', 'MONALEESA', 'SOLAR-1'], ['metastatic', 'sequencing', 'biomarker']],
-      ['HER2+ metastatic', 'First-line HP-taxane, second-line T-DXd, brain metastasis options', ['CLEOPATRA', 'DESTINY-Breast03', 'HER2CLIMB'], ['HER2', 'metastatic', 'ADC']],
-      ['HER2-low and ADC', 'HER2-low definition, T-DXd eligibility, ILD monitoring', ['DESTINY-Breast04'], ['HER2-low', 'ADC', 'toxicity']],
-      ['TNBC metastatic', 'PD-L1 assays, sacituzumab, PARPi, TROP2 ADC traps', ['ASCENT', 'KEYNOTE-355'], ['TNBC', 'ADC', 'PD-L1']],
-      ['Breast toxicity drill', 'CDK4/6 neutropenia/QTc/diarrhea, PI3K hyperglycemia, ADC ILD', ['Toxicity Review'], ['toxicity', 'ADC', 'CDK4/6']],
-      ['Breast trial endpoint recall', 'Blank recall for population, intervention, endpoint, OS/PFS/iDFS', ['Golden Trial Recall'], ['trial', 'endpoint', 'flashcard']],
-      ['Breast boss prep', 'HER2/TNBC/HR+ mixed mock and correction', ['Breast Boss'], ['boss', 'mixed mock', 'weakness repair']],
-    ],
-  },
-  {
-    module: 'GI',
-    cancer: 'GI',
-    days: 12,
-    phase: 'Phase 1: High-frequency cancer progression',
-    bossUnlockContribution: 'GI Boss',
-    tasks: [
-      ['CRC biomarkers', 'RAS/BRAF/MSI/HER2/NTRK, sidedness, anti-EGFR rules', ['FIRE-3', 'PARADIGM'], ['CRC', 'biomarker', 'metastatic']],
-      ['Metastatic CRC sequencing', 'FOLFOX/FOLFIRI, bevacizumab beyond progression, EGFR rechallenge, TAS-102', ['VELOUR', 'RAISE', 'SUNLIGHT'], ['CRC', 'sequencing', 'metastatic']],
-      ['Rectal TNT', 'PRODIGE-23, RAPIDO, OPRA, watch-and-wait, endpoint traps', ['PRODIGE-23', 'RAPIDO', 'OPRA'], ['rectal', 'neoadjuvant', 'radiation']],
-      ['Adjuvant colon cancer', 'Stage II risk, stage III duration, IDEA, ctDNA caveats', ['IDEA'], ['colon', 'adjuvant', 'algorithm']],
-      ['Gastric/GEJ first-line', 'HER2, PD-L1 CPS, CLDN18.2, chemo-IO, trastuzumab choices', ['CheckMate-649', 'KEYNOTE-859', 'SPOTLIGHT'], ['gastric', 'GEJ', 'biomarker']],
-      ['Esophageal cancer', 'CROSS, CheckMate-577, definitive CCRT, squamous vs adenocarcinoma', ['CROSS', 'CheckMate-577'], ['esophageal', 'CCRT', 'adjuvant']],
-      ['HCC systemic therapy', 'Atezo-bev, STRIDE, second-line sequencing, contraindications', ['IMbrave150', 'HIMALAYA'], ['HCC', 'ICI', 'sequencing']],
-      ['Pancreas cancer', 'Adjuvant modified FOLFIRINOX, metastatic regimens, BRCA/PARPi', ['PRODIGE-24', 'POLO'], ['pancreas', 'PARPi', 'adjuvant']],
-      ['Biliary tract cancer', 'TOPAZ-1, KEYNOTE-966, FGFR2, IDH1, HER2, BRAF', ['TOPAZ-1', 'KEYNOTE-966'], ['biliary', 'biomarker', 'ICI']],
-      ['GIST and NET', 'KIT/PDGFRA, imatinib dose, avapritinib, sunitinib/regorafenib/ripretinib', ['GIST Review'], ['GIST', 'targeted therapy', 'rare']],
-      ['GI toxicity and supportive traps', 'EGFR rash/hypomagnesemia, diarrhea, hepatic dysfunction, nutrition', ['Toxicity Review'], ['toxicity', 'supportive', 'GI']],
-      ['GI boss prep', 'GI mixed mock with CRC, gastric/GEJ, rectal TNT, HCC, biliary', ['GI Boss'], ['boss', 'mixed mock', 'weakness repair']],
-    ],
-  },
-  {
-    module: 'GU', cancer: 'GU', days: 9, phase: 'Phase 1: High-frequency cancer progression', bossUnlockContribution: 'GU Readiness',
-    tasks: [
-      ['RCC adjuvant and metastatic', 'KEYNOTE-564, IO/TKI first-line choices, risk groups, toxicity', ['KEYNOTE-564', 'CheckMate-9ER', 'CLEAR'], ['RCC', 'ICI', 'TKI']],
-      ['Urothelial perioperative', 'Cisplatin eligibility, neoadjuvant chemo, adjuvant nivolumab', ['CheckMate-274'], ['urothelial', 'perioperative', 'cisplatin']],
-      ['Urothelial metastatic', 'EV-pembrolizumab, avelumab maintenance, FGFR, EV toxicity', ['EV-302', 'JAVELIN-Bladder-100', 'THOR'], ['urothelial', 'ADC', 'FGFR']],
-      ['Prostate hormone-sensitive', 'Triplet therapy, ARPI selection, docetaxel, volume/risk traps', ['ARASENS', 'PEACE-1'], ['prostate', 'ARPI', 'metastatic']],
-      ['mCRPC sequencing', 'PARPi combinations, Lu-177 PSMA, radium-223, cabazitaxel', ['VISION', 'PROpel', 'TALAPRO-2'], ['prostate', 'PARPi', 'radioligand']],
-      ['Seminoma and germ cell', 'Stage I/II seminoma, RT fields, BEP/EP, salvage concepts', ['Seminoma Review'], ['seminoma', 'radiation', 'algorithm']],
-      ['GU biomarkers', 'BRCA/HRR, FGFR, MSI, PD-L1 caveats, germline testing', ['Biomarker Review'], ['biomarker', 'BRCA', 'FGFR']],
-      ['GU toxicity drill', 'EV rash/hyperglycemia/neuropathy, TKI HTN, IO nephritis', ['Toxicity Review'], ['toxicity', 'ADC', 'TKI']],
-      ['GU mixed correction', 'Fix GU wrong-rate >=50% and mastery <=2 questions', ['Weakness Review'], ['weakness repair', 'wrong retest', 'GU']],
-    ],
-  },
-  {
-    module: 'GYN', cancer: 'GYN', days: 8, phase: 'Phase 2: Trap-topic progression', bossUnlockContribution: 'GYN Readiness',
-    tasks: [
-      ['Endometrial IO', 'dMMR/pMMR, lenvatinib-pembrolizumab, dostarlimab/carbo-taxol', ['KEYNOTE-775', 'RUBY'], ['endometrial', 'ICI', 'biomarker']],
-      ['Cervical CCRT and IO', 'KEYNOTE-A18, brachytherapy OAR, recurrent/metastatic pembrolizumab', ['KEYNOTE-A18', 'KEYNOTE-826'], ['cervical', 'CCRT', 'ICI']],
-      ['Ovarian first-line maintenance', 'BRCA/HRD, bevacizumab, olaparib/niraparib, PAOLA-1', ['SOLO-1', 'PAOLA-1', 'PRIMA'], ['ovarian', 'PARPi', 'maintenance']],
-      ['Ovarian recurrence', 'Platinum-sensitive vs resistant, mirvetuximab, FRalpha, PARPi retreatment traps', ['MIRASOL'], ['ovarian', 'ADC', 'biomarker']],
-      ['GYN trial interpretation', 'PFS vs OS, maintenance endpoints, subgroup forest plots', ['Trial Interpretation'], ['endpoint', 'statistics', 'GYN']],
-      ['GYN toxicity drill', 'PARPi cytopenia/MDS, IO toxicity, bevacizumab bowel/perforation risk', ['Toxicity Review'], ['toxicity', 'PARPi', 'ICI']],
-      ['GYN rapid algorithm', 'Endometrial/cervical/ovarian treatment sequencing blank recall', ['Algorithm Recall'], ['algorithm', 'flashcard', 'GYN']],
-      ['GYN mixed correction', 'Fix GYN wrong-rate >=50% and high-confidence wrong questions', ['Weakness Review'], ['weakness repair', 'wrong retest', 'GYN']],
-    ],
-  },
-  {
-    module: 'Heme', cancer: 'Heme', days: 10, phase: 'Phase 2: Trap-topic progression', bossUnlockContribution: 'Heme Readiness',
-    tasks: [
-      ['Hodgkin lymphoma', 'ABVD vs A+AVD, PET-adapted therapy, brentuximab toxicity, checkpoint inhibitors', ['ECHELON-1', 'RATHL'], ['HL', 'toxicity', 'trial']],
-      ['DLBCL and CAR-T', 'R-CHOP, pola-R-CHP, second-line CAR-T, bridging, CRS/ICANS', ['POLARIX', 'ZUMA-7', 'TRANSFORM'], ['DLBCL', 'CAR-T', 'toxicity']],
-      ['Indolent lymphoma', 'FL/MCL/CLL treatment triggers, BTK inhibitors, venetoclax, anti-CD20', ['CLL Review'], ['CLL', 'BTK', 'sequencing']],
-      ['Multiple myeloma frontline', 'Transplant eligibility, quadruplets, maintenance, high-risk cytogenetics', ['GRIFFIN', 'PERSEUS'], ['MM', 'transplant', 'maintenance']],
-      ['Multiple myeloma relapse', 'BCMA, bispecifics, CAR-T, sequencing and infection risk', ['CARTITUDE', 'KarMMa'], ['MM', 'BCMA', 'CAR-T']],
-      ['CML and AML', 'TKI milestones, resistance mutations, venetoclax/HMA, FLT3/IDH', ['CML Review', 'AML Review'], ['CML', 'AML', 'targeted therapy']],
-      ['CNS lymphoma and special sites', 'PCNSL induction, consolidation, ocular/CNS relapse patterns', ['PCNSL Review'], ['PCNSL', 'algorithm', 'rare']],
-      ['Heme toxicity drill', 'TLS, cytokine release, neuropathy, cytopenia, infection prophylaxis', ['Toxicity Review'], ['toxicity', 'TLS', 'supportive']],
-      ['Heme trial endpoint recall', 'Blank recall of HL/DLBCL/MM pivotal trials and endpoints', ['Golden Trial Recall'], ['trial', 'endpoint', 'flashcard']],
-      ['Heme mixed correction', 'Fix Heme wrong-rate >=50%, mastery <=2, high-confidence wrong', ['Weakness Review'], ['weakness repair', 'wrong retest', 'Heme']],
-    ],
-  },
-  {
-    module: 'Head & Neck', cancer: 'Head & Neck', days: 5, phase: 'Phase 2: Trap-topic progression', bossUnlockContribution: 'Head & Neck Boss',
-    tasks: [
-      ['HPV oropharynx and staging', 'HPV-positive prognosis, AJCC differences, de-escalation traps', ['HPV HNSCC Review'], ['HPV', 'staging', 'radiation']],
-      ['Definitive and induction CCRT', 'Cisplatin vs cetuximab, TPF induction, larynx preservation trial traps', ['DeCIDE', 'RTOG 1016'], ['CCRT', 'induction', 'trial']],
-      ['Recurrent/metastatic HNSCC', 'KEYNOTE-048, CheckMate-141, platinum timing, CPS interpretation', ['KEYNOTE-048', 'CheckMate-141'], ['metastatic', 'ICI', 'PD-L1']],
-      ['Nasopharyngeal carcinoma', 'Gemcitabine-cisplatin, toripalimab/camrelizumab, EBV DNA, CCRT', ['JUPITER-02'], ['NPC', 'ICI', 'CCRT']],
-      ['Head & Neck boss prep', 'HPV/HNSCC/NPC/CCRT mixed mock and correction', ['Head & Neck Boss'], ['boss', 'mixed mock', 'weakness repair']],
-    ],
-  },
-  {
-    module: 'Rare/Skin/Sarcoma/CUP/Other', cancer: 'Other', days: 7, phase: 'Phase 2: Trap-topic progression', bossUnlockContribution: 'Rare Readiness',
-    tasks: [
-      ['Melanoma adjuvant/metastatic', 'BRAF/MEK, PD-1, CTLA-4, relatlimab, brain metastasis', ['COMBI-AD', 'CheckMate-238'], ['melanoma', 'ICI', 'BRAF']],
-      ['Non-melanoma skin cancers', 'CSCC, BCC, Merkel cell, immunotherapy and hedgehog inhibitors', ['KEYNOTE-629'], ['skin', 'ICI', 'rare']],
-      ['Sarcoma systemic therapy', 'GIST separation, pazopanib, trabectedin, subtype-specific traps', ['PALETTE'], ['sarcoma', 'rare', 'targeted therapy']],
-      ['CUP and IHC', 'Lung vs GI vs breast vs H&N markers, NGS, empiric therapy limits', ['CUP Review'], ['CUP', 'IHC', 'biomarker']],
-      ['Endocrine/neuroendocrine tumors', 'MEN/VHL, thyroid, NET grading, somatostatin/PRRT', ['NETTER-1'], ['NET', 'thyroid', 'rare']],
-      ['Rare tumor biomarkers', 'NTRK/RET/MSI/TMB/BRAF across tumor types', ['Tumor-agnostic Review'], ['biomarker', 'tumor agnostic', 'targeted therapy']],
-      ['Rare/Other mixed correction', 'Fix rare tumor, CUP, skin, sarcoma wrong-rate >=50%', ['Weakness Review'], ['weakness repair', 'wrong retest', 'rare']],
-    ],
-  },
-  {
-    module: 'Supportive/Emergency/Stats', cancer: 'Supportive/Stats', days: 8, phase: 'Phase 2: Trap-topic progression', bossUnlockContribution: 'Supportive Readiness',
-    tasks: [
-      ['CINV and pain', 'Antiemetic risk groups, olanzapine, breakthrough nausea, opioid conversion', ['Supportive Review'], ['CINV', 'pain', 'supportive']],
-      ['Oncologic emergencies', 'TLS, SIADH, MSCC, IICP, hypercalcemia, neutropenic fever', ['Emergency Review'], ['emergency', 'supportive', 'algorithm']],
-      ['ICI toxicity', 'Pneumonitis, colitis, hepatitis, endocrine, myocarditis; hold vs steroid vs rechallenge', ['irAE Review'], ['ICI', 'toxicity', 'supportive']],
-      ['ADC/TKI/PARPi toxicity', 'ILD, neuropathy, ocular toxicity, cytopenia, hypertension, QTc', ['Toxicity Review'], ['ADC', 'TKI', 'PARPi']],
-      ['Biomarker mega-review', 'MSI/dMMR, PD-L1 CPS/TPS, HER2, BRCA/HRD, NTRK/RET, KRAS', ['Biomarker Review'], ['biomarker', 'tumor agnostic', 'rapid recall']],
-      ['Statistics essentials', 'HR/CI/KM, ITT, non-inferiority, crossover, subgroup forest plot', ['Stats Review'], ['statistics', 'endpoint', 'trial interpretation']],
-      ['Endpoint design drill', 'OS/PFS/EFS/DFS/iDFS/pCR/MRD definitions and exam traps', ['Endpoint Review'], ['endpoint', 'trial', 'flashcard']],
-      ['Supportive/Stats mixed correction', 'Fix supportive and statistics wrong-rate >=50% questions', ['Weakness Review'], ['weakness repair', 'wrong retest', 'statistics']],
-    ],
-  },
-];
-
-const mockPlanTasks = [
-  ['Phase 3: First full mock cycle', 'Mock + correction', 'Mock', '112 first full mock', 'Complete 112 full exam under timed conditions; no explanations until finished', ['112 Exam'], ['mock', '112', 'timed'], 'Final Board Boss'],
-  ['Phase 3: First full mock cycle', 'Mock + correction', 'Mock', '112 correction', 'Classify every 112 wrong answer by error type and create cards for trial/biomarker/toxicity misses', ['112 Correction'], ['correction', 'error type', 'flashcard'], 'Final Board Boss'],
-  ['Phase 3: First full mock cycle', 'Mock + correction', 'Mock', '113 first full mock', 'Complete 113 full exam under timed conditions; no explanations until finished', ['113 Exam'], ['mock', '113', 'timed'], 'Final Board Boss'],
-  ['Phase 3: First full mock cycle', 'Mock + correction', 'Mock', '113 correction', 'Classify every 113 wrong answer and add high-confidence wrong to Critical Error Queue', ['113 Correction'], ['correction', 'critical error', 'flashcard'], 'Final Board Boss'],
-  ['Phase 3: First full mock cycle', 'Mock + correction', 'Mock', '114 first full mock', 'Complete 114 full exam under timed conditions; no explanations until finished', ['114 Exam'], ['mock', '114', 'timed'], 'Final Board Boss'],
-  ['Phase 3: First full mock cycle', 'Mock + correction', 'Mock', '114 correction', 'Classify every 114 wrong answer and tag score draggers by cancer/topic', ['114 Correction'], ['correction', 'score dragger', 'flashcard'], 'Final Board Boss'],
-  ['Phase 3: First full mock cycle', 'Mock + correction', 'Mock', 'Mixed correction A', 'Repair top Lung/Breast/GI score draggers from first mock cycle', ['Weakness Review'], ['weakness repair', 'Lung', 'Breast', 'GI'], 'Final Board Boss'],
-  ['Phase 3: First full mock cycle', 'Mock + correction', 'Mock', 'Mixed correction B', 'Repair Heme/GU/GYN/Head & Neck score draggers from first mock cycle', ['Weakness Review'], ['weakness repair', 'Heme', 'GU', 'GYN', 'Head & Neck'], 'Final Board Boss'],
-  ['Phase 3: First full mock cycle', 'Mock + correction', 'Mock', 'Trial card checkpoint', 'Generate or review at least 50 pivotal trial cards; endpoint recall target 85%', ['Trial Boss'], ['trial', 'flashcard', 'endpoint'], 'Trial Boss'],
-  ['Phase 3: First full mock cycle', 'Mock + correction', 'Mock', 'First cycle readiness audit', 'Review predicted score, volatility, red topics, and plan the weakness-only block', ['Readiness Audit'], ['readiness', 'volatility', 'red topic'], 'Final Board Boss'],
-  ['Phase 5: Second full mock cycle', 'Mock + correction', 'Mock', '112 full mock retest', 'Retest 112; require wrong-retest conversion trend toward 90%', ['112 Retest'], ['mock', 'retest', '112'], 'Final Board Boss'],
-  ['Phase 5: Second full mock cycle', 'Mock + correction', 'Mock', '113 full mock retest', 'Retest 113 and compare score volatility with first cycle', ['113 Retest'], ['mock', 'retest', '113'], 'Final Board Boss'],
-  ['Phase 5: Second full mock cycle', 'Mock + correction', 'Mock', '114 full mock retest', 'Retest 114; all high-confidence wrong must become cards or review tasks', ['114 Retest'], ['mock', 'retest', '114'], 'Final Board Boss'],
-  ['Phase 5: Second full mock cycle', 'Mock + correction', 'Mock', 'Wrong-retest 90 checkpoint', 'Only previously wrong questions; target wrong-retest conversion >=90%', ['Wrong Retest'], ['wrong retest', 'critical error', 'mastery'], 'Final Board Boss'],
-  ['Phase 5: Second full mock cycle', 'Mock + correction', 'Mock', 'Mixed retest correction', 'Repair any remaining red topics after 112-114 retest and regenerate cards for persistent misses', ['Mixed Correction'], ['correction', 'red topic', 'flashcard'], 'Final Board Boss'],
-  ['Phase 5: Second full mock cycle', 'Mock + correction', 'Mock', 'Final readiness lock', 'Confirm latest score trend, high-confidence wrong rate, and wrong-retest conversion before final rapid recall', ['Readiness Audit'], ['readiness', 'wrong retest', 'volatility'], 'Final Board Boss'],
-  ['Phase 5: Second full mock cycle', 'Mock + correction', 'Mock', 'Final Board Boss', 'Mixed board boss: latest full mock >=75% and wrong-retest >=90%', ['Final Board Boss'], ['boss', 'mock', 'readiness'], 'Final Board Boss'],
-];
-
-const weaknessPlanTasks = Array.from({ length: 8 }, (_, index) => ({
-  id: 83 + index,
-  day: `Day ${83 + index}`,
-  phase: 'Phase 4: Weakness repair only',
-  module: 'Weakness Repair',
-  cancer: 'Weakness Repair',
-  topic: [
-    'High-confidence wrong repair',
-    'Wrong-rate >=50% Lung/Breast/GI',
-    'Wrong-rate >=50% GU/GYN/Heme/Head & Neck',
-    'Trial endpoint repair',
-    'Biomarker cutoff repair',
-    'Toxicity repair',
-    'Statistics and trial interpretation repair',
-    'Algorithm blank recall + Boss rematch',
-  ][index],
-  details: [
-    'Redo every high-confidence wrong; write why the wrong choice felt attractive.',
-    'Only Lung/Breast/GI score draggers with wrong-rate >=50%.',
-    'Repair second-tier score draggers from GU, GYN, Heme, and Head & Neck.',
-    'Turn every Trial confusion miss into a Trial Card.',
-    'Repair PD-L1 CPS/TPS, HER2, MSI/dMMR, BRCA/HRD, RAS/BRAF, FGFR, and FRalpha cutoffs.',
-    'Repair ICI, ADC, PARPi, TKI, CDK4/6, and EV toxicity traps.',
-    'Repair HR/CI, non-inferiority, subgroup, crossover, and endpoint definition misses.',
-    'Retry all failed Boss prompts and fill missing algorithm cards.',
-  ][index],
-  goldenTrials: ['Weakness Review'],
-  focusTags: ['wrongRate >=50', 'mastery <=2', 'high-confidence wrong', 'repeated wrong'],
-  requiredQuestionIds: [],
-  bossUnlockContribution: 'Final Board Boss',
-  priority: 'High',
-}));
-
-const rareSupportiveRequiredTasks = [
-  ['Rare/Skin/Sarcoma/CUP/Other', 'Other', 'Melanoma / non-melanoma skin cancer', 'BRAF/MEK, PD-1, CTLA-4, relatlimab, CSCC, BCC, Merkel cell', ['COMBI-AD', 'CheckMate-238', 'KEYNOTE-629'], ['melanoma', 'skin', 'rare']],
-  ['Rare/Skin/Sarcoma/CUP/Other', 'Other', 'Sarcoma / GIST', 'Separate GIST from sarcoma; KIT/PDGFRA, imatinib dose, avapritinib, pazopanib', ['GIST Review', 'PALETTE'], ['sarcoma', 'GIST', 'rare']],
-  ['Rare/Skin/Sarcoma/CUP/Other', 'Other', 'CUP / IHC', 'CK7/CK20, TTF-1, PAX8, GATA3, CDX2, p40, thyroglobulin, NGS role', ['CUP Review'], ['CUP', 'IHC', 'biomarker']],
-  ['Rare/Skin/Sarcoma/CUP/Other', 'Other', 'NET / thyroid / MEN / VHL / tumor-agnostic', 'NET grading, somatostatin analog, PRRT, NTRK/RET/MSI/TMB/BRAF', ['NETTER-1', 'Tumor-agnostic Review'], ['NET', 'MEN', 'VHL', 'rare']],
-  ['Supportive/Emergency/Stats', 'Supportive/Stats', 'Oncologic emergencies', 'TLS, MSCC, SIADH, IICP, hypercalcemia, neutropenic fever', ['Emergency Review'], ['emergency', 'supportive', 'algorithm']],
-  ['Supportive/Emergency/Stats', 'Supportive/Stats', 'Toxicity mega-review', 'ICI pneumonitis/colitis/hepatitis/endocrine/myocarditis; ADC ILD; PARPi cytopenia/MDS; TKI HTN/QTc', ['Toxicity Review'], ['ICI', 'ADC', 'toxicity']],
-  ['Supportive/Emergency/Stats', 'Supportive/Stats', 'Statistics / endpoint design', 'HR/CI/KM, ITT, non-inferiority, crossover, subgroup forest plot, OS/PFS/EFS/DFS/iDFS/pCR/MRD', ['Stats Review', 'Endpoint Review'], ['statistics', 'endpoint', 'trial interpretation']],
-];
-
-const dailyCompletionCriteria = [
-  'Daily Practice completed',
-  'Boss 1-3 at least 2 pass',
-  'Create 3-5 high-value cards',
-  'Wrong answers classified by errorType',
-];
-
-function getTaskHighYieldWeight({ cancer, topic, details, focusTags = [], goldenTrials = [] }) {
-  const text = [cancer, topic, details, ...focusTags, ...goldenTrials].join(' ').toLowerCase();
-  const matched = HIGH_YIELD_TOPICS.filter((item) => (
-    item.cancer === cancer
-    || item.aliases.some((alias) => text.includes(String(alias).toLowerCase()))
-  ));
-  if (matched.length) return Math.max(...matched.map((item) => item.examFrequency));
-  if (String(topic || '').toLowerCase().includes('toxicity') || focusTags.includes('toxicity')) return 3;
-  if (['Other', 'Rare/Skin/Sarcoma/CUP/Other'].includes(cancer) || focusTags.includes('rare')) return 2;
-  return 3;
-}
-
-function buildStudyPlan100() {
-  const tasks = [];
-  const moduleOrder = ['Lung', 'Breast', 'GI', 'GU', 'GYN', 'Head & Neck', 'Heme', 'Rare/Skin/Sarcoma/CUP/Other', 'Supportive/Emergency/Stats'];
-  const orderedModules = [...planModules].sort((a, b) => moduleOrder.indexOf(a.module) - moduleOrder.indexOf(b.module));
-  orderedModules.forEach((module) => {
-    module.tasks.forEach(([topic, details, goldenTrials, focusTags]) => {
-      const id = tasks.length + 1;
-      const phase = id <= 45
-        ? 'Phase 1: High-frequency cancer progression'
-        : 'Phase 2: Trap-topic progression';
-      tasks.push({
-        id,
-        day: `Day ${id}`,
-        phase,
-        module: module.module,
-        cancer: module.cancer,
-        topic,
-        details,
-        goldenTrials,
-        focusTags,
-        highYieldWeight: getTaskHighYieldWeight({ cancer: module.cancer, topic, details, focusTags, goldenTrials }),
-        completionCriteria: dailyCompletionCriteria,
-        requiredQuestionIds: [],
-        bossUnlockContribution: module.bossUnlockContribution,
-        priority: focusTags.includes('boss') || focusTags.includes('weakness repair') ? 'High' : 'High',
-      });
-    });
-  });
-
-  const withWeakness = tasks.slice(0, 100);
-
-  rareSupportiveRequiredTasks.forEach(([module, cancer, topic, details, goldenTrials, focusTags], index) => {
-    const id = 66 + index;
-    withWeakness[id - 1] = {
-      id,
-      day: `Day ${id}`,
-      phase: 'Phase 3: Rare + Supportive/Stats required block',
-      module,
-      cancer,
-      topic,
-      details,
-      goldenTrials,
-      focusTags,
-      highYieldWeight: getTaskHighYieldWeight({ cancer, topic, details, focusTags, goldenTrials }),
-      completionCriteria: dailyCompletionCriteria,
-      requiredQuestionIds: [],
-      bossUnlockContribution: 'Rare/Supportive Readiness',
-      priority: 'High',
-    };
-  });
-
-  mockPlanTasks.forEach(([phase, module, cancer, topic, details, goldenTrials, focusTags, bossUnlockContribution], index) => {
-    const id = index < 10 ? 73 + index : 91 + (index - 10);
-    withWeakness[id - 1] = {
-      id,
-      day: `Day ${id}`,
-      phase,
-      module,
-      cancer,
-      topic,
-      details,
-      goldenTrials,
-      focusTags,
-      highYieldWeight: getTaskHighYieldWeight({ cancer, topic, details, focusTags, goldenTrials }),
-      completionCriteria: dailyCompletionCriteria,
-      requiredQuestionIds: [],
-      bossUnlockContribution,
-      priority: 'High',
-    };
-  });
-
-  weaknessPlanTasks.forEach((task) => {
-    withWeakness[task.id - 1] = {
-      ...task,
-      highYieldWeight: getTaskHighYieldWeight(task),
-      completionCriteria: dailyCompletionCriteria,
-    };
-  });
-
-  [
-    ['Golden trial rapid recall', 'Blank recall population/intervention/endpoint/result for all golden trials', ['Golden Trial Recall'], ['trial', 'endpoint', 'rapid recall']],
-    ['Biomarker and toxicity rapid recall', 'MSI/dMMR, PD-L1 CPS/TPS, HER2, BRCA/HRD, NTRK/RET, ADC/ICI/PARPi/TKI toxicity', ['Biomarker Review', 'Toxicity Review'], ['biomarker', 'toxicity', 'rapid recall']],
-    ['Algorithm final sprint', 'NSCLC, Breast, GI, GU, GYN, Heme sequencing flowcharts from memory', ['Algorithm Recall'], ['algorithm', 'rapid recall', 'final review']],
-  ].forEach(([topic, details, goldenTrials, focusTags], index) => {
-    const id = 98 + index;
-    withWeakness[id - 1] = {
-      id,
-      day: `Day ${id}`,
-      phase: 'Phase 6: Final rapid recall',
-      module: 'Final Review',
-      cancer: 'Final Review',
-      topic,
-      details,
-      goldenTrials,
-      focusTags,
-      highYieldWeight: getTaskHighYieldWeight({ cancer: 'Final Review', topic, details, focusTags, goldenTrials }),
-      completionCriteria: dailyCompletionCriteria,
-      requiredQuestionIds: [],
-      bossUnlockContribution: 'Final Board Boss',
-      priority: 'High',
-    };
-  });
-
-  return withWeakness.slice(0, 100);
-}
-
-const studyPlan100 = buildStudyPlan100();
-
 let lastSavedStorageSlices = {};
 
 function readStorageJSON(key, fallback = null) {
@@ -1168,7 +722,9 @@ function normalizeFocusSessions(focusSessions = []) {
       durationSeconds: Math.max(0, Math.round(Number(session.durationSeconds) || 0)),
       durationMinutes: Math.max(0, Math.round(Number(session.durationMinutes) || ((Number(session.durationSeconds) || 0) / 60))),
       planTaskId: session.planTaskId || null,
+      legacyPlanTaskId: session.legacyPlanTaskId || null,
       planTopic: session.planTopic || '',
+      planDay: session.planDay || '',
     }));
 }
 
@@ -1180,7 +736,9 @@ function normalizeFocusTimer(focusTimer = {}) {
         date: active.date || formatLocalDate(new Date(active.startedAt)),
         startedAt: active.startedAt,
         planTaskId: active.planTaskId || null,
+        legacyPlanTaskId: active.legacyPlanTaskId || null,
         planTopic: active.planTopic || '',
+        planDay: active.planDay || '',
         updatedAt: active.updatedAt || active.startedAt,
       }
     : null;
@@ -1770,16 +1328,48 @@ function removeDeletedFlashcardRecords(records = {}, deletedFlashcardIds = {}) {
   return Object.fromEntries(Object.entries(records || {}).filter(([id]) => !deletedFlashcardIds[id]));
 }
 
+function makePlanProgressEntry(progress = {}, task, completed = true) {
+  if (!task) return progress;
+  return {
+    ...progress,
+    [getStudyPlanTaskKey(task)]: completed,
+    [task.id]: completed,
+  };
+}
+
+function getPlanProgressValue(progress = {}, task) {
+  return isPlanTaskComplete(progress, task);
+}
+
+function getPlanTaskStorageId(task) {
+  return task ? getStudyPlanTaskKey(task) : null;
+}
+
+function makePlanTaskSnapshot(task) {
+  if (!task) return {};
+  return {
+    planTaskId: getPlanTaskStorageId(task),
+    legacyPlanTaskId: task.id,
+    planTopic: task.topic,
+    planDay: task.day,
+  };
+}
+
 function normalizePlanItemProgress(progress = {}) {
   if (!progress || typeof progress !== 'object' || Array.isArray(progress)) return {};
-  return Object.fromEntries(Object.entries(progress).map(([taskId, item]) => {
+  return Object.fromEntries(Object.entries(progress).flatMap(([taskId, item]) => {
+    const task = getStudyPlanTaskById(taskId);
+    const normalizedTaskId = task ? getPlanTaskStorageId(task) : taskId;
     const criteria = item?.criteria && typeof item.criteria === 'object' && !Array.isArray(item.criteria) ? item.criteria : {};
     const knowledge = item?.knowledge && typeof item.knowledge === 'object' && !Array.isArray(item.knowledge) ? item.knowledge : {};
-    return [taskId, {
+    const normalizedItem = {
       criteria: Object.fromEntries(Object.entries(criteria).filter(([, value]) => Boolean(value))),
       knowledge: Object.fromEntries(Object.entries(knowledge).filter(([, value]) => Boolean(value))),
       updatedAt: item?.updatedAt || null,
-    }];
+    };
+    const entries = [[normalizedTaskId, normalizedItem]];
+    if (task) entries.push([task.id, normalizedItem]);
+    return entries;
   }));
 }
 
@@ -1949,6 +1539,7 @@ function normalizeState(state) {
       practiceMode: PRACTICE_MODES[stateSettings.practiceMode] ? stateSettings.practiceMode : 'standard',
       workoutReminder,
     },
+    planProgress: normalizePlanProgress(state?.planProgress),
     planItemProgress: normalizePlanItemProgress(state?.planItemProgress),
     dailyQuestProgress: state?.dailyQuestProgress || {},
     bossProgress: state?.bossProgress || {},
@@ -2796,7 +2387,7 @@ function getModuleProgress(planProgress = {}) {
   return studyPlan100.reduce((acc, task) => {
     if (!acc[task.module]) acc[task.module] = { module: task.module, total: 0, completed: 0 };
     acc[task.module].total += 1;
-    if (planProgress[task.id]) acc[task.module].completed += 1;
+    if (getPlanProgressValue(planProgress, task)) acc[task.module].completed += 1;
     return acc;
   }, {});
 }
@@ -2886,7 +2477,7 @@ function getDueFlashcards(state) {
 }
 
 function getTodayPlanTask(state) {
-  return studyPlan100.find((task) => !state.planProgress?.[task.id]) || studyPlan100[studyPlan100.length - 1];
+  return studyPlan100.find((task) => !getPlanProgressValue(state.planProgress, task)) || studyPlan100[studyPlan100.length - 1];
 }
 
 function getDailyQuestBucket(state, date = TODAY) {
@@ -2903,29 +2494,38 @@ function getDailyQuestBucket(state, date = TODAY) {
 
 function getSavedDailyQuestTask(state, date, taskId) {
   const bucket = getDailyQuestBucket(state, date);
-  return bucket.tasks?.[taskId] || {};
+  const task = getStudyPlanTaskById(taskId);
+  return bucket.tasks?.[taskId]
+    || (task ? bucket.tasks?.[getPlanTaskStorageId(task)] : null)
+    || (task ? bucket.tasks?.[task.id] : null)
+    || {};
 }
 
 function writeDailyQuestTask(state, date, taskId, progress) {
   const bucket = getDailyQuestBucket(state, date);
+  const task = getStudyPlanTaskById(taskId);
+  const storageId = task ? getPlanTaskStorageId(task) : taskId;
+  const existingTasks = { ...(bucket.tasks || {}) };
+  if (task && storageId !== String(task.id)) delete existingTasks[task.id];
   return {
     ...bucket,
-    activeTaskId: taskId,
+    activeTaskId: storageId,
     tasks: {
-      ...(bucket.tasks || {}),
-      [taskId]: progress,
+      ...existingTasks,
+      [storageId]: progress,
     },
   };
 }
 
 function getDailyQuestProgress(state, date = TODAY, task = getTodayPlanTask(state), practiceDone = false) {
-  const planTaskId = task?.id || 1;
+  const planTaskId = getPlanTaskStorageId(task) || 'day-1';
   const activeSaved = getSavedDailyQuestTask(state, date, planTaskId);
   const memoryDone = Boolean(activeSaved.memoryDone);
   const bossDone = Boolean(activeSaved.bossDone);
   const practiceStar = Boolean(activeSaved.practiceDone || practiceDone);
   const stars = [practiceStar, memoryDone, bossDone].filter(Boolean).length;
   return {
+    ...makePlanTaskSnapshot(task),
     planTaskId,
     practiceDone: practiceStar,
     memoryDone,
@@ -3114,8 +2714,14 @@ function getQuestReviewHistory(state, flashcardState) {
     .flatMap(([date]) => {
       const bucket = getDailyQuestBucket(state, date);
       return Object.entries(bucket.tasks || {}).map(([taskId, saved]) => {
-        const planTaskId = Number(saved.planTaskId || taskId);
-        const task = studyPlan100.find((item) => Number(item.id) === planTaskId) || studyPlan100[planTaskId - 1] || null;
+        const planTaskId = saved.planTaskId || taskId;
+        const task = getStudyPlanTaskById(planTaskId)
+          || getStudyPlanTaskById(saved.legacyPlanTaskId)
+          || getStudyPlanTaskById(taskId)
+          || null;
+        const taskLabel = task
+          ? `${task.day}｜${task.topic}`
+          : [saved.planDay, saved.planTopic].filter(Boolean).join('｜') || `Task ${planTaskId}`;
         const topicRecallCards = new Map(buildTopicRecallCards(task).map((card) => [card.id, card]));
         const recallRows = Object.entries(saved.recallRatings || {}).map(([cardId, rating]) => {
           const card = cardsById.get(cardId) || topicRecallCards.get(cardId) || {
@@ -3137,7 +2743,8 @@ function getQuestReviewHistory(state, flashcardState) {
           id: `${date}-${planTaskId}`,
           date,
           taskId: planTaskId,
-          taskLabel: task ? `${task.day}｜${task.topic}` : `Task ${planTaskId}`,
+          legacyTaskId: saved.legacyPlanTaskId || task?.id || null,
+          taskLabel,
           cancer: task?.cancer || saved.cancer || 'Quest',
           stars: saved.stars || [saved.practiceDone, saved.memoryDone, saved.bossDone].filter(Boolean).length,
           memoryDone: Boolean(saved.memoryDone),
@@ -3803,7 +3410,7 @@ function formatNewsDate(value) {
 function NewsPanel({ fallbackItems, planTasks, defaultTaskId }) {
   const [selectedTaskId, setSelectedTaskId] = useState(defaultTaskId || 1);
   const [liveNews, setLiveNews] = useState({ items: [], status: 'idle', error: '', fetchedAt: null, source: 'cached' });
-  const selectedTask = planTasks.find((task) => Number(task.id) === Number(selectedTaskId)) || planTasks[0];
+  const selectedTask = getStudyPlanTaskById(selectedTaskId) || planTasks[0];
   const criteria = useMemo(() => getNotionNewsCriteriaForTask(selectedTask), [selectedTask]);
   const cachedItems = useMemo(() => rankNotionNewsItems(fallbackItems, criteria), [fallbackItems, criteria]);
   const sortedItems = liveNews.status === 'ready' ? liveNews.items : cachedItems;
@@ -3885,9 +3492,9 @@ function NewsPanel({ fallbackItems, planTasks, defaultTaskId }) {
       <section className="news-controls" aria-label="NEWS day selector">
         <label>
           <span>Day</span>
-          <select value={selectedTask?.id || 1} onChange={(event) => setSelectedTaskId(Number(event.target.value))}>
+          <select value={selectedTask ? getPlanTaskStorageId(selectedTask) : ''} onChange={(event) => setSelectedTaskId(event.target.value)}>
             {planTasks.map((task) => (
-              <option key={task.id} value={task.id}>{task.day} · {task.topic}</option>
+              <option key={getPlanTaskStorageId(task)} value={getPlanTaskStorageId(task)}>{task.day} · {task.topic}</option>
             ))}
           </select>
         </label>
@@ -7103,8 +6710,7 @@ export default function App() {
           id: `focus-${Date.now()}`,
           date: TODAY,
           startedAt: now,
-          planTaskId: questTask?.id || null,
-          planTopic: questTask?.topic || '',
+          ...makePlanTaskSnapshot(questTask),
           updatedAt: now,
         },
       },
@@ -7124,11 +6730,15 @@ export default function App() {
           id: activeFocusSession.id,
           date: activeFocusSession.date || TODAY,
           startedAt: activeFocusSession.startedAt,
+          ...makePlanTaskSnapshot(questTask),
+          ...activeFocusSession,
           endedAt,
           durationSeconds,
           durationMinutes,
-          planTaskId: activeFocusSession.planTaskId || questTask?.id || null,
+          planTaskId: activeFocusSession.planTaskId || getPlanTaskStorageId(questTask),
+          legacyPlanTaskId: activeFocusSession.legacyPlanTaskId || questTask?.id || null,
           planTopic: activeFocusSession.planTopic || questTask?.topic || '',
+          planDay: activeFocusSession.planDay || questTask?.day || '',
         },
         ...(prev.focusSessions || []),
       ],
@@ -7189,7 +6799,7 @@ export default function App() {
       const schedule = getReviewSchedulePreview(rating, previousStats);
       const mastery = Math.max(0, Math.min(5, (previousStats.mastery ?? card.mastery ?? 0) + rule.masteryDelta));
       const currentQuest = getDailyQuestProgress(prev, TODAY, getTodayPlanTask(prev), todayCompleted);
-      const currentTask = studyPlan100.find((task) => task.id === currentQuest.planTaskId) || getTodayPlanTask(prev);
+      const currentTask = getStudyPlanTaskById(currentQuest.planTaskId) || getTodayPlanTask(prev);
       const dailyQuestProgress = updateDailyQuestMemoryProgress(prev, TODAY, currentTask, todayCompleted, cardId, rating);
       return {
         ...prev,
@@ -7469,7 +7079,8 @@ export default function App() {
   const baseQuestTask = getTodayPlanTask(state);
   const rawTodayIds = todaySession?.questionIds || EMPTY_ARRAY;
   const todaySessionPlanTaskId = todaySession?.planTaskId || null;
-  const todaySessionMatchesQuest = Number(todaySessionPlanTaskId) === Number(baseQuestTask?.id);
+  const todaySessionMatchesQuest = getStudyPlanTaskById(todaySessionPlanTaskId) === baseQuestTask
+    || getStudyPlanTaskById(todaySession?.legacyPlanTaskId) === baseQuestTask;
   const todayIds = todaySessionMatchesQuest ? rawTodayIds : EMPTY_ARRAY;
   const todayQuestions = todayIds.map((id) => getQuestionWithOverride(id, questionDataState)).filter(Boolean);
   const selectedPracticeMode = state.settings?.practiceMode || 'standard';
@@ -7486,7 +7097,7 @@ export default function App() {
     && todayPracticeTargetIds.length >= todayPracticeTargetCount
     && todayRatedCount >= todayPracticeTargetCount;
   const questProgress = getDailyQuestProgress(state, TODAY, baseQuestTask, todayCompleted);
-  const questTask = studyPlan100.find((task) => task.id === questProgress.planTaskId) || baseQuestTask;
+  const questTask = getStudyPlanTaskById(questProgress.planTaskId) || baseQuestTask;
   const todayFocusMinutes = sumFocusMinutesByDate(state, TODAY);
   const focusStreak = getFocusStreak(state, TODAY);
   const focusElapsedSeconds = focusStartedAt
@@ -7589,7 +7200,8 @@ export default function App() {
         updateState((prev) => {
           const modeConfig = getPracticeModeConfig(prev.settings?.practiceMode);
           const existing = prev.sessions?.[TODAY];
-          const existingMatchesQuest = Number(existing?.planTaskId) === Number(questTask.id);
+          const existingMatchesQuest = getStudyPlanTaskById(existing?.planTaskId) === questTask
+            || getStudyPlanTaskById(existing?.legacyPlanTaskId) === questTask;
           const existingQuestionIds = existingMatchesQuest ? (existing?.questionIds || []) : [];
           const targetCount = force ? modeConfig.total : Math.min(modeConfig.total, Math.max(PRACTICE_PAGE_SIZE, existingQuestionIds.length));
           const rankedHighYieldTopics = getRankedHighYieldTopics(prev, questTask);
@@ -7602,8 +7214,7 @@ export default function App() {
               [TODAY]: {
                 ...(force ? {} : existing),
                 date: TODAY,
-                planTaskId: questTask.id,
-                planTopic: questTask.topic,
+                ...makePlanTaskSnapshot(questTask),
                 practiceMode: prev.settings?.practiceMode || 'standard',
                 practiceModeLabel: modeConfig.shortLabel,
                 practiceRecipe: {
@@ -7654,7 +7265,8 @@ export default function App() {
     let loadedMore = false;
     updateState((prev) => {
       const existing = prev.sessions?.[TODAY];
-      const existingMatchesQuest = Number(existing?.planTaskId) === Number(questTask.id);
+      const existingMatchesQuest = getStudyPlanTaskById(existing?.planTaskId) === questTask
+        || getStudyPlanTaskById(existing?.legacyPlanTaskId) === questTask;
       if (!existingMatchesQuest) return prev;
       const existingQuestionIds = existing?.questionIds || [];
       const targetCount = Math.min(todayPracticeConfig.total, (nextPage + 1) * PRACTICE_PAGE_SIZE);
@@ -7713,7 +7325,7 @@ export default function App() {
       ...prev,
       sessions: {
         ...(prev.sessions || {}),
-        [TODAY]: { ...(prev.sessions?.[TODAY] || {}), planTaskId: questTask.id, planTopic: questTask.topic, completed: true },
+        [TODAY]: { ...(prev.sessions?.[TODAY] || {}), ...makePlanTaskSnapshot(questTask), completed: true },
       },
       game: {
         ...awardXp(prev.game || defaultState.game, getPracticeModeConfig(prev.sessions?.[TODAY]?.practiceMode).xp, `${getPracticeModeConfig(prev.sessions?.[TODAY]?.practiceMode).shortLabel} Daily Practice completed`, { date: TODAY, practiceMode: prev.sessions?.[TODAY]?.practiceMode || 'standard' }),
@@ -7766,7 +7378,7 @@ export default function App() {
         ...prev,
         dailyQuestProgress: {
           ...(prev.dailyQuestProgress || {}),
-          [TODAY]: writeDailyQuestTask(prev, TODAY, questTask.id, next),
+          [TODAY]: writeDailyQuestTask(prev, TODAY, getPlanTaskStorageId(questTask), next),
         },
       };
     }, ['quest']);
@@ -7792,7 +7404,7 @@ export default function App() {
         bossProgress: {
           ...(prev.bossProgress || {}),
           [TODAY]: {
-            planTaskId: questTask.id,
+            ...makePlanTaskSnapshot(questTask),
             results: nextResults,
             passed: passCount,
             bossDone,
@@ -7801,7 +7413,7 @@ export default function App() {
         },
         dailyQuestProgress: {
           ...(prev.dailyQuestProgress || {}),
-          [TODAY]: writeDailyQuestTask(prev, TODAY, questTask.id, next),
+          [TODAY]: writeDailyQuestTask(prev, TODAY, getPlanTaskStorageId(questTask), next),
         },
       };
     }, ['quest']);
@@ -7813,7 +7425,7 @@ export default function App() {
     updateState((prev) => {
       const currentProgress = getDailyQuestProgress(prev, TODAY, questTask, todayCompleted);
       if (currentProgress.xpClaimed || currentProgress.stars < 3) return prev;
-      const awardedGame = awardXp(prev.game || defaultState.game, XP_RULES.stageClear, 'Daily quest stage clear', { date: TODAY, taskId: questTask.id });
+      const awardedGame = awardXp(prev.game || defaultState.game, XP_RULES.stageClear, 'Daily quest stage clear', { date: TODAY, taskId: getPlanTaskStorageId(questTask), legacyTaskId: questTask.id });
       const nextGame = {
         ...awardedGame,
         streak: (prev.game?.streak || 0) + 1,
@@ -7829,13 +7441,10 @@ export default function App() {
         ...prev,
         game: nextGame,
         player: nextPlayer,
-        planProgress: {
-          ...(prev.planProgress || {}),
-          [questTask.id]: true,
-        },
+        planProgress: makePlanProgressEntry(prev.planProgress, questTask, true),
         dailyQuestProgress: {
           ...(prev.dailyQuestProgress || {}),
-          [TODAY]: writeDailyQuestTask(prev, TODAY, questTask.id, {
+          [TODAY]: writeDailyQuestTask(prev, TODAY, getPlanTaskStorageId(questTask), {
             ...currentProgress,
             practiceDone: true,
             memoryDone: true,
@@ -8015,18 +7624,18 @@ export default function App() {
 
   const planSummary = useMemo(() => {
     const total = studyPlan100.length;
-    const completed = studyPlan100.filter((task) => planProgress[task.id]).length;
+    const completed = studyPlan100.filter((task) => getPlanProgressValue(planProgress, task)).length;
     const percent = total ? Math.round((completed / total) * 100) : 0;
 
     const byCancerMap = studyPlan100.reduce((acc, task) => {
       if (!acc[task.cancer]) acc[task.cancer] = { cancer: task.cancer, total: 0, completed: 0 };
       acc[task.cancer].total += 1;
-      if (planProgress[task.id]) acc[task.cancer].completed += 1;
+      if (getPlanProgressValue(planProgress, task)) acc[task.cancer].completed += 1;
       return acc;
     }, {});
 
     const goldenTotal = studyPlan100.filter((task) => task.goldenTrials?.length).length;
-    const goldenCompleted = studyPlan100.filter((task) => task.goldenTrials?.length && planProgress[task.id]).length;
+    const goldenCompleted = studyPlan100.filter((task) => task.goldenTrials?.length && getPlanProgressValue(planProgress, task)).length;
 
     return {
       total,
@@ -8064,7 +7673,7 @@ export default function App() {
   ]);
 
 
-  const nextPlanTask = studyPlan100.find((task) => !planProgress[task.id]) || studyPlan100[studyPlan100.length - 1];
+  const nextPlanTask = studyPlan100.find((task) => !getPlanProgressValue(planProgress, task)) || studyPlan100[studyPlan100.length - 1];
   const topWeakCancer = cancerSummary.find((row) => row.status === 'Red') || cancerSummary[0];
   const topRedTopic = readiness.redTopics?.[0];
   const mockNeeded = readiness.recentMockScores.length < 3 || readiness.recentMockAverage < 80;
@@ -8108,21 +7717,20 @@ export default function App() {
   };
 
   const togglePlanTask = (id, checkedOverride = null) => {
-    const task = studyPlan100.find((item) => Number(item.id) === Number(id));
+    const task = getStudyPlanTaskById(id);
     if (!task) return;
     updateState((prev) => {
-      const wasDone = Boolean(prev.planProgress?.[id]);
+      const wasDone = getPlanProgressValue(prev.planProgress, task);
       const checked = checkedOverride == null ? !wasDone : Boolean(checkedOverride);
+      const storageId = getPlanTaskStorageId(task);
       const nextState = {
         ...prev,
-        game: checked && !wasDone ? awardXp(prev.game || defaultState.game, XP_RULES.planTask, '100-Day task completed', { taskId: id }) : prev.game,
-        planProgress: {
-          ...(prev.planProgress || {}),
-          [id]: checked,
-        },
+        game: checked && !wasDone ? awardXp(prev.game || defaultState.game, XP_RULES.planTask, '100-Day task completed', { taskId: storageId, legacyTaskId: task.id }) : prev.game,
+        planProgress: makePlanProgressEntry(prev.planProgress, task, checked),
         planItemProgress: {
           ...(prev.planItemProgress || {}),
-          [id]: buildFullPlanItemProgress(task, checked),
+          [storageId]: buildFullPlanItemProgress(task, checked),
+          [task.id]: buildFullPlanItemProgress(task, checked),
         },
       };
       return syncBossGameState(nextState);
@@ -8131,7 +7739,7 @@ export default function App() {
 
   const togglePlanItem = (task, group, item) => {
     updateState((prev) => {
-      const taskId = task.id;
+      const taskId = getPlanTaskStorageId(task);
       const current = getPlanItemProgressForTask(prev, taskId);
       const nextGroup = {
         ...(current[group] || {}),
@@ -8146,20 +7754,18 @@ export default function App() {
       const nextPlanItemProgress = {
         ...(prev.planItemProgress || {}),
         [taskId]: nextItemProgress,
+        [task.id]: nextItemProgress,
       };
       const fullyConfirmed = isTaskFullyConfirmed(task, nextItemProgress);
       const questCleared = Object.values(prev.dailyQuestProgress || {}).some((bucket) => {
-        const saved = bucket?.tasks?.[taskId] || (Number(bucket?.planTaskId) === Number(taskId) ? bucket : null);
+        const saved = bucket?.tasks?.[taskId] || bucket?.tasks?.[task.id] || (getStudyPlanTaskById(bucket?.planTaskId) === task ? bucket : null);
         return Boolean(saved?.xpClaimed || saved?.stageClearedAt);
       });
-      const wasDone = Boolean(prev.planProgress?.[taskId]);
-      const nextPlanProgress = {
-        ...(prev.planProgress || {}),
-        [taskId]: fullyConfirmed || (wasDone && questCleared),
-      };
+      const wasDone = getPlanProgressValue(prev.planProgress, task);
+      const nextPlanProgress = makePlanProgressEntry(prev.planProgress, task, fullyConfirmed || (wasDone && questCleared));
       const nextState = {
         ...prev,
-        game: fullyConfirmed && !wasDone ? awardXp(prev.game || defaultState.game, XP_RULES.planTask, '100-Day task completed', { taskId }) : prev.game,
+        game: fullyConfirmed && !wasDone ? awardXp(prev.game || defaultState.game, XP_RULES.planTask, '100-Day task completed', { taskId, legacyTaskId: task.id }) : prev.game,
         planProgress: nextPlanProgress,
         planItemProgress: nextPlanItemProgress,
       };
@@ -8172,7 +7778,10 @@ export default function App() {
       const next = { ...(prev.planProgress || {}) };
       const nextItemProgress = { ...(prev.planItemProgress || {}) };
       studyPlan100.filter((task) => task.cancer === cancer).forEach((task) => {
+        const storageId = getPlanTaskStorageId(task);
+        next[storageId] = completed;
         next[task.id] = completed;
+        nextItemProgress[storageId] = buildFullPlanItemProgress(task, completed);
         nextItemProgress[task.id] = buildFullPlanItemProgress(task, completed);
       });
       return syncBossGameState({ ...prev, planProgress: next, planItemProgress: nextItemProgress });
@@ -8237,7 +7846,8 @@ export default function App() {
     const modeConfig = getPracticeModeConfig(practiceMode);
     updateState((prev) => {
       const existing = prev.sessions?.[TODAY];
-      const existingMatchesQuest = Number(existing?.planTaskId) === Number(questTask.id);
+      const existingMatchesQuest = getStudyPlanTaskById(existing?.planTaskId) === questTask
+        || getStudyPlanTaskById(existing?.legacyPlanTaskId) === questTask;
       return {
         ...prev,
         settings: {
@@ -8457,7 +8067,7 @@ export default function App() {
       )}
 
       {tab === 'news' && (
-        <NewsPanel fallbackItems={notionNewsItems} planTasks={studyPlan100} defaultTaskId={questTask.id} />
+        <NewsPanel fallbackItems={notionNewsItems} planTasks={studyPlan100} defaultTaskId={getPlanTaskStorageId(questTask)} />
       )}
 
       {tab === 'readiness' && (
@@ -8835,20 +8445,21 @@ export default function App() {
             <h3>Daily Checklist</h3>
             <div className="plan-task-list">
               {studyPlan100.map((task) => {
-                const done = Boolean(planProgress[task.id]);
-                const itemProgress = getPlanItemProgressForTask(state, task.id);
+                const taskStorageId = getPlanTaskStorageId(task);
+                const done = getPlanProgressValue(planProgress, task);
+                const itemProgress = getPlanItemProgressForTask(state, taskStorageId);
                 const criteriaItems = getTaskCriteriaItems(task);
                 const knowledgeItems = getTaskKnowledgeItems(task);
                 const confirmedCount = criteriaItems.filter((item) => itemProgress.criteria?.[item]).length
                   + knowledgeItems.filter((item) => itemProgress.knowledge?.[item]).length;
                 const totalConfirmations = criteriaItems.length + knowledgeItems.length;
                 return (
-                  <article key={task.id} className={done ? 'plan-task done' : 'plan-task'}>
+                  <article key={taskStorageId} className={done ? 'plan-task done' : 'plan-task'}>
                     <input
                       type="checkbox"
                       checked={done}
                       aria-label={`${task.day} complete`}
-                      onChange={(event) => togglePlanTask(task.id, event.target.checked)}
+                      onChange={(event) => togglePlanTask(taskStorageId, event.target.checked)}
                     />
                     <div className="plan-task-main">
                       <div className="plan-task-title">
