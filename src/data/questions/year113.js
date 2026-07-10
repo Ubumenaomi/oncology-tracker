@@ -52,7 +52,8 @@ export const questions113 = [
       "cardEligible": true,
       "raw": []
     },
-    "explanationFigures": []
+    "explanationFigures": [],
+    "notionUrl": "https://app.notion.com/p/ubume/Head-and-neck-cancer-overview-16fbb19ac0c280f7a543ca61c7552bde"
   },
   {
     "year": 113,
@@ -557,7 +558,7 @@ export const questions113 = [
     "cancer": "Lung",
     "topic": "Metastatic",
     "trials": [],
-    "answer": "A",
+    "answer": "C",
     "explanation": "A可能有爭議但C明顯錯誤，故應選C\n\nA：大多數統計資料Uveal melanoma中Choroid佔85-90%，剩餘是iris及ciliary body合計佔剩餘10%。無法確定考題用的是哪份資料。需要知道最多的是Choroid即可。\n\nB: uveal melanoma\n腫瘤發展早期的突變跟G-protein α subunits相關, 佔85% (GNAQ and GNA11, mutually exclusive), 會活化下游MAPK pathway。\n腫瘤發展晚期的突變為BAP1, SF3B1 (splicing factor 3B subunit 1), EIF1AX (eukaryotic translation initiation factor 1A X-linked)。有SF3B1, EIF1AX突變預後比較好。BAP1可以是germline (亦容易造成mesothelioma)。\nRef: Devita 12th p. 1605\n\nC錯誤：Immunotherapy在Cutaneous melanoma的成功沒有辦法複製在Uveal melanoma, 舉例以CheckMate-067為例（Ref C2），ORR分別為Ipi 19%, Nivo 44.9%, Ipi+Nivo 58.3%。而Uveal melanoma即便用Ipi+Nivo combined IO therapy ORR也只有13.7%（Meta-analysis, Ref C2）, 其於大多資料Nivo單用約5%, Ipi單用為0%。Devita亦有提出可能原因為Uveal melanoma TMB明顯不如Cutaneous melanoma。\n\nRef C1: https://ascopubs.org/doi/10.1200/JCO.2021.39.15_suppl.9506\nRef C2: https://ascopubs.org/doi/10.1200/JCO.2022.40.16_suppl.9534\n\nD: 最常見metastasis分為liver (>90%), Lung (24%), Bone (16%), 最少的是LN & Brain (<6%)\n\nE: Metastatic uveal melanoma的ICI治療效果明顯不如cutaneous melanoma, 應依照IMCgp100-202 trial結果優先考慮於HLA-A*02:01 positive病人使用Tebentafusp (BiTE targeting gp100 & CD3), 於trial中使用Tebentafusp對比於physician choice therapy (Pembro, Ipi or DTIC)有OS benefit, 此藥物另一個特色是即使用Tebentafusp後best reponse是PD的病人存活也比使用physician choice therapy後best response是PD的病人來得長（表示此藥物的機轉特別, response即便連SD都無法達到也能延長存活）。\n\n若病患為HLA-A*02:01 negative則才考慮IO, 若病患為liver dominant disease則應該積極考慮local therapy。附上uptodate流程圖更利於理解。",
     "tags": {
       "domain": "Lung",
@@ -1368,9 +1369,9 @@ export const questions113 = [
     "options": {
       "A": "根據KEYNOTE-671 trial，手術前neoadjuvant therapy 使用pembrolizumab plus platinum-doublet chemotherapy x 4 cycles followed by surgery then adjuvant pembrolizumab 相較於直接surgery then adjuvant pembrolizumab ，可顯著延長event-free survival(EFS)。",
       "B": "根據CheckMate 816 trial，手術前neoadjuvant therapy使用nivolumab 加上 platinum-doublet chemotherapy x 3 cycles相較於neoadjuvant chemotherapy，可顯著延長event-free survival(EFS)。",
-      "C": "",
-      "D": "",
-      "E": "中提及之期刊，均根據AJCC TNM stage system(8 th ed)]"
+      "C": "根據ADAURA trial，對於completely resected stage IB–IIIA or stage IIIB (T3, N2) NSCLC and positive for EGFR (exon 19 deletion, exon 21 L858R) mutations ，術後可考慮使用adjuvant osimertinib for 3 years。",
+      "D": "根據KEYNOTE-091 trial，對於completely resected stage IIB–IIIA, stage IIIB (T3, N2), or high-risk stage IIA NSCLC and negative for EGFR exon 19 deletion or exon 21 L858R mutations or AL K rearrangements，不管PD-L1表現如何，術後可考慮使用adjuvant pembrolizumab for up to 1 year。",
+      "E": "根據IMpower010 trial，對於completely resected stage IIB–IIIA, stage IIIB (T3, N2), or high-risk stage IIA NSCLC with PD-L1 ≥1% and negative for EGFR exon 19 deletion or exon 21 L858R mutations or AL K rearrangements，術後可考慮使用adjuvant atezolizumab for up to 1 year。"
     },
     "sourcePage": null,
     "cancer": "Lung",
@@ -1383,7 +1384,7 @@ export const questions113 = [
       "cancerDomain": "Lung",
       "cancerType": "NSCLC",
       "stage": "localized",
-      "clinicalSetting": "diagnosis/staging/risk",
+      "clinicalSetting": "localized curative intent",
       "treatmentModality": "surgery",
       "biomarker": [
         "EGFR",
@@ -1406,7 +1407,7 @@ export const questions113 = [
       "hashTags": [
         "#NSCLC",
         "#localized",
-        "#diagnosisstagingrisk",
+        "#localizedcurativeintent",
         "#surgery",
         "#Goldentrial",
         "#biomarker",
@@ -1486,7 +1487,7 @@ export const questions113 = [
     "cancer": "Lung",
     "topic": "Biomarker",
     "trials": [],
-    "answer": null,
+    "answer": "E",
     "explanation": "",
     "tags": {
       "domain": "Lung",
@@ -1519,7 +1520,7 @@ export const questions113 = [
         "#EGFR"
       ],
       "examWeight": 5,
-      "cardEligible": false,
+      "cardEligible": true,
       "raw": []
     },
     "explanationFigures": []
@@ -2970,11 +2971,11 @@ export const questions113 = [
     "id": "113-Q054",
     "stem": "關於explanatory 臨床試驗、pragmatic 臨床試驗的比較，下列何者是錯誤的？ 試驗特徵 explanatory pragmatic",
     "options": {
-      "A": "場景setting 日常醫療工作 資源豐富，理想場景",
-      "B": "受試者participants 高選擇性病人族群，有嚴 格的納入、排除條件 有興趣的臨床適應症，極少的 納入、排除條件",
-      "C": "介入intervention 強的順從性嚴格執行 有彈性，允許修改",
-      "D": "結果outcomes 通常是代理的滿足點(例 如：客觀反應率、無惡化 存活時間) 跟受試者、社區、醫療照顧提 供者直接相關(例如：客觀反 應率、總存活時間)",
-      "E": "跟醫療工作的關聯性 relevance to practice 間接 直接"
+      "A": "explanatory:日常醫療工作 pragmatic:資源豐富,理想場景",
+      "B": "explanatory:高選擇性病人族群,有嚴格的納入、排除條件 pragmatic:有興趣的臨床適應症,極少的納入、排除條件",
+      "C": "explanatory:強的順從性嚴格執行 pragmatic:有彈性,允許修改",
+      "D": "explanatory:通常是代理的滿足點(例如:客觀反應率、無惡化存活時間) pragmatic:跟受試者、社區、醫療照顧提供者直接相關(例如:客觀反應率、總存活時間)",
+      "E": "explanatory:間接 pragmatic:直接"
     },
     "sourcePage": null,
     "cancer": "Other",
@@ -4768,31 +4769,36 @@ export const questions113 = [
     "topic": "Lung",
     "trials": [],
     "answer": "D",
-    "explanation": "根據NCCN guideline-thymoma&thymic carcinoma v1.2025 (P.13 & 14/46), 1st line chemotherapy for thymoma 建議CAP, CAP+prednisolone, ADOC; pembrolizumab monotherapy 建議在 thymic carcinoma 2nd line 使用。",
+    "explanation": "根據NCCN guideline-thymoma&thymic carcinoma v1.2025 (P.13 & 14/46), 1st line chemotherapy for thymoma 建議CAP, CAP+prednisolone, ADOC; pembrolizumab monotherapy 建議在 thymic carcinoma 2nd line 使用。\nSummary: For this patient with metastatic thymoma, the only appropriate option is (4) ADOC, which is an NCCN-recommended first-line regimen with established efficacy (ORR 91.8%). \n[1][5] All pembrolizumab-containing options (1, 2, 3) are contraindicated because PD-1/PD-L1 inhibitors are not recommended for thymoma patients due to unacceptably high rates of severe immune-related adverse events, including fatal myocarditis. \n[1][3-4] Even for thymic carcinoma, pembrolizumab is only recommended in the subsequent-line setting, not first-line. \n[1]",
     "tags": {
       "domain": "Lung",
       "cancerDomain": "Lung",
       "cancerType": "Thymic malignancy",
-      "stage": "",
+      "stage": "metastatic",
       "clinicalSetting": "metastatic first-line",
       "treatmentModality": "chemotherapy",
-      "biomarker": [],
+      "biomarker": [
+        "PD-L1"
+      ],
       "evidenceType": "Guideline-only",
-      "questionType": "endpoint recognition",
+      "questionType": "toxicity",
       "subtopic": "Lung",
       "trial": [],
       "treatmentLine": "first-line",
       "endpoint": [
-        "OS"
+        "OS",
+        "ORR"
       ],
       "toxicity": [],
       "guidelineConcept": "Lung",
       "hashTags": [
         "#Thymicmalignancy",
+        "#metastatic",
         "#metastaticfirstline",
         "#chemotherapy",
         "#Guidelineonly",
-        "#endpointrecognition"
+        "#toxicity",
+        "#PDL1"
       ],
       "examWeight": 5,
       "cardEligible": true,
@@ -5841,7 +5847,7 @@ export const questions113 = [
     "cancer": "Lung",
     "topic": "Toxicity",
     "trials": [],
-    "answer": null,
+    "answer": "A",
     "explanation": "(1) 在大腸直腸癌，HER2高表現的病患約有2-5%，且可能與anti-EGFR 藥物使用的抗藥性有關。\nCorrect!\n*NCCN Guidelines Version 1.2025 MS-49 (Figure1)\n--HER2 is rarely amplified/overexpressed in CRC(approximately 3% overall), but the prevalence is higher in RAS/BRAF–wild type tumors (reported at 5%–14%).\n--目前無證據證實 HER2 overexpression在預後的角色\n--除了是HER2-targeted therapy的predictive marker, HER2 amplification/overexpression也與EGFR-targeting monoclonal antibodies的抗藥性有關!\n\n*參考trial: Raghav K, Loree JM, Morris JS, et al. Validation of HER2 Amplification as a Predictive Biomarker for Anti–Epidermal Growth Factor Receptor Antibody Therapy in Metastatic Colorectal Cancer. JCO Precision Oncology 2019:1-13. \n--研究對象：98 名 RAS/BRAF–wild type mCRC\n--不使用 EGFR inhibitor時，無論 HER2 狀態如何，median PFS相似。\n--使用 EGFR inhibitor時，HER2 amplification患者的 PFS 顯著較短(2.8 個月 vs. 8.1 個月)。\n--HR：7.05(95% CI, 3.4–14.9)。\n--P < .001\n--結論：in RAS/RAF wild-type mCRC，HER2 amplification與anti-EGFRab therapy的抗藥性/療效有關。\n\n(2) 在兩線化學治療失敗後，在HER2高表現，RAS-wild type 的大腸直腸癌病患，可考慮使用trastuzumab + tucatinib。\nCorrect!\n*NCCN Guidelines Version 1.2025, COL-D 2 OF 12 (Figure2)\n\n*參考trial: Strickler JH, Cercek A, Siena S, et al. Additional analyses of MOUNTAINEER: A phase II study of tucatinib and trastuzumab for HER2-positive mCRC [abstract]. Ann Oncol 2022;33:S808-S869.\n-研究方法\n--收錄18歲以上、chemotherapy-refractory, HER2-positive, RAS wild-type unresectable or metastatic CRC\n--Cohort A: Tucatinib (300 mgBID) + intravenous trastuzumab(8 mg/kg loading, then 6 mg/kg Q3wks)->打到progression\n--中途有擴大招募: 以4:3分至兩組\n--> Cohort B= tucatinib + trastuzumab \n--> Cohort C= tucatinib monotherapy\n--The primary endpoint= objective response rate for cohorts A and B combined and was assessed in patients in the full analysis set (ie, patients with HER2-positive disease who received at least one dose of study treatment).\n-結果\n--114 人 HER2 陽性並接受治療(Cohort A: 45, B: 39, C: 30)\n--ORR: 38.1%(Figure3)\n--AE: \n--> A+B: 腹瀉(64%)、3 級以上：高血壓(7%)、3%(3/86) tucatinib 相關嚴重不良事件（急性腎損傷、結腸炎、疲勞)\n--> C: 腹瀉(33%)、3 級以上：ALT、AST 升高(各 7%)、1 人(3%) tucatinib 相關嚴重不良事件（藥物過量）、\n\n-結論\n--Tucatinib+trastuzumab: FDA approved for mCRC and is an important new treatment option for chemotherapy-refractory HER2-positive mCRC.\n\n(3) 根據DESTINY-CRC02，單獨使用T-DXd無論RAS-mutant或wild type，其response rate 約為35%。\nIncorrect! 在subgroup分析中，RAS-Wild-type的ORR優於RAS-mutant，可以看直接下方**Subgroup研究的資料 (Figure4,5,6)\n\n*相關trial: Kanwal Raghav, et al.Trastuzumab deruxtecan in patients with HER2-positive advanced colorectal cancer (DESTINY-CRC02): primary results from a multicentre, randomised, phase 2 trial, The Lancet Oncology,Volume 25, Issue 9, 2024,1147-1162 \n-目的: 探討 Trastuzumab deruxtecan 不同劑量(5·4 mg/kg and 6·4 mg/kg)在先前治療過的HER2(+), RAS wild-type or mutant mCRC，找出適合的劑量\n-方法\n-- 收錄年滿 18 歲或 20 歲(依地區而定)、先前治療過的unresectable,recurrent, or metastatic HER2-positive, and RAS wild-type or mutant colorectal cancer (先前治療chemotherapy, and anti-EGFR, anti-VEGF, or anti-PD-L1 therapy)\n-- Stage 1: 1:1 的比例被隨機分配至接受 5.4 mg/kg 或 6.4 mg/kg 的 trastuzumab deruxtecan, Q21d\n-- Stage 2: 所有患者均被分配至 5.4 mg/kg 的治療組\n-- The primary endpoint= ORR\n-研究結果\n-- The confirmed ORR= 37·8% (5·4 mg/kg) vs 27·5% (6·4 mg/kg)\n-- Gr3 以上drug-related AE 34 (41%) vs 19 (49%) \n-- **Subgroup研究\n--> 在5·4 mg/kg組別的ORR: 39.7% (RAS wild-type) vs 28.6% (RAS mutant)\n--> 在6·4 mg/kg組別的ORR: 32.4% (RAS wild-type) vs 0% (RAS mutant)\n-結論: 在先前治療過的HER2-positive mCRC (有包含RAS mutations, 或先前接受anti-HER2 therapy)，trastuzumab deruxtecan 單用，5·4 mg/kg是最佳的劑量\n\n(4) 根據DESTINY-CRC01，在low HER2 (IHC2+/ISH-或IHC1+) 的病患使用T-DXd依然有約40%的response rate。\nIncorrect! ORR為0\n*相關trial: Salvatore Siena MD, et al. Trastuzumab deruxtecan (DS-8201) in patients with HER2-expressing metastatic colorectal cancer (DESTINY-CRC01): a multicentre, open-label, phase 2 trial. The Lancet Oncology,Volume 22, Issue 6, 2021,779-789\n\n-目的: 探討 Trastuzumab deruxtecan的anti-tumor activity與安全性，在HER2(+)的mutant mCRC\n-方法\n-- 需年滿 18 歲（日本為 20 歲以上）\n-- HER2-expressing metastatic colorectal cancer、且已接受兩種以上先前治療後惡化(可接受除了trastuzumab deruxtecan以外的HER2-targeted therapies)、且 RAS and BRAFV600E wild-type\n-- 依照 HER2 表現程度 分為3個cohort\n--> Cohort A：HER2 陽性（即 IHC3+ 或 IHC2+ 且 ISH 陽性）\n--> Cohort B：HER2 低表現（IHC2+ 且 ISH 陰性）\n--> Cohort C：HER2 低表現（IHC1+）\n-- 所有患者接受 6.4 mg/kg trastuzumab deruxtecan Q3wk，直至疾病進展、出現不可接受的不良反應、withdrawal，或死亡。\n--The primary endpoint= ORR in cohort A、safety\n\n-研究結果\n-- ORR= 24(45.3%) in cohort A\n-- 3 or worse treatment-emergent adverse events that occurred in at least 10% of all participants\n-- **對於Cohort B and Cohort C的分析 (Figure7)\n--> 均無患者達到客觀緩解(ORR)\n--> mPFS 在cohort B and C相似: 1.3 個月 and 1.4 個月\n--> mOS 在cohort B and C: not reached\n--> PD or Death: Cohort B (4名)、Cohort C (14名)\n----\n\n此題覺得答案為(1)(2)\n(審稿附議)",
     "tags": {
       "domain": "GI",
