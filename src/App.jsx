@@ -258,6 +258,7 @@ const FEEDBACK_SOUND_PATHS = {
   correct: '/sounds/correct.mp3',
   wrong: '/sounds/wrong.mp3',
   taskCompletion: '/sounds/task-completion.mp3',
+  pomodoroComplete: '/sounds/pomodoro-complete.mp3',
 };
 const feedbackAudioElements = {};
 
@@ -372,6 +373,15 @@ function playTaskCompletionFeedback() {
   playFeedbackSound('taskCompletion', () => {
     playTone(523.25, 783.99, 0.12, 0, 0.16, 'triangle');
     playTone(659.25, 1046.5, 0.18, 0.09, 0.14, 'sine');
+  });
+}
+
+function playPomodoroCompletionFeedback() {
+  triggerHapticFeedback('correct');
+  playFeedbackSound('pomodoroComplete', () => {
+    playTone(880, 880, 0.18, 0, 0.18, 'square');
+    playTone(880, 880, 0.18, 0.32, 0.18, 'square');
+    playTone(880, 880, 0.18, 0.64, 0.18, 'square');
   });
 }
 
@@ -7208,7 +7218,7 @@ export default function App() {
           activeSession: null,
         },
       }), ['activity']);
-      playTaskCompletionFeedback();
+      playPomodoroCompletionFeedback();
       return;
     }
 
@@ -7248,7 +7258,7 @@ export default function App() {
         },
       };
     }, ['activity']);
-    playTaskCompletionFeedback();
+    playPomodoroCompletionFeedback();
     setFocusTick(now.getTime());
   };
 

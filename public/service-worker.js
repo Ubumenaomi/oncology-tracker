@@ -1,4 +1,4 @@
-const CACHE_NAME = 'oncology-tracker-v3'
+const CACHE_NAME = 'oncology-tracker-v4'
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -10,6 +10,7 @@ const APP_SHELL = [
   '/sounds/correct.mp3',
   '/sounds/wrong.mp3',
   '/sounds/task-completion.mp3',
+  '/sounds/pomodoro-complete.mp3',
 ]
 
 self.addEventListener('install', (event) => {
