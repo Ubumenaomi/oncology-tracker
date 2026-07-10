@@ -571,6 +571,7 @@ const defaultState = {
   customQuestions: {},
   deletedQuestionIds: {},
   mockExams: [],
+  activeMockExam: null,
   flashcards: {},
   flashcardStats: {},
   deletedFlashcardIds: {},
@@ -621,6 +622,7 @@ function buildStorageSlices(state) {
     activity: {
       focusSessions: state.focusSessions || [],
       mockExams: state.mockExams || [],
+      activeMockExam: state.activeMockExam || null,
       focusTimer: state.focusTimer || defaultState.focusTimer,
     },
     sessions: {
@@ -684,6 +686,7 @@ function hydrateStateFromStorage() {
     cloudMeta: app?.cloudMeta ?? v2Core?.cloudMeta ?? legacyState.cloudMeta ?? defaultState.cloudMeta,
     focusSessions: activity?.focusSessions ?? v2Core?.focusSessions ?? legacyState.focusSessions ?? defaultState.focusSessions,
     mockExams: activity?.mockExams ?? v2Core?.mockExams ?? legacyState.mockExams ?? defaultState.mockExams,
+    activeMockExam: activity?.activeMockExam ?? v2Core?.activeMockExam ?? legacyState.activeMockExam ?? defaultState.activeMockExam,
     focusTimer: activity?.focusTimer ?? v2Core?.focusTimer ?? legacyState.focusTimer ?? defaultState.focusTimer,
     sessions: sessions?.sessions ?? v2Core?.sessions ?? legacyState.sessions ?? defaultState.sessions,
     planProgress: progress?.planProgress ?? v2Core?.planProgress ?? legacyState.planProgress ?? defaultState.planProgress,
@@ -1069,6 +1072,7 @@ function hydrateStateFromCloudSlices(sliceMap = {}) {
     cloudMeta: app.cloudMeta ?? defaultState.cloudMeta,
     focusSessions: activity.focusSessions ?? defaultState.focusSessions,
     mockExams: activity.mockExams ?? defaultState.mockExams,
+    activeMockExam: activity.activeMockExam ?? defaultState.activeMockExam,
     focusTimer: activity.focusTimer ?? defaultState.focusTimer,
     sessions: sessions.sessions ?? defaultState.sessions,
     planProgress: progress.planProgress ?? defaultState.planProgress,
@@ -6633,16 +6637,47 @@ function summarizeMockResults(results = []) {
   };
 }
 
-function MockExamPanel({ state, onFinishMock, onEnsureQuestionYears }) {
-  const [questionCount, setQuestionCount] = useState(80);
-  const [timerMinutes, setTimerMinutes] = useState(120);
-  const [examMode, setExamMode] = useState('diagnostic-mock-0');
-  const [examYear, setExamYear] = useState('All');
-  const [exam, setExam] = useState(null);
-  const [startedAt, setStartedAt] = useState(null);
-  const [answers, setAnswers] = useState({});
-  const [showResults, setShowResults] = useState(false);
-  const [examMessage, setExamMessage] = useState('');
+function MockExamPanel({ state, persistedDraft, onDraftChange, onDraftClear, onFinishMock, onEnsureQuestionYears }) {
+  const [questionCount, setQuestionCount] = useState(persistedDraft?.questionCount || 80);
+  const [timerMinutes, setTimerMinutes] = useState(persistedDraft?.timerMinutes || 120);
+  const [examMode, setExamMode] = useState(persistedDraft?.examMode || 'diagnostic-mock-0');
+  const [examYear, setExamYear] = useState(persistedDraft?.examYear || 'All');
+  const [exam, setExam] = useState(persistedDraft?.exam || null);
+  const [startedAt, setStartedAt] = useState(persistedDraft?.startedAt || null);
+  const [answers, setAnswers] = useState(persistedDraft?.answers || {});
+  const [showResults, setShowResults] = useState(Boolean(persistedDraft?.showResults));
+  const [examMessage, setExamMessage] = useState(persistedDraft?.examMessage || '');
+  const [draftClosed, setDraftClosed] = useState(false);
+  const examQuestions = useMemo(
+    () => (exam?.questionIds || []).map((id) => getQuestionWithOverride(id, state)).filter(Boolean),
+    [exam?.questionIds, state],
+  );
+
+  useEffect(() => {
+    if (!exam?.questionIds?.length) return;
+    const years = getQuestionYearsFromIds(exam.questionIds);
+    if (years.length) onEnsureQuestionYears(years);
+  }, [exam?.id, exam?.questionIds, onEnsureQuestionYears]);
+
+  useEffect(() => {
+    if (!exam) return;
+    if (draftClosed) {
+      onDraftClear();
+      return;
+    }
+    onDraftChange({
+      questionCount,
+      timerMinutes,
+      examMode,
+      examYear,
+      exam,
+      startedAt,
+      answers,
+      showResults,
+      examMessage,
+      updatedAt: new Date().toISOString(),
+    });
+  }, [answers, draftClosed, exam, examMessage, examMode, examYear, onDraftChange, onDraftClear, questionCount, showResults, startedAt, timerMinutes]);
 
   const startMock = async () => {
     const yearsToLoad = examYear === 'All' ? state.settings?.preferredYears || QUESTION_YEARS : [examYear];
@@ -6661,7 +6696,8 @@ function MockExamPanel({ state, onFinishMock, onEnsureQuestionYears }) {
         return true;
       }));
     const selected = pool.slice(0, Number(questionCount));
-    setExam({ id: `mock-${Date.now()}`, questions: selected, mode: examMode, year: examYear === 'All' ? null : Number(examYear) });
+    setDraftClosed(false);
+    setExam({ id: `mock-${Date.now()}`, questionIds: selected.map((question) => question.id), mode: examMode, year: examYear === 'All' ? null : Number(examYear) });
     setStartedAt(Date.now());
     setAnswers({});
     setShowResults(false);
@@ -6683,14 +6719,14 @@ function MockExamPanel({ state, onFinishMock, onEnsureQuestionYears }) {
 
   const finishMock = () => {
     if (!exam) return;
-    const missingIndex = exam.questions.findIndex((question) => !answers[question.id]?.selected);
+    const missingIndex = examQuestions.findIndex((question) => !answers[question.id]?.selected);
     if (missingIndex >= 0) {
       setExamMessage(`第 ${missingIndex + 1} 題尚未作答，已跳到該題。`);
-      document.querySelector(`[data-mock-question-id="${exam.questions[missingIndex].id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.querySelector(`[data-mock-question-id="${examQuestions[missingIndex].id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
     const elapsedSec = startedAt ? Math.round((Date.now() - startedAt) / 1000) : 0;
-    const results = exam.questions.map((q) => {
+    const results = examQuestions.map((q) => {
       const draft = answers[q.id] || {};
       const correctAnswer = String(q.answer || getStat(state, q.id).correctAnswer || '').trim().toUpperCase();
       const selected = String(draft.selected || '').trim().toUpperCase();
@@ -6771,10 +6807,12 @@ function MockExamPanel({ state, onFinishMock, onEnsureQuestionYears }) {
     const completedExam = { ...exam.completedExam, results, persistedAt, completedAt: persistedAt };
     onFinishMock(completedExam);
     setExam({ ...exam, completedExam });
+    setDraftClosed(true);
     setExamMessage('錯因訂正已完成，Mock Exam 結果已寫入統計。');
   };
 
   const completed = exam?.completedExam;
+  const restoringQuestions = Boolean(exam?.questionIds?.length && examQuestions.length < exam.questionIds.length);
 
   return (
     <main className="panel">
@@ -6820,6 +6858,7 @@ function MockExamPanel({ state, onFinishMock, onEnsureQuestionYears }) {
 
       {completed && showResults && (
         <>
+          {restoringQuestions && <p className="save-message">正在恢復 Mock Exam 題目，請稍候。</p>}
           {examMessage && <p className="save-message">{examMessage}</p>}
           <section className="readiness-hero">
             <MetricCard label="答對率" value={`${completed.score}%`} sub={`${completed.correct}/${completed.questionCount - (completed.pendingCount || 0)} graded correct`} />
@@ -6833,7 +6872,7 @@ function MockExamPanel({ state, onFinishMock, onEnsureQuestionYears }) {
             </div>
           </section>
           <div className="question-list">
-            {exam.questions.map((question, index) => {
+            {examQuestions.map((question, index) => {
               const result = completed.results.find((row) => row.questionId === question.id);
               const remediation = answers[question.id]?.errorType ? getRemediationForErrorType(answers[question.id].errorType) : null;
               return (
@@ -6883,14 +6922,15 @@ function MockExamPanel({ state, onFinishMock, onEnsureQuestionYears }) {
 
       {exam && !showResults && (
         <>
+          {restoringQuestions && <p className="save-message">正在恢復 Mock Exam 題目，請稍候。</p>}
           <div className="mock-toolbar">
-            <strong>{exam.questions.length} questions</strong>
-            <span className="muted">已作答 {Object.values(answers).filter((a) => a.selected).length}/{exam.questions.length}</span>
-            <button className="good" onClick={finishMock}>Finish exam and score</button>
+            <strong>{examQuestions.length} questions</strong>
+            <span className="muted">已作答 {Object.values(answers).filter((a) => a.selected).length}/{examQuestions.length}</span>
+            <button className="good" disabled={restoringQuestions} onClick={finishMock}>Finish exam and score</button>
           </div>
           {examMessage && <p className="save-message">{examMessage}</p>}
           <div className="question-list">
-            {exam.questions.map((q, index) => {
+            {examQuestions.map((q, index) => {
               const draft = answers[q.id] || { confidence: 3, selected: '' };
               return (
                 <article className="question-card" key={q.id} data-mock-question-id={q.id}>
@@ -8412,6 +8452,14 @@ export default function App() {
     [allFlashcards]
   );
 
+  const updateActiveMockExam = useCallback((draft) => {
+    updateState((prev) => ({ ...prev, activeMockExam: draft }), ['activity']);
+  }, [updateState]);
+
+  const clearActiveMockExam = useCallback(() => {
+    updateState((prev) => prev.activeMockExam ? { ...prev, activeMockExam: null } : prev, ['activity']);
+  }, [updateState]);
+
   const finishMockExam = (completedExam) => {
     updateState((prev) => {
       const existingExam = (prev.mockExams || []).find((mock) => mock.id === completedExam.id);
@@ -8935,7 +8983,14 @@ export default function App() {
       )}
 
       {tab === 'mock' && (
-        <MockExamPanel state={state} onFinishMock={finishMockExam} onEnsureQuestionYears={ensureQuestionYearsReady} />
+        <MockExamPanel
+          state={state}
+          persistedDraft={state.activeMockExam}
+          onDraftChange={updateActiveMockExam}
+          onDraftClear={clearActiveMockExam}
+          onFinishMock={finishMockExam}
+          onEnsureQuestionYears={ensureQuestionYearsReady}
+        />
       )}
 
       {tab === 'critical' && (
