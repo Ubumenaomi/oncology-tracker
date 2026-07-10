@@ -2051,7 +2051,7 @@ function applyBatchQuestionResults(stats, results, mode, attemptId) {
     const rating = result.isCorrect ? 'Good' : 'Again';
     const interval = nextIntervalByRating(rating, previous);
     const wasPreviouslyWrong = (previous.wrong || 0) > 0;
-    const remediation = !result.isCorrect ? getRemediationForErrorType(result.errorType) : null;
+    const remediation = !result.isCorrect && result.errorType ? getRemediationForErrorType(result.errorType) : null;
     const remediationEvent = remediation ? {
       date: TODAY,
       questionId: result.questionId,
@@ -2085,7 +2085,7 @@ function applyBatchQuestionResults(stats, results, mode, attemptId) {
       userAnswer: result.selected,
       correctAnswer: result.correctAnswer,
       lastConfidence: result.confidence,
-      lastErrorType: result.isCorrect ? '' : result.errorType,
+      lastErrorType: result.isCorrect ? '' : (result.errorType || previous.lastErrorType || ''),
       confidenceHistory: [...(previous.confidenceHistory || []), result.confidence].slice(-50),
       answerHistory: [...(previous.answerHistory || []), event].slice(-50),
       timeHistory: result.timeSpentSec == null ? (previous.timeHistory || []) : [...(previous.timeHistory || []), result.timeSpentSec].slice(-50),
@@ -2098,6 +2098,46 @@ function applyBatchQuestionResults(stats, results, mode, attemptId) {
         : [...(previous.errorTypes || []), result.errorType].slice(-20),
       lastRemediationTask: remediationEvent || previous.lastRemediationTask || null,
       remediationTasks: remediationEvent ? [remediationEvent, ...(previous.remediationTasks || [])].slice(0, 20) : (previous.remediationTasks || []),
+    };
+  });
+
+  return nextStats;
+}
+
+function applyBatchRemediationsToStats(stats, results, attemptId) {
+  const nextStats = { ...(stats || {}) };
+
+  results.forEach((result) => {
+    if (result.isCorrect || !result.errorType) return;
+    const previous = { ...emptyStat(), ...(nextStats[result.questionId] || {}) };
+    const remediation = getRemediationForErrorType(result.errorType);
+    const remediationEvent = {
+      date: TODAY,
+      questionId: result.questionId,
+      errorType: result.errorType,
+      task: remediation.task,
+      cardType: remediation.cardType,
+      action: remediation.action,
+      attemptId,
+    };
+    const answerHistory = (previous.answerHistory || []).map((event) => (
+      event?.attemptId === attemptId
+        ? { ...event, errorType: result.errorType, remediationTask: remediation.task, remediationCardType: remediation.cardType }
+        : event
+    ));
+    const alreadyHasRemediation = (previous.remediationTasks || []).some((task) => task?.attemptId === attemptId);
+
+    nextStats[result.questionId] = {
+      ...previous,
+      lastErrorType: result.errorType,
+      errorTypes: (previous.errorTypes || []).at(-1) === result.errorType
+        ? (previous.errorTypes || [])
+        : [...(previous.errorTypes || []), result.errorType].slice(-20),
+      answerHistory,
+      lastRemediationTask: remediationEvent,
+      remediationTasks: alreadyHasRemediation
+        ? (previous.remediationTasks || []).map((task) => task?.attemptId === attemptId ? remediationEvent : task)
+        : [remediationEvent, ...(previous.remediationTasks || [])].slice(0, 20),
     };
   });
 
@@ -6604,9 +6644,11 @@ function MockExamPanel({ state, onFinishMock, onEnsureQuestionYears }) {
       topScoreLoss,
       results,
       startedAt: new Date(startedAt || Date.now()).toISOString(),
-      completedAt: new Date().toISOString(),
+      scoredAt: new Date().toISOString(),
+      completedAt: null,
     };
     playResultFeedback(score >= 60 ? 'correct' : 'wrong');
+    onFinishMock(completedExam);
     setExam({ ...exam, completedExam });
     setShowResults(true);
     setExamMessage('已整份交卷。請查看所有答案並完成錯題的錯因分類。');
@@ -6630,7 +6672,8 @@ function MockExamPanel({ state, onFinishMock, onEnsureQuestionYears }) {
       document.querySelector(`[data-mock-review-id="${missing.questionId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
-    const completedExam = { ...exam.completedExam, results, persistedAt: new Date().toISOString() };
+    const persistedAt = new Date().toISOString();
+    const completedExam = { ...exam.completedExam, results, persistedAt, completedAt: persistedAt };
     onFinishMock(completedExam);
     setExam({ ...exam, completedExam });
     setExamMessage('錯因訂正已完成，Mock Exam 結果已寫入統計。');
@@ -7604,18 +7647,25 @@ export default function App() {
   const todayPracticeTargetIds = todayIds.slice(0, todayPracticeTargetCount);
   const dailyBatchSubmitted = Boolean(todaySession?.submittedAt && todaySession?.gradingResults?.length);
   const dailyBatchResults = todaySession?.gradingResults || EMPTY_ARRAY;
+  const dailyBatchAttemptsRecorded = dailyBatchResults.length > 0 && dailyBatchResults.every((result) => (
+    (getStat(state, result.questionId).answerHistory || []).some((event) => event?.attemptId === todaySession?.attemptId)
+  ));
   const dailyBatchCorrect = dailyBatchResults.filter((result) => result.isCorrect).length;
   const dailyBatchWrong = dailyBatchResults.length - dailyBatchCorrect;
   const dailyWrongClassified = dailyBatchResults.filter((result) => (
-    !result.isCorrect && todaySession?.practiceDrafts?.[result.questionId]?.errorType
+    !result.isCorrect && (result.errorType || todaySession?.practiceDrafts?.[result.questionId]?.errorType)
   )).length;
+  const dailyBatchClassificationComplete = dailyBatchSubmitted && dailyBatchResults.every((result) => (
+    result.isCorrect || result.errorType || todaySession?.practiceDrafts?.[result.questionId]?.errorType
+  ));
   const todayRatedCount = todayPracticeTargetIds.filter((id) => hasDailyPracticeRating(state, id, TODAY)).length;
   const firstIncompletePracticeIndex = todayPracticeTargetIds.findIndex((id) => !hasDailyPracticeRating(state, id, TODAY));
   const firstIncompletePracticeId = firstIncompletePracticeIndex >= 0 ? todayPracticeTargetIds[firstIncompletePracticeIndex] : null;
   const todayCompleted = todaySessionMatchesQuest
     && todayPracticeTargetCount > 0
     && todayPracticeTargetIds.length >= todayPracticeTargetCount
-    && todayRatedCount >= todayPracticeTargetCount;
+    && todayRatedCount >= todayPracticeTargetCount
+    && (!dailyBatchSubmitted || dailyBatchClassificationComplete);
   const questProgress = getDailyQuestProgress(state, TODAY, baseQuestTask, todayCompleted);
   const questTask = getStudyPlanTaskById(questProgress.planTaskId) || baseQuestTask;
   const todayFocusMinutes = sumFocusMinutesByDate(state, TODAY);
@@ -7734,28 +7784,34 @@ export default function App() {
       };
     });
 
-    updateState((prev) => ({
-      ...prev,
-      sessions: {
-        ...(prev.sessions || {}),
-        [TODAY]: {
-          ...(prev.sessions?.[TODAY] || {}),
-          attemptId,
-          submittedAt,
-          gradingResults,
-          statsCommittedAt: null,
+    updateState((prev) => {
+      const existingSession = prev.sessions?.[TODAY] || {};
+      if (existingSession.attemptsCommittedAt) return prev;
+      return {
+        ...prev,
+        stats: applyBatchQuestionResults(prev.stats, gradingResults, 'daily', attemptId),
+        sessions: {
+          ...(prev.sessions || {}),
+          [TODAY]: {
+            ...existingSession,
+            attemptId,
+            submittedAt,
+            gradingResults,
+            attemptsCommittedAt: submittedAt,
+            statsCommittedAt: null,
+          },
         },
-      },
-    }), ['sessions']);
+      };
+    }, ['stats', 'sessions']);
     setPracticePage(0);
     setPracticePageMessage('已整份交卷。請逐題查看答案，並完成所有錯題的錯因分類。');
   };
 
   const finalizeDailyPractice = () => {
-    if (!dailyBatchSubmitted || todaySession?.statsCommittedAt) return;
+    if (!dailyBatchSubmitted || (todaySession?.statsCommittedAt && dailyBatchAttemptsRecorded)) return;
     const results = dailyBatchResults.map((result) => ({
       ...result,
-      errorType: result.isCorrect ? '' : (todaySession?.practiceDrafts?.[result.questionId]?.errorType || ''),
+      errorType: result.isCorrect ? '' : (result.errorType || todaySession?.practiceDrafts?.[result.questionId]?.errorType || ''),
     }));
     const missingError = results.find((result) => !result.isCorrect && !result.errorType);
     if (missingError) {
@@ -7767,13 +7823,17 @@ export default function App() {
     const committedAt = new Date().toISOString();
     updateState((prev) => {
       const session = prev.sessions?.[TODAY] || {};
-      if (session.statsCommittedAt) return prev;
+      const attemptsRecorded = results.every((result) => (
+        (prev.stats?.[result.questionId]?.answerHistory || []).some((event) => event?.attemptId === session.attemptId)
+      ));
+      if (session.statsCommittedAt && attemptsRecorded) return prev;
+      const attemptStats = attemptsRecorded ? prev.stats : applyBatchQuestionResults(prev.stats, results, 'daily', session.attemptId);
       return {
         ...prev,
-        stats: applyBatchQuestionResults(prev.stats, results, 'daily', session.attemptId),
+        stats: applyBatchRemediationsToStats(attemptStats, results, session.attemptId),
         sessions: {
           ...(prev.sessions || {}),
-          [TODAY]: { ...session, gradingResults: results, statsCommittedAt: committedAt, completed: true },
+          [TODAY]: { ...session, gradingResults: results, attemptsCommittedAt: session.attemptsCommittedAt || committedAt, statsCommittedAt: committedAt, completed: true },
         },
       };
     }, ['stats', 'sessions']);
@@ -7919,18 +7979,42 @@ export default function App() {
       openFirstIncompletePracticeQuestion();
       return;
     }
-    updateState((prev) => ({
-      ...prev,
-      sessions: {
-        ...(prev.sessions || {}),
-        [TODAY]: { ...(prev.sessions?.[TODAY] || {}), ...makePlanTaskSnapshot(questTask), completed: true },
-      },
-      game: {
-        ...awardXp(prev.game || defaultState.game, getPracticeModeConfig(prev.sessions?.[TODAY]?.practiceMode).xp, `${getPracticeModeConfig(prev.sessions?.[TODAY]?.practiceMode).shortLabel} Daily Practice completed`, { date: TODAY, practiceMode: prev.sessions?.[TODAY]?.practiceMode || 'standard' }),
-        streak: (prev.game?.streak || 0) + 1,
-        dailyClaims: { ...(prev.game?.dailyClaims || {}), [TODAY]: true },
-      },
-    }), ['sessions', 'game']);
+    updateState((prev) => {
+      const session = prev.sessions?.[TODAY] || {};
+      const results = (session.gradingResults || []).map((result) => ({
+        ...result,
+        errorType: result.isCorrect ? '' : (result.errorType || session.practiceDrafts?.[result.questionId]?.errorType || ''),
+      }));
+      const attemptId = session.attemptId;
+      const attemptsRecorded = results.length > 0 && results.every((result) => (
+        (prev.stats?.[result.questionId]?.answerHistory || []).some((event) => event?.attemptId === attemptId)
+      ));
+      const attemptStats = results.length && !attemptsRecorded
+        ? applyBatchQuestionResults(prev.stats, results, 'daily', attemptId)
+        : prev.stats;
+      const nextStats = results.length ? applyBatchRemediationsToStats(attemptStats, results, attemptId) : attemptStats;
+      const claimedAt = new Date().toISOString();
+      return {
+        ...prev,
+        stats: nextStats,
+        sessions: {
+          ...(prev.sessions || {}),
+          [TODAY]: {
+            ...session,
+            ...makePlanTaskSnapshot(questTask),
+            gradingResults: results.length ? results : session.gradingResults,
+            attemptsCommittedAt: session.attemptsCommittedAt || (results.length ? claimedAt : null),
+            statsCommittedAt: session.statsCommittedAt || (results.length ? claimedAt : null),
+            completed: true,
+          },
+        },
+        game: {
+          ...awardXp(prev.game || defaultState.game, getPracticeModeConfig(session.practiceMode).xp, `${getPracticeModeConfig(session.practiceMode).shortLabel} Daily Practice completed`, { date: TODAY, practiceMode: session.practiceMode || 'standard' }),
+          streak: (prev.game?.streak || 0) + 1,
+          dailyClaims: { ...(prev.game?.dailyClaims || {}), [TODAY]: true },
+        },
+      };
+    }, ['stats', 'sessions', 'game']);
   };
 
   const markDailyCheckIn = () => {
@@ -8182,7 +8266,16 @@ export default function App() {
 
   const finishMockExam = (completedExam) => {
     updateState((prev) => {
-      if ((prev.mockExams || []).some((mock) => mock.id === completedExam.id)) return prev;
+      const existingExam = (prev.mockExams || []).find((mock) => mock.id === completedExam.id);
+      if (existingExam) {
+        return {
+          ...prev,
+          stats: completedExam.persistedAt
+            ? applyBatchRemediationsToStats(prev.stats, completedExam.results, completedExam.id)
+            : prev.stats,
+          mockExams: (prev.mockExams || []).map((mock) => mock.id === completedExam.id ? completedExam : mock),
+        };
+      }
       return {
         ...prev,
         stats: applyBatchQuestionResults(prev.stats, completedExam.results, 'mock', completedExam.id),
@@ -8812,8 +8905,8 @@ export default function App() {
                 {!dailyBatchSubmitted ? (
                   <button className="good" onClick={submitDailyPractice}>整份交卷並顯示答案</button>
                 ) : (
-                  <button className="good" disabled={Boolean(todaySession?.statsCommittedAt)} onClick={finalizeDailyPractice}>
-                    {todaySession?.statsCommittedAt ? '訂正與統計已完成' : '完成錯因訂正並寫入統計'}
+                  <button className="good" disabled={Boolean(todaySession?.statsCommittedAt && dailyBatchAttemptsRecorded)} onClick={finalizeDailyPractice}>
+                    {todaySession?.statsCommittedAt && dailyBatchAttemptsRecorded ? '訂正與統計已完成' : '完成錯因訂正並寫入統計'}
                   </button>
                 )}
               </div>
