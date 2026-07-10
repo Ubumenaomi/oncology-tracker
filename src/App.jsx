@@ -2068,6 +2068,19 @@ function applyBatchQuestionResults(stats, results, mode, attemptId) {
       mode,
       rating,
       attemptId,
+      wasPreviouslyWrong,
+      previousStat: {
+        mastery: previous.mastery || 0,
+        repeatedWrong: previous.repeatedWrong || 0,
+        wrongRetestAttempts: previous.wrongRetestAttempts || 0,
+        wrongRetestCorrect: previous.wrongRetestCorrect || 0,
+        intervalDays: previous.intervalDays || 1,
+        nextReviewDate: previous.nextReviewDate || null,
+        lastResult: previous.lastResult || null,
+        lastRating: previous.lastRating || null,
+        lastAttemptAt: previous.lastAttemptAt || null,
+        lastErrorType: previous.lastErrorType || '',
+      },
       remediationTask: remediation?.task || '',
       remediationCardType: remediation?.cardType || '',
     };
@@ -2108,17 +2121,41 @@ function applyBatchQuestionResults(stats, results, mode, attemptId) {
 function regradeBatchQuestionResult(stats, result, mode, attemptId) {
   const previous = { ...emptyStat(), ...(stats?.[result.questionId] || {}) };
   const previousEvent = (previous.answerHistory || []).find((event) => event?.attemptId === attemptId);
-  if (!previousEvent || previousEvent.correctAnswer) {
+  if (!previousEvent) {
     return applyBatchQuestionResults(stats, [result], mode, attemptId);
   }
+  if (
+    previousEvent.correctAnswer === result.correctAnswer
+    && previousEvent.isCorrect === result.isCorrect
+  ) return stats;
+
+  const previousWasWrongRetest = previousEvent.wasPreviouslyWrong
+    ?? ((previous.wrong || 0) - (previousEvent.isCorrect ? 0 : 1) > 0);
+  const oldMasteryDelta = previousEvent.isCorrect ? 1 : -1;
+  const previousSnapshot = previousEvent.previousStat || {};
+  const remainingHistory = (previous.answerHistory || []).filter((event) => event?.attemptId !== attemptId);
+  const trailingWrong = [...remainingHistory].reverse().findIndex((event) => event?.isCorrect);
 
   const cleanedStat = {
     ...previous,
     attempts: Math.max(0, (previous.attempts || 0) - 1),
     correct: Math.max(0, (previous.correct || 0) - (previousEvent.isCorrect ? 1 : 0)),
     wrong: Math.max(0, (previous.wrong || 0) - (previousEvent.isCorrect ? 0 : 1)),
-    answerHistory: (previous.answerHistory || []).filter((event) => event?.attemptId !== attemptId),
+    answerHistory: remainingHistory,
+    mastery: previousSnapshot.mastery ?? Math.max(0, Math.min(5, (previous.mastery || 0) - oldMasteryDelta)),
+    repeatedWrong: previousSnapshot.repeatedWrong ?? (trailingWrong < 0 ? remainingHistory.filter((event) => event?.isCorrect === false).length : trailingWrong),
     highConfidenceWrong: Math.max(0, (previous.highConfidenceWrong || 0) - (!previousEvent.isCorrect && previousEvent.confidence >= 4 ? 1 : 0)),
+    wrongRetestAttempts: previousSnapshot.wrongRetestAttempts ?? Math.max(0, (previous.wrongRetestAttempts || 0) - (previousWasWrongRetest ? 1 : 0)),
+    wrongRetestCorrect: previousSnapshot.wrongRetestCorrect ?? Math.max(0, (previous.wrongRetestCorrect || 0) - (previousWasWrongRetest && previousEvent.isCorrect ? 1 : 0)),
+    intervalDays: previousSnapshot.intervalDays ?? previous.intervalDays,
+    nextReviewDate: Object.hasOwn(previousSnapshot, 'nextReviewDate') ? previousSnapshot.nextReviewDate : previous.nextReviewDate,
+    lastResult: Object.hasOwn(previousSnapshot, 'lastResult') ? previousSnapshot.lastResult : previous.lastResult,
+    lastRating: Object.hasOwn(previousSnapshot, 'lastRating') ? previousSnapshot.lastRating : previous.lastRating,
+    lastAttemptAt: Object.hasOwn(previousSnapshot, 'lastAttemptAt') ? previousSnapshot.lastAttemptAt : previous.lastAttemptAt,
+    lastErrorType: previousSnapshot.lastErrorType ?? previous.lastErrorType,
+    confidenceHistory: (previous.confidenceHistory || []).slice(0, -1),
+    timeHistory: previousEvent.timeSpentSec == null ? (previous.timeHistory || []) : (previous.timeHistory || []).slice(0, -1),
+    remediationTasks: (previous.remediationTasks || []).filter((task) => task?.attemptId !== attemptId),
   };
   return applyBatchQuestionResults({ ...(stats || {}), [result.questionId]: cleanedStat }, [result], mode, attemptId);
 }
@@ -4735,7 +4772,8 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                     value={correctAnswer}
                     onChange={(e) => {
                       setCorrectAnswer(e.target.value);
-                      if (practiceMode) onPracticeChange?.({ correctAnswer: e.target.value });
+                      setErrorType('');
+                      if (practiceMode) onPracticeChange?.({ correctAnswer: e.target.value, errorType: '' });
                     }}
                   >
                     <option value="" disabled={practiceMode && batchSubmitted}>尚未輸入</option>
@@ -6575,6 +6613,26 @@ function FlashcardReviewPanel({ dueFlashcards, allFlashcards, onReviewCard, onUp
   );
 }
 
+function summarizeMockResults(results = []) {
+  const gradeable = results.filter((row) => row.isCorrect != null);
+  const correct = gradeable.filter((row) => row.isCorrect).length;
+  const wrongRows = gradeable.filter((row) => !row.isCorrect);
+  const cancerLoss = wrongRows.reduce((acc, row) => {
+    const key = `${row.cancer} · ${row.topic || 'General'}`;
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  return {
+    correct,
+    pendingCount: results.length - gradeable.length,
+    score: gradeable.length ? Math.round((correct / gradeable.length) * 100) : 0,
+    highConfidenceWrong: wrongRows.filter((row) => row.confidence >= 4).length,
+    slowCorrect: gradeable.filter((row) => row.isCorrect && row.timeSpentSec > 90).length,
+    fastWrong: wrongRows.filter((row) => row.timeSpentSec < 30).length,
+    topScoreLoss: Object.entries(cancerLoss).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([label, count]) => ({ label, count })),
+  };
+}
+
 function MockExamPanel({ state, onFinishMock, onEnsureQuestionYears }) {
   const [questionCount, setQuestionCount] = useState(80);
   const [timerMinutes, setTimerMinutes] = useState(120);
@@ -6634,9 +6692,9 @@ function MockExamPanel({ state, onFinishMock, onEnsureQuestionYears }) {
     const elapsedSec = startedAt ? Math.round((Date.now() - startedAt) / 1000) : 0;
     const results = exam.questions.map((q) => {
       const draft = answers[q.id] || {};
-      const correctAnswer = String(q.answer || '').trim().toUpperCase();
+      const correctAnswer = String(q.answer || getStat(state, q.id).correctAnswer || '').trim().toUpperCase();
       const selected = String(draft.selected || '').trim().toUpperCase();
-      const isCorrect = Boolean(selected && correctAnswer && selected === correctAnswer);
+      const isCorrect = correctAnswer ? selected === correctAnswer : null;
       return {
         questionId: q.id,
         selected: selected || null,
@@ -6650,17 +6708,7 @@ function MockExamPanel({ state, onFinishMock, onEnsureQuestionYears }) {
         submittedAt: new Date().toISOString(),
       };
     });
-    const correct = results.filter((row) => row.isCorrect).length;
-    const score = results.length ? Math.round((correct / results.length) * 100) : 0;
-    const cancerLoss = results.filter((row) => !row.isCorrect).reduce((acc, row) => {
-      const key = `${row.cancer} · ${row.topic || 'General'}`;
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-    const topScoreLoss = Object.entries(cancerLoss).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([label, count]) => ({ label, count }));
-    const highConfidenceWrong = results.filter((row) => !row.isCorrect && row.confidence >= 4).length;
-    const slowCorrect = results.filter((row) => row.isCorrect && row.timeSpentSec > 90).length;
-    const fastWrong = results.filter((row) => !row.isCorrect && row.timeSpentSec < 30).length;
+    const summary = summarizeMockResults(results);
     const completedExam = {
       id: exam.id,
       mode: exam.mode || examMode,
@@ -6668,28 +6716,37 @@ function MockExamPanel({ state, onFinishMock, onEnsureQuestionYears }) {
       questionCount: results.length,
       timerMinutes: Number(timerMinutes),
       elapsedSec,
-      score,
-      correct,
-      highConfidenceWrong,
-      slowCorrect,
-      fastWrong,
-      topScoreLoss,
+      ...summary,
       results,
       startedAt: new Date(startedAt || Date.now()).toISOString(),
       scoredAt: new Date().toISOString(),
       completedAt: null,
     };
-    playResultFeedback(score >= 60 ? 'correct' : 'wrong');
+    playResultFeedback(summary.score >= 60 ? 'correct' : 'wrong');
     onFinishMock(completedExam);
     setExam({ ...exam, completedExam });
     setShowResults(true);
     setExamMessage('已整份交卷。請查看所有答案並完成錯題的錯因分類。');
   };
 
+  const updateMockCorrectAnswer = (questionId, nextAnswer) => {
+    if (!exam?.completedExam || exam.completedExam.persistedAt) return;
+    const correctAnswer = String(nextAnswer || '').trim().toUpperCase();
+    const results = exam.completedExam.results.map((result) => result.questionId === questionId ? {
+      ...result,
+      correctAnswer: correctAnswer || null,
+      isCorrect: correctAnswer ? result.selected === correctAnswer : null,
+    } : result);
+    const completedExam = { ...exam.completedExam, ...summarizeMockResults(results), results };
+    updateAnswer(questionId, { correctAnswer, errorType: '' });
+    onFinishMock(completedExam);
+    setExam({ ...exam, completedExam });
+  };
+
   const finalizeMock = () => {
     if (!exam?.completedExam || exam.completedExam.persistedAt) return;
     const results = exam.completedExam.results.map((result) => {
-      const errorType = result.isCorrect ? '' : (answers[result.questionId]?.errorType || '');
+      const errorType = result.isCorrect === false ? (answers[result.questionId]?.errorType || '') : '';
       const remediation = errorType ? getRemediationForErrorType(errorType) : null;
       return {
         ...result,
@@ -6698,6 +6755,12 @@ function MockExamPanel({ state, onFinishMock, onEnsureQuestionYears }) {
         remediationCardType: remediation?.cardType || '',
       };
     });
+    const missingCorrectAnswer = results.find((result) => result.isCorrect == null);
+    if (missingCorrectAnswer) {
+      setExamMessage('仍有題目尚未設定正解，已跳到該題。');
+      document.querySelector(`[data-mock-review-id="${missingCorrectAnswer.questionId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
     const missing = results.find((result) => !result.isCorrect && !result.errorType);
     if (missing) {
       setExamMessage('仍有錯題尚未選擇錯因，已跳到該題。');
@@ -6759,8 +6822,9 @@ function MockExamPanel({ state, onFinishMock, onEnsureQuestionYears }) {
         <>
           {examMessage && <p className="save-message">{examMessage}</p>}
           <section className="readiness-hero">
-            <MetricCard label="答對率" value={`${completed.score}%`} sub={`${completed.correct}/${completed.questionCount} correct`} />
-            <MetricCard label="答錯率" value={`${100 - completed.score}%`} sub={`${completed.questionCount - completed.correct}/${completed.questionCount} wrong`} />
+            <MetricCard label="答對率" value={`${completed.score}%`} sub={`${completed.correct}/${completed.questionCount - (completed.pendingCount || 0)} graded correct`} />
+            <MetricCard label="答錯率" value={`${100 - completed.score}%`} sub={`${completed.questionCount - (completed.pendingCount || 0) - completed.correct}/${completed.questionCount - (completed.pendingCount || 0)} graded wrong`} />
+            {completed.pendingCount > 0 && <MetricCard label="待補正解" value={completed.pendingCount} sub="補入後才納入分數" />}
             <MetricCard label="High-confidence wrong" value={completed.highConfidenceWrong} sub="confidence 4–5 but wrong" />
             <MetricCard label="Fast wrong / Slow correct" value={`${completed.fastWrong}/${completed.slowCorrect}`} sub="speed diagnostics" />
             <div className="subsection full-span">
@@ -6784,8 +6848,18 @@ function MockExamPanel({ state, onFinishMock, onEnsureQuestionYears }) {
                       </label>
                     ))}
                   </div>
-                  <div className="feedback-box"><strong>{result.isCorrect ? 'Correct' : 'Wrong'}｜你的答案：{result.selected}｜正解：{result.correctAnswer}</strong></div>
-                  {!result.isCorrect && (
+                  <div className="feedback-box"><strong>{result.isCorrect == null ? '待補正解' : result.isCorrect ? 'Correct' : 'Wrong'}｜你的答案：{result.selected}｜正解：{result.correctAnswer || '尚未輸入'}</strong></div>
+                  {!question.answer && (
+                    <div className="answer-row">
+                      <label>正解
+                        <select disabled={Boolean(completed.persistedAt)} value={result.correctAnswer || ''} onChange={(event) => updateMockCorrectAnswer(question.id, event.target.value)}>
+                          <option value="" disabled>尚未輸入</option>
+                          {['A', 'B', 'C', 'D', 'E'].map((answer) => <option key={answer} value={answer}>{answer}</option>)}
+                        </select>
+                      </label>
+                    </div>
+                  )}
+                  {result.isCorrect === false && (
                     <div className="answer-row">
                       <label>Error type
                         <select disabled={Boolean(completed.persistedAt)} value={answers[question.id]?.errorType || ''} onChange={(event) => updateAnswer(question.id, { errorType: event.target.value })}>
@@ -8342,11 +8416,17 @@ export default function App() {
     updateState((prev) => {
       const existingExam = (prev.mockExams || []).find((mock) => mock.id === completedExam.id);
       if (existingExam) {
+        const regradedStats = completedExam.results.reduce(
+          (nextStats, result) => result.isCorrect == null
+            ? nextStats
+            : regradeBatchQuestionResult(nextStats, result, 'mock', completedExam.id),
+          prev.stats,
+        );
         return {
           ...prev,
           stats: completedExam.persistedAt
-            ? applyBatchRemediationsToStats(prev.stats, completedExam.results, completedExam.id)
-            : prev.stats,
+            ? applyBatchRemediationsToStats(regradedStats, completedExam.results, completedExam.id)
+            : regradedStats,
           mockExams: (prev.mockExams || []).map((mock) => mock.id === completedExam.id ? completedExam : mock),
         };
       }
