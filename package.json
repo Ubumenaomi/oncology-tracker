@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "questions:promote": "node scripts/promote-question-backup.js",
     "tag:questions": "node scripts/tag-question-bank.js",
     "preview": "vite preview"
   },

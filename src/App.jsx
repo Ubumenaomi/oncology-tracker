@@ -2031,6 +2031,69 @@ function nextIntervalByRating(rating, stat) {
   return getAnkiIntervalDays(rating, stat);
 }
 
+function applyBatchQuestionResults(stats, results, mode, attemptId) {
+  const nextStats = { ...(stats || {}) };
+
+  results.forEach((result) => {
+    const previous = { ...emptyStat(), ...(nextStats[result.questionId] || {}) };
+    if ((previous.answerHistory || []).some((event) => event?.attemptId === attemptId)) return;
+
+    const rating = result.isCorrect ? 'Good' : 'Again';
+    const interval = nextIntervalByRating(rating, previous);
+    const wasPreviouslyWrong = (previous.wrong || 0) > 0;
+    const remediation = !result.isCorrect ? getRemediationForErrorType(result.errorType) : null;
+    const remediationEvent = remediation ? {
+      date: TODAY,
+      questionId: result.questionId,
+      errorType: result.errorType,
+      task: remediation.task,
+      cardType: remediation.cardType,
+      action: remediation.action,
+      attemptId,
+    } : null;
+    const event = {
+      ...result,
+      date: TODAY,
+      mode,
+      rating,
+      attemptId,
+      remediationTask: remediation?.task || '',
+      remediationCardType: remediation?.cardType || '',
+    };
+
+    nextStats[result.questionId] = {
+      ...previous,
+      attempts: (previous.attempts || 0) + 1,
+      correct: (previous.correct || 0) + (result.isCorrect ? 1 : 0),
+      wrong: (previous.wrong || 0) + (result.isCorrect ? 0 : 1),
+      lastResult: result.isCorrect ? 'correct' : 'wrong',
+      lastRating: rating,
+      lastAttemptAt: TODAY,
+      nextReviewDate: addDays(TODAY, interval),
+      mastery: result.isCorrect ? Math.min(5, (previous.mastery || 0) + 1) : Math.max(0, (previous.mastery || 0) - 1),
+      intervalDays: interval,
+      userAnswer: result.selected,
+      correctAnswer: result.correctAnswer,
+      lastConfidence: result.confidence,
+      lastErrorType: result.isCorrect ? '' : result.errorType,
+      confidenceHistory: [...(previous.confidenceHistory || []), result.confidence].slice(-50),
+      answerHistory: [...(previous.answerHistory || []), event].slice(-50),
+      timeHistory: result.timeSpentSec == null ? (previous.timeHistory || []) : [...(previous.timeHistory || []), result.timeSpentSec].slice(-50),
+      highConfidenceWrong: (previous.highConfidenceWrong || 0) + (!result.isCorrect && result.confidence >= 4 ? 1 : 0),
+      repeatedWrong: result.isCorrect ? 0 : (previous.repeatedWrong || 0) + 1,
+      wrongRetestAttempts: (previous.wrongRetestAttempts || 0) + (wasPreviouslyWrong ? 1 : 0),
+      wrongRetestCorrect: (previous.wrongRetestCorrect || 0) + (wasPreviouslyWrong && result.isCorrect ? 1 : 0),
+      errorTypes: result.isCorrect || !result.errorType || (previous.errorTypes || []).at(-1) === result.errorType
+        ? (previous.errorTypes || [])
+        : [...(previous.errorTypes || []), result.errorType].slice(-20),
+      lastRemediationTask: remediationEvent || previous.lastRemediationTask || null,
+      remediationTasks: remediationEvent ? [remediationEvent, ...(previous.remediationTasks || [])].slice(0, 20) : (previous.remediationTasks || []),
+    };
+  });
+
+  return nextStats;
+}
+
 function getAnkiIntervalDays(rating, stat = {}) {
   const current = Math.max(1, Number(stat.intervalDays) || 1);
   const attempts = Number(stat.attempts) || 0;
@@ -4131,7 +4194,7 @@ function PracticeModeSelector({ value, onChange, compact = false }) {
 }
 
 
-function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswerUntilSubmit = false, practiceMode = false, practiceDraft = null, onPracticeChange = null, onEdit }) {
+function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswerUntilSubmit = false, practiceMode = false, practiceDraft = null, onPracticeChange = null, batchSubmitted = false, onEdit }) {
   const initialAnswer = stat.correctAnswer || question.answer || '';
   const [selected, setSelected] = useState(practiceMode ? '' : stat.userAnswer || '');
   const [correctAnswer, setCorrectAnswer] = useState(initialAnswer);
@@ -4162,7 +4225,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
       setWrongNotes(practiceDraft.wrongNotes ?? (stat.wrongNotes || ''));
       setConfidence(practiceDraft.confidence ?? stat.lastConfidence ?? 3);
       setErrorType(practiceDraft.errorType ?? stat.lastErrorType ?? '');
-      setRevealed(practiceDraft.revealed ?? false);
+      setRevealed(batchSubmitted || practiceDraft.revealed || false);
     } else {
       setSelected(practiceMode ? '' : stat.userAnswer || '');
       setCorrectAnswer(nextAnswer);
@@ -4182,6 +4245,10 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
     // Local answer state should reset only when the rendered question changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [question.id]);
+
+  useEffect(() => {
+    if (practiceMode) setRevealed(batchSubmitted);
+  }, [batchSubmitted, practiceMode]);
 
   const onPracticeChangeRef = useRef(onPracticeChange);
   useEffect(() => { onPracticeChangeRef.current = onPracticeChange; }, [onPracticeChange]);
@@ -4445,6 +4512,11 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
 
   const updateRecordedErrorType = (nextErrorType) => {
     setErrorType(nextErrorType);
+    if (practiceMode && batchSubmitted) {
+      onPracticeChange?.({ errorType: nextErrorType });
+      setFeedback(nextErrorType ? `已選擇錯因：${nextErrorType}` : '請選擇錯因。');
+      return;
+    }
     if (!hasRecordedCurrentWrongAttempt || !nextErrorType || isCorrectSelection) return;
 
     const remediation = getRemediationForErrorType(nextErrorType);
@@ -4550,7 +4622,22 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
             })}
           </div>
 
-          {hideAnswerUntilSubmit && !revealed && (
+          {practiceMode && !revealed && (
+            <div className="answer-row">
+              <label>
+                Confidence
+                <select value={confidence} onChange={(e) => setConfidence(Number(e.target.value))}>
+                  <option value={1}>1 完全猜</option>
+                  <option value={2}>2 不太確定</option>
+                  <option value={3}>3 有印象</option>
+                  <option value={4}>4 有把握</option>
+                  <option value={5}>5 非常確定</option>
+                </select>
+              </label>
+            </div>
+          )}
+
+          {hideAnswerUntilSubmit && !revealed && !practiceMode && (
             <div className="submit-row">
               <button className="primary" onClick={submitAnswer}>送出作答後顯示正解與詳解</button>
               {feedback && <span className="save-message">{feedback}</span>}
@@ -4572,16 +4659,16 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
               </div>
 
               <div className="answer-row">
-                <label>
+                {!practiceMode && <label>
                   正解
                   <select value={correctAnswer} onChange={(e) => setCorrectAnswer(e.target.value)}>
                     <option value="">尚未輸入</option>
                     {['A', 'B', 'C', 'D', 'E'].map((x) => <option key={x} value={x}>{x}</option>)}
                   </select>
-                </label>
+                </label>}
                 <label>
                   Confidence
-                  <select value={confidence} onChange={(e) => setConfidence(Number(e.target.value))}>
+                  <select disabled={practiceMode && batchSubmitted} value={confidence} onChange={(e) => setConfidence(Number(e.target.value))}>
                     <option value={1}>1 完全猜</option>
                     <option value={2}>2 不太確定</option>
                     <option value={3}>3 有印象</option>
@@ -4604,13 +4691,13 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                     <span>{selectedErrorRemediation.action}</span>
                   </div>
                 )}
-                <label>
+                {!practiceMode && <label>
                   Mastery
                   <select value={stat.mastery || 0} onChange={(e) => onUpdateStat(question.id, { ...stat, mastery: Number(e.target.value) })}>
                     {[0, 1, 2, 3, 4, 5].map((x) => <option key={x} value={x}>{x}</option>)}
                   </select>
-                </label>
-                {answerIsSingleChoice ? (
+                </label>}
+                {!practiceMode && (answerIsSingleChoice ? (
                   <div className="rating-buttons">
                     <button
                       className="rating-button again"
@@ -4649,8 +4736,8 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                   <button className="primary" disabled={hasRecordedCurrentAnswer} onClick={recordUngradedAttempt}>
                     {hasRecordedCurrentAnswer ? '已記錄未判分作答' : '記錄未判分作答'}
                   </button>
-                )}
-                <button className="secondary" onClick={saveNote}>儲存詳解/筆記</button>
+                ))}
+                {!practiceMode && <button className="secondary" onClick={saveNote}>儲存詳解/筆記</button>}
                 {practiceMode && (
                   <button className="secondary" onClick={() => setNotesExpanded(true)}>放大閱讀/編輯</button>
                 )}
@@ -6415,6 +6502,7 @@ function MockExamPanel({ state, onFinishMock, onEnsureQuestionYears }) {
   const [startedAt, setStartedAt] = useState(null);
   const [answers, setAnswers] = useState({});
   const [showResults, setShowResults] = useState(false);
+  const [examMessage, setExamMessage] = useState('');
 
   const startMock = async () => {
     const yearsToLoad = examYear === 'All' ? state.settings?.preferredYears || QUESTION_YEARS : [examYear];
@@ -6437,6 +6525,7 @@ function MockExamPanel({ state, onFinishMock, onEnsureQuestionYears }) {
     setStartedAt(Date.now());
     setAnswers({});
     setShowResults(false);
+    setExamMessage('');
   };
 
   const updateAnswer = (questionId, patch) => {
@@ -6454,6 +6543,12 @@ function MockExamPanel({ state, onFinishMock, onEnsureQuestionYears }) {
 
   const finishMock = () => {
     if (!exam) return;
+    const missingIndex = exam.questions.findIndex((question) => !answers[question.id]?.selected);
+    if (missingIndex >= 0) {
+      setExamMessage(`第 ${missingIndex + 1} 題尚未作答，已跳到該題。`);
+      document.querySelector(`[data-mock-question-id="${exam.questions[missingIndex].id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
     const elapsedSec = startedAt ? Math.round((Date.now() - startedAt) / 1000) : 0;
     const results = exam.questions.map((q) => {
       const draft = answers[q.id] || {};
@@ -6502,9 +6597,33 @@ function MockExamPanel({ state, onFinishMock, onEnsureQuestionYears }) {
       completedAt: new Date().toISOString(),
     };
     playResultFeedback(score >= 60 ? 'correct' : 'wrong');
-    onFinishMock(completedExam);
     setExam({ ...exam, completedExam });
     setShowResults(true);
+    setExamMessage('已整份交卷。請查看所有答案並完成錯題的錯因分類。');
+  };
+
+  const finalizeMock = () => {
+    if (!exam?.completedExam || exam.completedExam.persistedAt) return;
+    const results = exam.completedExam.results.map((result) => {
+      const errorType = result.isCorrect ? '' : (answers[result.questionId]?.errorType || '');
+      const remediation = errorType ? getRemediationForErrorType(errorType) : null;
+      return {
+        ...result,
+        errorType,
+        remediationTask: remediation?.task || '',
+        remediationCardType: remediation?.cardType || '',
+      };
+    });
+    const missing = results.find((result) => !result.isCorrect && !result.errorType);
+    if (missing) {
+      setExamMessage('仍有錯題尚未選擇錯因，已跳到該題。');
+      document.querySelector(`[data-mock-review-id="${missing.questionId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    const completedExam = { ...exam.completedExam, results, persistedAt: new Date().toISOString() };
+    onFinishMock(completedExam);
+    setExam({ ...exam, completedExam });
+    setExamMessage('錯因訂正已完成，Mock Exam 結果已寫入統計。');
   };
 
   const completed = exam?.completedExam;
@@ -6552,16 +6671,55 @@ function MockExamPanel({ state, onFinishMock, onEnsureQuestionYears }) {
       </div>
 
       {completed && showResults && (
-        <section className="readiness-hero">
-          <MetricCard label="Score" value={`${completed.score}%`} sub={`${completed.correct}/${completed.questionCount} correct`} />
-          <MetricCard label="Predicted range" value={`${Math.max(0, completed.score - 5)}–${Math.min(100, completed.score + 5)}%`} sub="mock sampling band" />
-          <MetricCard label="High-confidence wrong" value={completed.highConfidenceWrong} sub="confidence 4–5 but wrong" />
-          <MetricCard label="Fast wrong / Slow correct" value={`${completed.fastWrong}/${completed.slowCorrect}`} sub="speed diagnostics" />
-          <div className="subsection full-span">
-            <h3>Top score loss</h3>
-            {completed.topScoreLoss.length ? completed.topScoreLoss.map((item) => <div className="weak-row" key={item.label}>{item.label} · lost {item.count}</div>) : <p className="muted">沒有錯題。</p>}
+        <>
+          {examMessage && <p className="save-message">{examMessage}</p>}
+          <section className="readiness-hero">
+            <MetricCard label="答對率" value={`${completed.score}%`} sub={`${completed.correct}/${completed.questionCount} correct`} />
+            <MetricCard label="答錯率" value={`${100 - completed.score}%`} sub={`${completed.questionCount - completed.correct}/${completed.questionCount} wrong`} />
+            <MetricCard label="High-confidence wrong" value={completed.highConfidenceWrong} sub="confidence 4–5 but wrong" />
+            <MetricCard label="Fast wrong / Slow correct" value={`${completed.fastWrong}/${completed.slowCorrect}`} sub="speed diagnostics" />
+            <div className="subsection full-span">
+              <h3>Top score loss</h3>
+              {completed.topScoreLoss.length ? completed.topScoreLoss.map((item) => <div className="weak-row" key={item.label}>{item.label} · lost {item.count}</div>) : <p className="muted">沒有錯題。</p>}
+            </div>
+          </section>
+          <div className="question-list">
+            {exam.questions.map((question, index) => {
+              const result = completed.results.find((row) => row.questionId === question.id);
+              const remediation = answers[question.id]?.errorType ? getRemediationForErrorType(answers[question.id].errorType) : null;
+              return (
+                <article className="question-card" key={question.id} data-mock-review-id={question.id}>
+                  <div className="question-top"><div><span className="qid">{index + 1}. {question.id}</span><span className="pill">{question.cancer}</span></div></div>
+                  <p className="stem">{question.stem}</p>
+                  <div className="options">
+                    {Object.entries(question.options || {}).map(([key, value]) => (
+                      <label key={key} className={['option', result.selected === key ? 'selected' : '', result.correctAnswer === key ? 'correct-option' : '', result.selected === key && !result.isCorrect ? 'wrong-option' : ''].filter(Boolean).join(' ')}>
+                        <input type="radio" checked={result.selected === key} disabled readOnly />
+                        <span className="option-key">{key}</span><span>{value}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="feedback-box"><strong>{result.isCorrect ? 'Correct' : 'Wrong'}｜你的答案：{result.selected}｜正解：{result.correctAnswer}</strong></div>
+                  {!result.isCorrect && (
+                    <div className="answer-row">
+                      <label>Error type
+                        <select disabled={Boolean(completed.persistedAt)} value={answers[question.id]?.errorType || ''} onChange={(event) => updateAnswer(question.id, { errorType: event.target.value })}>
+                          <option value="">選擇錯因</option>
+                          {ERROR_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{type}</option>)}
+                        </select>
+                      </label>
+                      {remediation && <div className="remediation-preview"><strong>{remediation.task}</strong><span>{remediation.action}</span></div>}
+                    </div>
+                  )}
+                  <div className="textareas"><label>詳解 / guideline / trial note<textarea value={question.explanation || '目前沒有詳解。'} readOnly /></label></div>
+                </article>
+              );
+            })}
           </div>
-        </section>
+          <button className="good" disabled={Boolean(completed.persistedAt)} onClick={finalizeMock}>
+            {completed.persistedAt ? '訂正與統計已完成' : '完成錯因訂正並寫入統計'}
+          </button>
+        </>
       )}
 
       {exam && !showResults && (
@@ -6571,11 +6729,12 @@ function MockExamPanel({ state, onFinishMock, onEnsureQuestionYears }) {
             <span className="muted">已作答 {Object.values(answers).filter((a) => a.selected).length}/{exam.questions.length}</span>
             <button className="good" onClick={finishMock}>Finish exam and score</button>
           </div>
+          {examMessage && <p className="save-message">{examMessage}</p>}
           <div className="question-list">
             {exam.questions.map((q, index) => {
               const draft = answers[q.id] || { confidence: 3, selected: '' };
               return (
-                <article className="question-card" key={q.id}>
+                <article className="question-card" key={q.id} data-mock-question-id={q.id}>
                   <div className="question-top">
                     <div><span className="qid">{index + 1}. {q.id}</span><span className="pill">{q.cancer}</span><span className="pill soft">{q.topic}</span></div>
                   </div>
@@ -7433,6 +7592,13 @@ export default function App() {
   const todayPracticeConfig = getPracticeModeConfig(todayPracticeMode);
   const todayPracticeTargetCount = todayPracticeConfig.total;
   const todayPracticeTargetIds = todayIds.slice(0, todayPracticeTargetCount);
+  const dailyBatchSubmitted = Boolean(todaySession?.submittedAt && todaySession?.gradingResults?.length);
+  const dailyBatchResults = todaySession?.gradingResults || EMPTY_ARRAY;
+  const dailyBatchCorrect = dailyBatchResults.filter((result) => result.isCorrect).length;
+  const dailyBatchWrong = dailyBatchResults.length - dailyBatchCorrect;
+  const dailyWrongClassified = dailyBatchResults.filter((result) => (
+    !result.isCorrect && todaySession?.practiceDrafts?.[result.questionId]?.errorType
+  )).length;
   const todayRatedCount = todayPracticeTargetIds.filter((id) => hasDailyPracticeRating(state, id, TODAY)).length;
   const firstIncompletePracticeIndex = todayPracticeTargetIds.findIndex((id) => !hasDailyPracticeRating(state, id, TODAY));
   const firstIncompletePracticeId = firstIncompletePracticeIndex >= 0 ? todayPracticeTargetIds[firstIncompletePracticeIndex] : null;
@@ -7521,6 +7687,87 @@ export default function App() {
         },
       };
     }, ['sessions']);
+  };
+
+  const submitDailyPractice = () => {
+    if (dailyBatchSubmitted) return;
+    if (todayPracticeTargetIds.length < todayPracticeTargetCount) {
+      setPracticePageMessage(`請先載入全部 ${todayPracticeTargetCount} 題再交卷。`);
+      return;
+    }
+    const missingIndex = todayPracticeTargetIds.findIndex((id) => !todaySession?.practiceDrafts?.[id]?.selected);
+    if (missingIndex >= 0) {
+      setPracticePage(Math.floor(missingIndex / PRACTICE_PAGE_SIZE));
+      setPracticePageMessage(`第 ${missingIndex + 1} 題尚未作答，已跳到該題。`);
+      window.setTimeout(() => {
+        document.querySelector(`[data-question-id="${todayPracticeTargetIds[missingIndex]}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+      return;
+    }
+
+    const submittedAt = new Date().toISOString();
+    const attemptId = `daily-${TODAY}-${todaySession?.createdAt || submittedAt}`;
+    const gradingResults = todayPracticeTargetIds.map((id) => {
+      const question = getQuestionWithOverride(id, questionDataState);
+      const draft = todaySession?.practiceDrafts?.[id] || {};
+      const selected = String(draft.selected || '').trim().toUpperCase();
+      const correctAnswer = String(question?.answer || '').trim().toUpperCase();
+      return {
+        questionId: id,
+        selected,
+        correctAnswer,
+        isCorrect: Boolean(selected && correctAnswer && selected === correctAnswer),
+        confidence: Number(draft.confidence) || 3,
+        cancer: question?.cancer,
+        topic: question?.topic,
+        submittedAt,
+      };
+    });
+
+    updateState((prev) => ({
+      ...prev,
+      sessions: {
+        ...(prev.sessions || {}),
+        [TODAY]: {
+          ...(prev.sessions?.[TODAY] || {}),
+          attemptId,
+          submittedAt,
+          gradingResults,
+          statsCommittedAt: null,
+        },
+      },
+    }), ['sessions']);
+    setPracticePage(0);
+    setPracticePageMessage('已整份交卷。請逐題查看答案，並完成所有錯題的錯因分類。');
+  };
+
+  const finalizeDailyPractice = () => {
+    if (!dailyBatchSubmitted || todaySession?.statsCommittedAt) return;
+    const results = dailyBatchResults.map((result) => ({
+      ...result,
+      errorType: result.isCorrect ? '' : (todaySession?.practiceDrafts?.[result.questionId]?.errorType || ''),
+    }));
+    const missingError = results.find((result) => !result.isCorrect && !result.errorType);
+    if (missingError) {
+      const missingIndex = todayPracticeTargetIds.indexOf(missingError.questionId);
+      setPracticePage(Math.max(0, Math.floor(missingIndex / PRACTICE_PAGE_SIZE)));
+      setPracticePageMessage('仍有錯題尚未選擇錯因，已跳到該題。');
+      return;
+    }
+    const committedAt = new Date().toISOString();
+    updateState((prev) => {
+      const session = prev.sessions?.[TODAY] || {};
+      if (session.statsCommittedAt) return prev;
+      return {
+        ...prev,
+        stats: applyBatchQuestionResults(prev.stats, results, 'daily', session.attemptId),
+        sessions: {
+          ...(prev.sessions || {}),
+          [TODAY]: { ...session, gradingResults: results, statsCommittedAt: committedAt, completed: true },
+        },
+      };
+    }, ['stats', 'sessions']);
+    setPracticePageMessage('錯因訂正已完成，答題結果已寫入統計。');
   };
 
   const createTodaySession = ({ force = false } = {}) => {
@@ -7925,41 +8172,13 @@ export default function App() {
 
   const finishMockExam = (completedExam) => {
     updateState((prev) => {
-      const nextStats = { ...(prev.stats || {}) };
-      completedExam.results.forEach((result) => {
-        const previous = getStat(prev, result.questionId);
-        const wasPreviouslyWrong = (previous.wrong || 0) > 0;
-        const interval = result.isCorrect ? nextIntervalByRating(result.confidence >= 4 ? 'Easy' : 'Good', previous) : 1;
-        const event = { ...result, date: TODAY, mode: 'mock', rating: result.isCorrect ? 'Good' : 'Again' };
-        nextStats[result.questionId] = {
-          ...previous,
-          attempts: (previous.attempts || 0) + 1,
-          correct: (previous.correct || 0) + (result.isCorrect ? 1 : 0),
-          wrong: (previous.wrong || 0) + (result.isCorrect ? 0 : 1),
-          lastResult: result.isCorrect ? 'correct' : 'wrong',
-          lastRating: result.isCorrect ? 'Good' : 'Again',
-          lastAttemptAt: TODAY,
-          nextReviewDate: addDays(TODAY, interval),
-          mastery: result.isCorrect ? Math.min(5, (previous.mastery || 0) + 1) : Math.max(0, (previous.mastery || 0) - 1),
-          intervalDays: interval,
-          userAnswer: result.selected,
-          correctAnswer: result.correctAnswer,
-          lastConfidence: result.confidence,
-          confidenceHistory: [...(previous.confidenceHistory || []), result.confidence].slice(-50),
-          answerHistory: [...(previous.answerHistory || []), event].slice(-50),
-          timeHistory: [...(previous.timeHistory || []), result.timeSpentSec].slice(-50),
-          highConfidenceWrong: (previous.highConfidenceWrong || 0) + (!result.isCorrect && result.confidence >= 4 ? 1 : 0),
-          repeatedWrong: result.isCorrect ? 0 : (previous.repeatedWrong || 0) + 1,
-          wrongRetestAttempts: (previous.wrongRetestAttempts || 0) + (wasPreviouslyWrong ? 1 : 0),
-          wrongRetestCorrect: (previous.wrongRetestCorrect || 0) + (wasPreviouslyWrong && result.isCorrect ? 1 : 0),
-        };
-      });
+      if ((prev.mockExams || []).some((mock) => mock.id === completedExam.id)) return prev;
       return {
         ...prev,
-        stats: nextStats,
+        stats: applyBatchQuestionResults(prev.stats, completedExam.results, 'mock', completedExam.id),
         mockExams: [completedExam, ...(prev.mockExams || [])].slice(0, 20),
       };
-    });
+    }, ['stats', 'mockExams']);
   };
 
   const planProgress = useMemo(() => state.planProgress || {}, [state.planProgress]);
@@ -8506,7 +8725,7 @@ export default function App() {
               </p>
             </div>
             <div className="inline-actions">
-              <button className="secondary" disabled={isCreatingPractice} onClick={regenerateTodaySession}>重新抽題</button>
+              <button className="secondary" disabled={isCreatingPractice || dailyBatchSubmitted} onClick={regenerateTodaySession}>重新抽題</button>
               <button className={todayCompleted ? 'good' : 'secondary'} disabled={state.game?.dailyClaims?.[TODAY]} onClick={claimDailyCompletion}>
                 {state.game?.dailyClaims?.[TODAY] ? '今日 XP 已領取' : todayCompleted ? '領取每日 XP' : '跳到未完成題目'}
               </button>
@@ -8547,8 +8766,19 @@ export default function App() {
               </div>
               <div className="practice-page-toolbar">
                 <strong>第 {currentPracticePage + 1} 頁 / 共 {totalPracticePages} 頁</strong>
-                <span>目前已載入 {todayQuestions.length}/{todayPracticeConfig.total} 題，每頁 10 題。</span>
+                <span>
+                  {dailyBatchSubmitted
+                    ? `已交卷：${dailyBatchCorrect} 答對 / ${dailyBatchWrong} 答錯`
+                    : `已作答 ${todayPracticeTargetIds.filter((id) => todaySession?.practiceDrafts?.[id]?.selected).length}/${todayPracticeConfig.total} 題；已載入 ${todayQuestions.length} 題。`}
+                </span>
               </div>
+              {dailyBatchSubmitted && (
+                <section className="readiness-hero">
+                  <MetricCard label="答對率" value={`${dailyBatchResults.length ? Math.round((dailyBatchCorrect / dailyBatchResults.length) * 100) : 0}%`} sub={`${dailyBatchCorrect}/${dailyBatchResults.length} correct`} />
+                  <MetricCard label="答錯率" value={`${dailyBatchResults.length ? Math.round((dailyBatchWrong / dailyBatchResults.length) * 100) : 0}%`} sub={`${dailyBatchWrong}/${dailyBatchResults.length} wrong`} />
+                  <MetricCard label="錯因完成" value={`${dailyWrongClassified}/${dailyBatchWrong}`} sub="所有錯題分類後才完成" />
+                </section>
+              )}
               <div className="question-list">
                 {visibleTodayQuestions.map((q) => (
                   <QuestionCard
@@ -8560,14 +8790,22 @@ export default function App() {
                     practiceMode
                     practiceDraft={todaySession?.practiceDrafts?.[q.id]}
                     onPracticeChange={(patch) => updatePracticeDraft(q.id, patch)}
+                    batchSubmitted={dailyBatchSubmitted}
                   />
                 ))}
               </div>
               <div className="practice-page-actions">
                 <button className="secondary" disabled={currentPracticePage === 0} onClick={() => setPracticePage(Math.max(0, currentPracticePage - 1))}>上一頁</button>
-                <button className="primary" disabled={currentPracticePage + 1 >= totalPracticePages} onClick={loadNextPracticePage}>
+                <button className="primary" disabled={dailyBatchSubmitted || currentPracticePage + 1 >= totalPracticePages} onClick={loadNextPracticePage}>
                   {todayQuestions.length < Math.min(todayPracticeConfig.total, (currentPracticePage + 2) * PRACTICE_PAGE_SIZE) ? '下一頁並補題' : '下一頁'}
                 </button>
+                {!dailyBatchSubmitted ? (
+                  <button className="good" onClick={submitDailyPractice}>整份交卷並顯示答案</button>
+                ) : (
+                  <button className="good" disabled={Boolean(todaySession?.statsCommittedAt)} onClick={finalizeDailyPractice}>
+                    {todaySession?.statsCommittedAt ? '訂正與統計已完成' : '完成錯因訂正並寫入統計'}
+                  </button>
+                )}
               </div>
               {practicePageMessage && <p className="save-message">{practicePageMessage}</p>}
             </>
