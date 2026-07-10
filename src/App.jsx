@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, useRef } from 'react';
-import { AlertTriangle, BarChart3, ChevronDown, ClipboardList, Home, Newspaper, Settings2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import { AlertTriangle, BarChart3, ChevronDown, ClipboardList, Clock3, ExternalLink, Home, Newspaper, Pause, Play, RotateCcw, Settings2 } from 'lucide-react';
 import './App.css';
 import { QUESTION_BANK_TOTAL, QUESTION_YEARS, cancerCategories } from './data/questionBankMeta.js';
 import { buildFlashcardTags } from './data/taxonomy.js';
@@ -392,6 +392,13 @@ const FOCUS_MARQUEE_MESSAGES = [
   '勝利不是將來才有的',
 ];
 
+const POMODORO_PRESETS = {
+  standard: { id: 'standard', label: '標準節奏', focusMinutes: 25, restMinutes: 5 },
+  long: { id: 'long', label: '長時專注', focusMinutes: 50, restMinutes: 10 },
+};
+const DEFAULT_POMODORO_PRESET = 'standard';
+const POMODORO_VIDEO_ID = 'z-j6jsLtgjs';
+
 const PRACTICE_MODES = {
   minimum: {
     label: '保底',
@@ -535,6 +542,7 @@ const defaultState = {
   focusTimer: {
     activeSession: null,
     leaderboardStartedAt: new Date().toISOString(),
+    selectedPreset: DEFAULT_POMODORO_PRESET,
   },
   stats: {},
   settings: {
@@ -725,6 +733,9 @@ function normalizeFocusSessions(focusSessions = []) {
       legacyPlanTaskId: session.legacyPlanTaskId || null,
       planTopic: session.planTopic || '',
       planDay: session.planDay || '',
+      source: session.source || 'focus-timer',
+      preset: POMODORO_PRESETS[session.preset] ? session.preset : null,
+      completedCycles: Math.max(0, Math.round(Number(session.completedCycles) || 0)),
     }));
 }
 
@@ -740,11 +751,21 @@ function normalizeFocusTimer(focusTimer = {}) {
         planTopic: active.planTopic || '',
         planDay: active.planDay || '',
         updatedAt: active.updatedAt || active.startedAt,
+        source: active.source === 'pomodoro' ? 'pomodoro' : 'focus-timer',
+        preset: POMODORO_PRESETS[active.preset] ? active.preset : DEFAULT_POMODORO_PRESET,
+        focusMinutes: Math.max(1, Math.round(Number(active.focusMinutes) || POMODORO_PRESETS[active.preset]?.focusMinutes || 25)),
+        restMinutes: Math.max(1, Math.round(Number(active.restMinutes) || POMODORO_PRESETS[active.preset]?.restMinutes || 5)),
+        phase: active.phase === 'rest' ? 'rest' : 'focus',
+        status: active.status === 'paused' ? 'paused' : 'running',
+        phaseStartedAt: active.phaseStartedAt || active.startedAt,
+        phaseEndsAt: active.phaseEndsAt || null,
+        remainingSeconds: Math.max(0, Math.round(Number(active.remainingSeconds) || 0)),
       }
     : null;
   return {
     activeSession,
     leaderboardStartedAt: focusTimer?.leaderboardStartedAt || defaultState.focusTimer.leaderboardStartedAt,
+    selectedPreset: POMODORO_PRESETS[focusTimer?.selectedPreset] ? focusTimer.selectedPreset : DEFAULT_POMODORO_PRESET,
   };
 }
 
@@ -766,13 +787,18 @@ function mergeFocusTimer(cloudTimer = {}, localTimer = {}) {
   return {
     activeSession,
     leaderboardStartedAt: startedAtCandidates[0] || defaultState.focusTimer.leaderboardStartedAt,
+    selectedPreset: local.selectedPreset || cloud.selectedPreset || DEFAULT_POMODORO_PRESET,
   };
 }
 
 function removeCompletedActiveFocusSession(focusTimer, focusSessions = []) {
   const normalizedTimer = normalizeFocusTimer(focusTimer);
   const completedIds = new Set(normalizeFocusSessions(focusSessions).map((session) => session.id));
-  if (normalizedTimer.activeSession && completedIds.has(normalizedTimer.activeSession.id)) {
+  if (
+    normalizedTimer.activeSession
+    && completedIds.has(normalizedTimer.activeSession.id)
+    && normalizedTimer.activeSession.phase !== 'rest'
+  ) {
     return {
       ...normalizedTimer,
       activeSession: null,
@@ -3071,6 +3097,126 @@ function FocusMarquee() {
         ))}
       </div>
     </div>
+  );
+}
+
+function PomodoroPanel({
+  timer,
+  remainingSeconds,
+  rows,
+  todayMinutes,
+  focusStreak,
+  onPresetChange,
+  onStart,
+  onPause,
+  onResume,
+  onCancel,
+  onFinishLegacy,
+}) {
+  const active = timer.activeSession;
+  const preset = POMODORO_PRESETS[active?.preset || timer.selectedPreset] || POMODORO_PRESETS.standard;
+  const isPomodoro = active?.source === 'pomodoro';
+  const phase = isPomodoro ? active.phase : 'focus';
+  const phaseTotalSeconds = (phase === 'rest' ? preset.restMinutes : preset.focusMinutes) * 60;
+  const progress = active && isPomodoro
+    ? Math.max(0, Math.min(1, 1 - (remainingSeconds / phaseTotalSeconds)))
+    : 0;
+  const userRank = rows.findIndex((row) => row.kind === 'user') + 1;
+  const timerLabel = active
+    ? (isPomodoro ? formatFocusDuration(remainingSeconds) : '自由計時進行中')
+    : formatFocusDuration(preset.focusMinutes * 60);
+
+  return (
+    <main className="panel pomodoro-page">
+      <div className="section-head pomodoro-page-head">
+        <div>
+          <div className="eyebrow dark">Focus Studio</div>
+          <h2>蕃茄鐘</h2>
+          <p className="muted">完成一整段專注才會加入今日讀書排行；休息時間不計分。</p>
+        </div>
+        <div className="pomodoro-summary-chips">
+          <span><strong>{todayMinutes}</strong> 今日分鐘</span>
+          <span><strong>#{userRank || '-'}</strong> 今日排名</span>
+          <span><strong>{focusStreak}</strong> 天 streak</span>
+        </div>
+      </div>
+
+      <section className="pomodoro-studio">
+        <article className={`pomodoro-clock-card ${phase === 'rest' ? 'resting' : ''}`}>
+          <div className="pomodoro-presets" aria-label="蕃茄鐘模式">
+            {Object.values(POMODORO_PRESETS).map((option) => (
+              <button
+                className={(active?.preset || timer.selectedPreset) === option.id ? 'active' : ''}
+                disabled={Boolean(active)}
+                key={option.id}
+                onClick={() => onPresetChange(option.id)}
+                type="button"
+              >
+                <strong>{option.focusMinutes}/{option.restMinutes}</strong>
+                <span>{option.label}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="pomodoro-dial" style={{ '--pomodoro-progress': `${progress * 360}deg` }}>
+            <div className="pomodoro-dial-inner">
+              <span>{active ? (phase === 'rest' ? '休息時間' : '專注時間') : '準備專注'}</span>
+              <strong>{timerLabel}</strong>
+              <em>{active?.status === 'paused' ? '已暫停' : `${preset.focusMinutes} 分專注 · ${preset.restMinutes} 分休息`}</em>
+            </div>
+          </div>
+
+          <div className="pomodoro-actions">
+            {!active && (
+              <button className="primary pomodoro-primary" type="button" onClick={onStart}>
+                <Play size={18} fill="currentColor" /> 開始專注
+              </button>
+            )}
+            {active && isPomodoro && active.status === 'running' && (
+              <button className="secondary" type="button" onClick={onPause}><Pause size={18} /> 暫停</button>
+            )}
+            {active && isPomodoro && active.status === 'paused' && (
+              <button className="good" type="button" onClick={onResume}><Play size={18} fill="currentColor" /> 繼續</button>
+            )}
+            {active && !isPomodoro && (
+              <button className="good" type="button" onClick={onFinishLegacy}>結束舊計時並記錄</button>
+            )}
+            {active && (
+              <button className="danger-soft" type="button" onClick={onCancel}><RotateCcw size={18} /> 取消本輪</button>
+            )}
+          </div>
+          {active && isPomodoro && phase === 'rest' && (
+            <p className="pomodoro-phase-note">本輪專注已完整記錄。休息結束後會停下來，等你手動開始下一輪。</p>
+          )}
+        </article>
+
+        <article className="pomodoro-video-card">
+          <div className="pomodoro-video-head">
+            <div>
+              <span>Study ambience</span>
+              <strong>專注影片</strong>
+            </div>
+            <a href={`https://www.youtube.com/watch?v=${POMODORO_VIDEO_ID}`} target="_blank" rel="noreferrer">
+              前往 YouTube <ExternalLink size={15} />
+            </a>
+          </div>
+          <div className="pomodoro-video-frame">
+            <iframe
+              allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+              loading="lazy"
+              referrerPolicy="strict-origin-when-cross-origin"
+              src={`https://www.youtube-nocookie.com/embed/${POMODORO_VIDEO_ID}?rel=0`}
+              title="蕃茄鐘專注影片"
+            />
+          </div>
+          <p className="muted">若影片禁止嵌入，計時器仍可獨立使用，並可由上方連結開啟 YouTube。</p>
+        </article>
+      </section>
+
+      <FocusMarquee />
+      <StudyLeaderboard rows={rows} />
+    </main>
   );
 }
 
@@ -6487,6 +6633,7 @@ export default function App() {
   const lastSyncedSignatureRef = useRef(getCloudSyncSignature(loadState()));
   const [isCreatingPractice, setIsCreatingPractice] = useState(false);
   const isCreatingPracticeRef = useRef(false);
+  const completedPomodoroPhaseRef = useRef('');
   const [practicePage, setPracticePage] = useState(0);
   const [practicePageMessage, setPracticePageMessage] = useState('');
   const [focusTick, setFocusTick] = useState(() => Date.now());
@@ -6614,10 +6761,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!focusStartedAt) return undefined;
+    if (!focusStartedAt || activeFocusSession?.status === 'paused') return undefined;
     const timer = window.setInterval(() => setFocusTick(Date.now()), 1000);
     return () => window.clearInterval(timer);
-  }, [focusStartedAt]);
+  }, [activeFocusSession?.status, focusStartedAt]);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -6742,7 +6889,7 @@ export default function App() {
     return () => clearTimeout(timeout);
   }, [state, user, isApplyingCloudState]);
 
-  const queueStorageSlices = (sliceNames = null) => {
+  const queueStorageSlices = useCallback((sliceNames = null) => {
     if (!sliceNames) {
       dirtyStorageSlicesRef.current = null;
       return;
@@ -6750,30 +6897,95 @@ export default function App() {
     if (dirtyStorageSlicesRef.current === null) return;
     const names = Array.isArray(sliceNames) ? sliceNames : [sliceNames];
     names.forEach((name) => dirtyStorageSlicesRef.current.add(name));
-  };
+  }, []);
 
-  const updateState = (updater, sliceNames = null) => {
+  const updateState = useCallback((updater, sliceNames = null) => {
     queueStorageSlices(sliceNames);
     setState((prev) => normalizeState(typeof updater === 'function' ? updater(prev) : updater));
-  };
+  }, [queueStorageSlices]);
 
-  const startFocusSession = () => {
-    const now = new Date().toISOString();
+  const setPomodoroPreset = (presetId) => {
+    if (activeFocusSession || !POMODORO_PRESETS[presetId]) return;
     updateState((prev) => ({
       ...prev,
       focusTimer: {
         ...normalizeFocusTimer(prev.focusTimer),
-        leaderboardStartedAt: now,
+        selectedPreset: presetId,
+      },
+    }), ['activity']);
+  };
+
+  const startPomodoroSession = () => {
+    if (activeFocusSession) return;
+    const now = new Date();
+    const preset = POMODORO_PRESETS[focusTimer.selectedPreset] || POMODORO_PRESETS.standard;
+    const startedAt = now.toISOString();
+    const phaseEndsAt = new Date(now.getTime() + (preset.focusMinutes * 60000)).toISOString();
+    completedPomodoroPhaseRef.current = '';
+    updateState((prev) => ({
+      ...prev,
+      focusTimer: {
+        ...normalizeFocusTimer(prev.focusTimer),
+        leaderboardStartedAt: startedAt,
+        selectedPreset: preset.id,
         activeSession: {
-          id: `focus-${Date.now()}`,
+          id: `pomodoro-${now.getTime()}`,
           date: TODAY,
-          startedAt: now,
-          ...makePlanTaskSnapshot(questTask),
-          updatedAt: now,
+          startedAt,
+          phaseStartedAt: startedAt,
+          phaseEndsAt,
+          remainingSeconds: preset.focusMinutes * 60,
+          source: 'pomodoro',
+          preset: preset.id,
+          focusMinutes: preset.focusMinutes,
+          restMinutes: preset.restMinutes,
+          phase: 'focus',
+          status: 'running',
+          ...makePlanTaskSnapshot(getTodayPlanTask(prev)),
+          updatedAt: startedAt,
         },
       },
     }), ['activity']);
-    setFocusTick(new Date(now).getTime());
+    setFocusTick(now.getTime());
+  };
+
+  const pausePomodoroSession = () => {
+    if (activeFocusSession?.source !== 'pomodoro' || activeFocusSession.status !== 'running') return;
+    const now = new Date();
+    const remainingSeconds = Math.max(0, Math.ceil((new Date(activeFocusSession.phaseEndsAt).getTime() - now.getTime()) / 1000));
+    updateState((prev) => ({
+      ...prev,
+      focusTimer: {
+        ...normalizeFocusTimer(prev.focusTimer),
+        activeSession: {
+          ...normalizeFocusTimer(prev.focusTimer).activeSession,
+          status: 'paused',
+          phaseEndsAt: null,
+          remainingSeconds,
+          updatedAt: now.toISOString(),
+        },
+      },
+    }), ['activity']);
+    setFocusTick(now.getTime());
+  };
+
+  const resumePomodoroSession = () => {
+    if (activeFocusSession?.source !== 'pomodoro' || activeFocusSession.status !== 'paused') return;
+    const now = new Date();
+    const remainingSeconds = Math.max(1, activeFocusSession.remainingSeconds || 1);
+    updateState((prev) => ({
+      ...prev,
+      focusTimer: {
+        ...normalizeFocusTimer(prev.focusTimer),
+        activeSession: {
+          ...normalizeFocusTimer(prev.focusTimer).activeSession,
+          status: 'running',
+          phaseEndsAt: new Date(now.getTime() + (remainingSeconds * 1000)).toISOString(),
+          updatedAt: now.toISOString(),
+        },
+      },
+    }), ['activity']);
+    setFocusTick(now.getTime());
   };
 
   const finishFocusSession = () => {
@@ -6818,6 +7030,80 @@ export default function App() {
     }), ['activity']);
     setFocusTick(new Date().getTime());
   };
+
+  // Kept as a latest-state handler so overdue phases use the current synced timer snapshot.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const completePomodoroPhase = () => {
+    if (activeFocusSession?.source !== 'pomodoro' || activeFocusSession.status !== 'running') return;
+    const phaseKey = `${activeFocusSession.id}:${activeFocusSession.phase}`;
+    if (completedPomodoroPhaseRef.current === phaseKey) return;
+    completedPomodoroPhaseRef.current = phaseKey;
+    const now = new Date();
+    const completedAt = now.toISOString();
+
+    if (activeFocusSession.phase === 'rest') {
+      updateState((prev) => ({
+        ...prev,
+        focusTimer: {
+          ...normalizeFocusTimer(prev.focusTimer),
+          activeSession: null,
+        },
+      }), ['activity']);
+      playTaskCompletionFeedback();
+      return;
+    }
+
+    updateState((prev) => {
+      const normalizedTimer = normalizeFocusTimer(prev.focusTimer);
+      const alreadyRecorded = normalizeFocusSessions(prev.focusSessions).some((session) => session.id === activeFocusSession.id);
+      const currentPlanTask = getTodayPlanTask(prev);
+      const completedSession = {
+        id: activeFocusSession.id,
+        date: activeFocusSession.date || TODAY,
+        startedAt: activeFocusSession.startedAt,
+        endedAt: completedAt,
+        durationSeconds: activeFocusSession.focusMinutes * 60,
+        durationMinutes: activeFocusSession.focusMinutes,
+        source: 'pomodoro',
+        preset: activeFocusSession.preset,
+        completedCycles: 1,
+        planTaskId: activeFocusSession.planTaskId || getPlanTaskStorageId(currentPlanTask),
+        legacyPlanTaskId: activeFocusSession.legacyPlanTaskId || currentPlanTask?.id || null,
+        planTopic: activeFocusSession.planTopic || currentPlanTask?.topic || '',
+        planDay: activeFocusSession.planDay || currentPlanTask?.day || '',
+      };
+      return {
+        ...prev,
+        focusSessions: alreadyRecorded ? prev.focusSessions : [completedSession, ...(prev.focusSessions || [])],
+        focusTimer: {
+          ...normalizedTimer,
+          activeSession: {
+            ...normalizedTimer.activeSession,
+            phase: 'rest',
+            status: 'running',
+            phaseStartedAt: completedAt,
+            phaseEndsAt: new Date(now.getTime() + (activeFocusSession.restMinutes * 60000)).toISOString(),
+            remainingSeconds: activeFocusSession.restMinutes * 60,
+            updatedAt: completedAt,
+          },
+        },
+      };
+    }, ['activity']);
+    playTaskCompletionFeedback();
+    setFocusTick(now.getTime());
+  };
+
+  const pomodoroRemainingSeconds = activeFocusSession?.source === 'pomodoro'
+    ? (activeFocusSession.status === 'paused'
+        ? activeFocusSession.remainingSeconds
+        : Math.max(0, Math.ceil((new Date(activeFocusSession.phaseEndsAt).getTime() - focusTick) / 1000)))
+    : 0;
+
+  useEffect(() => {
+    if (activeFocusSession?.source !== 'pomodoro' || activeFocusSession.status !== 'running') return;
+    if (pomodoroRemainingSeconds > 0) return;
+    completePomodoroPhase();
+  }, [activeFocusSession, pomodoroRemainingSeconds, completePomodoroPhase]);
 
   const updateStat = (id, nextStat) => {
     updateState((prev) => {
@@ -7158,10 +7444,7 @@ export default function App() {
   const questTask = getStudyPlanTaskById(questProgress.planTaskId) || baseQuestTask;
   const todayFocusMinutes = sumFocusMinutesByDate(state, TODAY);
   const focusStreak = getFocusStreak(state, TODAY);
-  const focusElapsedSeconds = focusStartedAt
-    ? Math.max(0, Math.floor((focusTick - new Date(focusStartedAt).getTime()) / 1000))
-    : 0;
-  const leaderboardFocusMinutes = todayFocusMinutes + (focusStartedAt ? Math.ceil(focusElapsedSeconds / 60) : 0);
+  const leaderboardFocusMinutes = todayFocusMinutes;
   const leaderboardElapsedSeconds = focusStartedAt ? Math.max(0, Math.floor((focusTick - leaderboardStartedAt) / 1000)) : 0;
   const focusLeaderboardRows = useMemo(
     () => buildFocusLeaderboard(leaderboardFocusMinutes, leaderboardElapsedSeconds),
@@ -8020,25 +8303,15 @@ export default function App() {
           <span className="pill trial">Score dragger</span>
           <strong>{missionControl.primaryFocus}</strong>
         </div>
-        <section className="focus-timer" aria-label="Focus timer">
-          <div>
-            <span>專注計時</span>
-            <strong>{focusStartedAt ? formatFocusDuration(focusElapsedSeconds) : `${todayFocusMinutes} 分`}</strong>
-            <em>{focusStartedAt ? '正在記錄這段讀書時間' : `今日已記錄 · 連續 ${focusStreak} 天`}</em>
-          </div>
-          <div className="focus-timer-actions">
-            {focusStartedAt ? (
-              <>
-                <button className="good" type="button" onClick={finishFocusSession}>結束並記錄</button>
-                <button className="secondary" type="button" onClick={cancelFocusSession}>取消</button>
-              </>
-            ) : (
-              <button className="primary" type="button" onClick={startFocusSession}>開始專注</button>
-            )}
-          </div>
-        </section>
-        <FocusMarquee />
-        <StudyLeaderboard rows={focusLeaderboardRows} />
+        <button className="pomodoro-home-card" type="button" onClick={() => setTab('pomodoro')}>
+          <span className="pomodoro-home-icon"><Clock3 size={24} /></span>
+          <span>
+            <em>Pomodoro Focus Studio</em>
+            <strong>{activeFocusSession?.source === 'pomodoro' ? '蕃茄鐘進行中' : `今日已專注 ${todayFocusMinutes} 分鐘`}</strong>
+            <small>目前排名 #{focusLeaderboardRows.findIndex((row) => row.kind === 'user') + 1} · 連續 {focusStreak} 天</small>
+          </span>
+          <b>進入蕃茄鐘 →</b>
+        </button>
         <div className="mission-actions">
           {missionControl.actions.map((action) => (
             <button className="mission-action" type="button" key={action.title} onClick={() => setTab(action.tab)}>
@@ -8058,6 +8331,10 @@ export default function App() {
         <button className={`nav-news ${tab === 'news' ? 'active' : ''}`} type="button" onClick={() => setTab('news')}>
           <Newspaper size={17} strokeWidth={2.4} />
           <span>NEWS</span>
+        </button>
+        <button className={`nav-pomodoro ${tab === 'pomodoro' ? 'active' : ''}`} type="button" onClick={() => setTab('pomodoro')}>
+          <Clock3 size={17} strokeWidth={2.4} />
+          <span>Pomodoro</span>
         </button>
         {NAV_GROUPS.map(({ id, label, Icon, items }) => {
           const active = items.some(([key]) => tab === key);
@@ -8125,6 +8402,22 @@ export default function App() {
 
       {tab === 'stats' && (
         <StatsDashboard stats={statsDashboard} />
+      )}
+
+      {tab === 'pomodoro' && (
+        <PomodoroPanel
+          timer={focusTimer}
+          remainingSeconds={pomodoroRemainingSeconds}
+          rows={focusLeaderboardRows}
+          todayMinutes={todayFocusMinutes}
+          focusStreak={focusStreak}
+          onPresetChange={setPomodoroPreset}
+          onStart={startPomodoroSession}
+          onPause={pausePomodoroSession}
+          onResume={resumePomodoroSession}
+          onCancel={cancelFocusSession}
+          onFinishLegacy={finishFocusSession}
+        />
       )}
 
       {tab === 'news' && (

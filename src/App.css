@@ -3477,6 +3477,184 @@ button:disabled {
   justify-content: flex-end;
 }
 
+.pomodoro-home-card {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  border: 1px solid #c7d2fe;
+  border-radius: 18px;
+  padding: 15px 17px;
+  margin-bottom: 14px;
+  text-align: left;
+  color: #172554;
+  background: linear-gradient(120deg, #eef2ff, #eff6ff 52%, #ecfeff);
+}
+
+.pomodoro-home-card:hover {
+  border-color: #4f46e5;
+  box-shadow: 0 14px 32px rgba(79, 70, 229, 0.14);
+}
+
+.pomodoro-home-icon {
+  width: 48px;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 15px;
+  color: #ffffff;
+  background: linear-gradient(145deg, #4f46e5, #2563eb);
+}
+
+.pomodoro-home-card > span:nth-child(2) {
+  display: grid;
+  gap: 2px;
+}
+
+.pomodoro-home-card em,
+.pomodoro-home-card small {
+  color: var(--muted);
+  font-style: normal;
+}
+
+.pomodoro-home-card em { font-size: 12px; font-weight: 850; text-transform: uppercase; letter-spacing: .06em; }
+.pomodoro-home-card strong { font-size: 19px; }
+.pomodoro-home-card b { color: #4338ca; white-space: nowrap; }
+
+.pomodoro-page {
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 12% 3%, rgba(99, 102, 241, .13), transparent 30%),
+    radial-gradient(circle at 92% 18%, rgba(14, 165, 233, .11), transparent 28%),
+    #f8fafc;
+}
+
+.pomodoro-page-head { align-items: center; }
+
+.pomodoro-summary-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.pomodoro-summary-chips span {
+  display: inline-flex;
+  gap: 5px;
+  align-items: baseline;
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  padding: 8px 11px;
+  color: var(--muted);
+  background: rgba(255,255,255,.86);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.pomodoro-summary-chips strong { color: #1e3a8a; font-size: 16px; }
+
+.pomodoro-studio {
+  display: grid;
+  grid-template-columns: minmax(340px, .86fr) minmax(420px, 1.14fr);
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.pomodoro-clock-card,
+.pomodoro-video-card {
+  border: 1px solid #dbe3ef;
+  border-radius: 24px;
+  padding: 20px;
+  background: rgba(255,255,255,.92);
+  box-shadow: 0 18px 44px rgba(30, 41, 59, .08);
+}
+
+.pomodoro-clock-card {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 20px;
+}
+
+.pomodoro-clock-card.resting { background: linear-gradient(160deg, #ffffff, #ecfdf5); }
+
+.pomodoro-presets {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+.pomodoro-presets button {
+  display: grid;
+  gap: 2px;
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  padding: 10px;
+  color: var(--text);
+  background: #f8fafc;
+}
+
+.pomodoro-presets button.active {
+  border-color: #4f46e5;
+  color: #3730a3;
+  background: #eef2ff;
+  box-shadow: inset 0 0 0 1px #818cf8;
+}
+
+.pomodoro-presets button:disabled { opacity: .72; cursor: not-allowed; }
+.pomodoro-presets span { color: var(--muted); font-size: 11px; }
+
+.pomodoro-dial {
+  width: min(280px, 72vw);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  padding: 12px;
+  background: conic-gradient(#4f46e5 var(--pomodoro-progress), #e2e8f0 0);
+  box-shadow: 0 24px 55px rgba(79, 70, 229, .16);
+}
+
+.resting .pomodoro-dial {
+  background: conic-gradient(#10b981 var(--pomodoro-progress), #d1fae5 0);
+  box-shadow: 0 24px 55px rgba(16, 185, 129, .16);
+}
+
+.pomodoro-dial-inner {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-content: center;
+  gap: 7px;
+  border-radius: 50%;
+  text-align: center;
+  background: #ffffff;
+}
+
+.pomodoro-dial-inner span { color: #4f46e5; font-size: 13px; font-weight: 900; letter-spacing: .08em; }
+.resting .pomodoro-dial-inner span { color: #059669; }
+.pomodoro-dial-inner strong { color: #172554; font-size: clamp(44px, 6vw, 66px); line-height: 1; font-variant-numeric: tabular-nums; }
+.pomodoro-dial-inner em { color: var(--muted); font-size: 12px; font-style: normal; }
+
+.pomodoro-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.pomodoro-actions button { display: inline-flex; gap: 7px; align-items: center; justify-content: center; }
+.pomodoro-primary { min-width: 170px; }
+.danger-soft { border-color: #fecaca; color: #b91c1c; background: #fef2f2; }
+.pomodoro-phase-note { max-width: 360px; margin: 0; color: #047857; text-align: center; font-size: 12px; font-weight: 750; }
+
+.pomodoro-video-card { display: grid; align-content: start; gap: 13px; }
+.pomodoro-video-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pomodoro-video-head > div { display: grid; gap: 2px; }
+.pomodoro-video-head span { color: var(--muted); font-size: 12px; font-weight: 800; text-transform: uppercase; }
+.pomodoro-video-head strong { font-size: 20px; }
+.pomodoro-video-head a { display: inline-flex; align-items: center; gap: 5px; color: #4338ca; font-size: 13px; font-weight: 800; text-decoration: none; }
+.pomodoro-video-frame { overflow: hidden; border-radius: 18px; aspect-ratio: 16 / 9; background: #0f172a; }
+.pomodoro-video-frame iframe { width: 100%; height: 100%; border: 0; }
+.pomodoro-video-card > p { margin: 0; font-size: 12px; }
+
 .focus-marquee {
   overflow: hidden;
   border: 1px solid #c7d2fe;
@@ -3656,4 +3834,17 @@ button:disabled {
   .leaderboard-minutes {
     grid-column: 3;
   }
+
+  .pomodoro-studio { grid-template-columns: 1fr; }
+  .pomodoro-summary-chips { justify-content: flex-start; }
+  .pomodoro-home-card { grid-template-columns: auto minmax(0, 1fr); }
+  .pomodoro-home-card b { grid-column: 2; }
+}
+
+@media (max-width: 560px) {
+  .pomodoro-clock-card,
+  .pomodoro-video-card { padding: 14px; border-radius: 20px; }
+  .pomodoro-dial { width: min(250px, 76vw); }
+  .pomodoro-home-card { padding: 13px; }
+  .pomodoro-home-card b { font-size: 13px; }
 }
