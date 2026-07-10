@@ -2045,6 +2045,7 @@ function applyBatchQuestionResults(stats, results, mode, attemptId) {
   const nextStats = { ...(stats || {}) };
 
   results.forEach((result) => {
+    if (result.isCorrect == null) return;
     const previous = { ...emptyStat(), ...(nextStats[result.questionId] || {}) };
     if ((previous.answerHistory || []).some((event) => event?.attemptId === attemptId)) return;
 
@@ -2102,6 +2103,24 @@ function applyBatchQuestionResults(stats, results, mode, attemptId) {
   });
 
   return nextStats;
+}
+
+function regradeBatchQuestionResult(stats, result, mode, attemptId) {
+  const previous = { ...emptyStat(), ...(stats?.[result.questionId] || {}) };
+  const previousEvent = (previous.answerHistory || []).find((event) => event?.attemptId === attemptId);
+  if (!previousEvent || previousEvent.correctAnswer) {
+    return applyBatchQuestionResults(stats, [result], mode, attemptId);
+  }
+
+  const cleanedStat = {
+    ...previous,
+    attempts: Math.max(0, (previous.attempts || 0) - 1),
+    correct: Math.max(0, (previous.correct || 0) - (previousEvent.isCorrect ? 1 : 0)),
+    wrong: Math.max(0, (previous.wrong || 0) - (previousEvent.isCorrect ? 0 : 1)),
+    answerHistory: (previous.answerHistory || []).filter((event) => event?.attemptId !== attemptId),
+    highConfidenceWrong: Math.max(0, (previous.highConfidenceWrong || 0) - (!previousEvent.isCorrect && previousEvent.confidence >= 4 ? 1 : 0)),
+  };
+  return applyBatchQuestionResults({ ...(stats || {}), [result.questionId]: cleanedStat }, [result], mode, attemptId);
 }
 
 function applyBatchRemediationsToStats(stats, results, attemptId) {
@@ -4244,7 +4263,7 @@ function PracticeModeSelector({ value, onChange, compact = false }) {
 }
 
 
-function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswerUntilSubmit = false, practiceMode = false, practiceDraft = null, onPracticeChange = null, batchSubmitted = false, onEdit }) {
+function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswerUntilSubmit = false, practiceMode = false, practiceDraft = null, onPracticeChange = null, batchSubmitted = false, batchFinalized = false, onEdit }) {
   const initialAnswer = stat.correctAnswer || question.answer || '';
   const [selected, setSelected] = useState(practiceMode ? '' : stat.userAnswer || '');
   const [correctAnswer, setCorrectAnswer] = useState(initialAnswer);
@@ -4709,10 +4728,17 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
               </div>
 
               <div className="answer-row">
-                {!practiceMode && <label>
+                {(!practiceMode || (batchSubmitted && !question.answer)) && <label>
                   正解
-                  <select value={correctAnswer} onChange={(e) => setCorrectAnswer(e.target.value)}>
-                    <option value="">尚未輸入</option>
+                  <select
+                    disabled={practiceMode && batchFinalized}
+                    value={correctAnswer}
+                    onChange={(e) => {
+                      setCorrectAnswer(e.target.value);
+                      if (practiceMode) onPracticeChange?.({ correctAnswer: e.target.value });
+                    }}
+                  >
+                    <option value="" disabled={practiceMode && batchSubmitted}>尚未輸入</option>
                     {['A', 'B', 'C', 'D', 'E'].map((x) => <option key={x} value={x}>{x}</option>)}
                   </select>
                 </label>}
@@ -5775,6 +5801,8 @@ function QuestPanel({
   onCreatePractice,
   isCreatingPractice,
   practiceMode,
+  hasPracticeSession,
+  remainingErrorTypes,
   onPracticeModeChange,
   onMarkRecall,
   onSetBossResult,
@@ -5804,9 +5832,13 @@ function QuestPanel({
       key: 'practice',
       title: 'Practice Star',
       done: progress.practiceDone,
-      text: '完成今日 Daily Practice 題目並評分。',
-      action: progress.practiceDone ? onOpenPractice : onCreatePractice,
-      actionText: progress.practiceDone ? '查看今日練習' : isCreatingPractice ? '產生中...' : '產生今日練習',
+      text: remainingErrorTypes > 0 ? `題目已完成；尚有 ${remainingErrorTypes} 題錯因需要分類。` : '完成今日 Daily Practice 題目並評分。',
+      action: progress.practiceDone || hasPracticeSession ? onOpenPractice : onCreatePractice,
+      actionText: progress.practiceDone
+        ? '查看今日練習'
+        : remainingErrorTypes > 0
+          ? `完成 ${remainingErrorTypes} 題錯因`
+          : hasPracticeSession ? '繼續今日練習' : isCreatingPractice ? '產生中...' : '產生今日練習',
     },
     {
       key: 'memory',
@@ -7647,16 +7679,18 @@ export default function App() {
   const todayPracticeTargetIds = todayIds.slice(0, todayPracticeTargetCount);
   const dailyBatchSubmitted = Boolean(todaySession?.submittedAt && todaySession?.gradingResults?.length);
   const dailyBatchResults = todaySession?.gradingResults || EMPTY_ARRAY;
-  const dailyBatchAttemptsRecorded = dailyBatchResults.length > 0 && dailyBatchResults.every((result) => (
+  const dailyGradeableResults = dailyBatchResults.filter((result) => result.isCorrect != null);
+  const dailyBatchAttemptsRecorded = dailyGradeableResults.length > 0 && dailyGradeableResults.every((result) => (
     (getStat(state, result.questionId).answerHistory || []).some((event) => event?.attemptId === todaySession?.attemptId)
   ));
   const dailyBatchCorrect = dailyBatchResults.filter((result) => result.isCorrect).length;
-  const dailyBatchWrong = dailyBatchResults.length - dailyBatchCorrect;
+  const dailyBatchWrong = dailyBatchResults.filter((result) => result.isCorrect === false).length;
+  const dailyBatchPending = dailyBatchResults.filter((result) => result.isCorrect == null).length;
   const dailyWrongClassified = dailyBatchResults.filter((result) => (
-    !result.isCorrect && (result.errorType || todaySession?.practiceDrafts?.[result.questionId]?.errorType)
+    result.isCorrect === false && (result.errorType || todaySession?.practiceDrafts?.[result.questionId]?.errorType)
   )).length;
   const dailyBatchClassificationComplete = dailyBatchSubmitted && dailyBatchResults.every((result) => (
-    result.isCorrect || result.errorType || todaySession?.practiceDrafts?.[result.questionId]?.errorType
+    result.isCorrect === true || (result.isCorrect === false && (result.errorType || todaySession?.practiceDrafts?.[result.questionId]?.errorType))
   ));
   const todayRatedCount = todayPracticeTargetIds.filter((id) => hasDailyPracticeRating(state, id, TODAY)).length;
   const firstIncompletePracticeIndex = todayPracticeTargetIds.findIndex((id) => !hasDailyPracticeRating(state, id, TODAY));
@@ -7736,17 +7770,34 @@ export default function App() {
 
       drafts[questionId] = nextDraft;
 
+      let gradingResults = sess.gradingResults || [];
+      let nextStats = prev.stats;
+      if (sess.submittedAt && patch.correctAnswer !== undefined) {
+        const correctAnswer = String(patch.correctAnswer || '').trim().toUpperCase();
+        gradingResults = gradingResults.map((result) => result.questionId === questionId ? {
+          ...result,
+          correctAnswer,
+          isCorrect: correctAnswer ? result.selected === correctAnswer : null,
+        } : result);
+        const updatedResult = gradingResults.find((result) => result.questionId === questionId);
+        if (updatedResult?.isCorrect != null) {
+          nextStats = regradeBatchQuestionResult(prev.stats, updatedResult, 'daily', sess.attemptId);
+        }
+      }
+
       return {
         ...prev,
+        stats: nextStats,
         sessions: {
           ...(prev.sessions || {}),
           [TODAY]: {
             ...sess,
             practiceDrafts: drafts,
+            gradingResults,
           },
         },
       };
-    }, ['sessions']);
+    }, patch.correctAnswer !== undefined ? ['stats', 'sessions'] : ['sessions']);
   };
 
   const submitDailyPractice = () => {
@@ -7771,12 +7822,12 @@ export default function App() {
       const question = getQuestionWithOverride(id, questionDataState);
       const draft = todaySession?.practiceDrafts?.[id] || {};
       const selected = String(draft.selected || '').trim().toUpperCase();
-      const correctAnswer = String(question?.answer || '').trim().toUpperCase();
+      const correctAnswer = String(draft.correctAnswer || question?.answer || getStat(state, id).correctAnswer || '').trim().toUpperCase();
       return {
         questionId: id,
         selected,
         correctAnswer,
-        isCorrect: Boolean(selected && correctAnswer && selected === correctAnswer),
+        isCorrect: correctAnswer ? selected === correctAnswer : null,
         confidence: Number(draft.confidence) || 3,
         cancer: question?.cancer,
         topic: question?.topic,
@@ -7811,8 +7862,15 @@ export default function App() {
     if (!dailyBatchSubmitted || (todaySession?.statsCommittedAt && dailyBatchAttemptsRecorded)) return;
     const results = dailyBatchResults.map((result) => ({
       ...result,
-      errorType: result.isCorrect ? '' : (result.errorType || todaySession?.practiceDrafts?.[result.questionId]?.errorType || ''),
+      errorType: result.isCorrect === false ? (result.errorType || todaySession?.practiceDrafts?.[result.questionId]?.errorType || '') : '',
     }));
+    const missingCorrectAnswer = results.find((result) => result.isCorrect == null);
+    if (missingCorrectAnswer) {
+      const missingIndex = todayPracticeTargetIds.indexOf(missingCorrectAnswer.questionId);
+      setPracticePage(Math.max(0, Math.floor(missingIndex / PRACTICE_PAGE_SIZE)));
+      setPracticePageMessage('仍有題目尚未設定正解，已跳到該題。');
+      return;
+    }
     const missingError = results.find((result) => !result.isCorrect && !result.errorType);
     if (missingError) {
       const missingIndex = todayPracticeTargetIds.indexOf(missingError.questionId);
@@ -7839,6 +7897,22 @@ export default function App() {
     }, ['stats', 'sessions']);
     setPracticePageMessage('錯因訂正已完成，答題結果已寫入統計。');
   };
+
+  useEffect(() => {
+    if (!dailyBatchSubmitted || !dailyGradeableResults.length || dailyBatchAttemptsRecorded) return;
+    updateState((prev) => {
+      const session = prev.sessions?.[TODAY] || {};
+      const repairedStats = applyBatchQuestionResults(prev.stats, session.gradingResults || [], 'daily', session.attemptId);
+      return {
+        ...prev,
+        stats: repairedStats,
+        sessions: {
+          ...(prev.sessions || {}),
+          [TODAY]: { ...session, attemptsCommittedAt: session.attemptsCommittedAt || new Date().toISOString() },
+        },
+      };
+    }, ['stats', 'sessions']);
+  }, [dailyBatchAttemptsRecorded, dailyBatchSubmitted, dailyGradeableResults.length, updateState]);
 
   const createTodaySession = ({ force = false } = {}) => {
     if (isCreatingPracticeRef.current) return;
@@ -8708,6 +8782,8 @@ export default function App() {
           onCreatePractice={createTodaySession}
           isCreatingPractice={isCreatingPractice}
           practiceMode={selectedPracticeMode}
+          hasPracticeSession={todayPracticeTargetIds.length > 0}
+          remainingErrorTypes={Math.max(0, dailyBatchWrong - dailyWrongClassified)}
           onPracticeModeChange={setPracticeMode}
           onMarkRecall={markQuestRecall}
           onSetBossResult={setQuestBossResult}
@@ -8871,7 +8947,7 @@ export default function App() {
                 <strong>第 {currentPracticePage + 1} 頁 / 共 {totalPracticePages} 頁</strong>
                 <span>
                   {dailyBatchSubmitted
-                    ? `已交卷：${dailyBatchCorrect} 答對 / ${dailyBatchWrong} 答錯`
+                    ? `已交卷：${dailyBatchCorrect} 答對 / ${dailyBatchWrong} 答錯${dailyBatchPending ? ` / ${dailyBatchPending} 題待補正解` : ''}`
                     : `已作答 ${todayPracticeTargetIds.filter((id) => todaySession?.practiceDrafts?.[id]?.selected).length}/${todayPracticeConfig.total} 題；已載入 ${todayQuestions.length} 題。`}
                 </span>
               </div>
@@ -8894,6 +8970,7 @@ export default function App() {
                     practiceDraft={todaySession?.practiceDrafts?.[q.id]}
                     onPracticeChange={(patch) => updatePracticeDraft(q.id, patch)}
                     batchSubmitted={dailyBatchSubmitted}
+                    batchFinalized={Boolean(todaySession?.statsCommittedAt && dailyBatchAttemptsRecorded)}
                   />
                 ))}
               </div>
