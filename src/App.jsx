@@ -572,6 +572,7 @@ const defaultState = {
   deletedQuestionIds: {},
   mockExams: [],
   activeMockExam: null,
+  activeMockExamClearedAt: null,
   flashcards: {},
   flashcardStats: {},
   deletedFlashcardIds: {},
@@ -623,6 +624,7 @@ function buildStorageSlices(state) {
       focusSessions: state.focusSessions || [],
       mockExams: state.mockExams || [],
       activeMockExam: state.activeMockExam || null,
+      activeMockExamClearedAt: state.activeMockExamClearedAt || null,
       focusTimer: state.focusTimer || defaultState.focusTimer,
     },
     sessions: {
@@ -687,6 +689,7 @@ function hydrateStateFromStorage() {
     focusSessions: activity?.focusSessions ?? v2Core?.focusSessions ?? legacyState.focusSessions ?? defaultState.focusSessions,
     mockExams: activity?.mockExams ?? v2Core?.mockExams ?? legacyState.mockExams ?? defaultState.mockExams,
     activeMockExam: activity?.activeMockExam ?? v2Core?.activeMockExam ?? legacyState.activeMockExam ?? defaultState.activeMockExam,
+    activeMockExamClearedAt: activity?.activeMockExamClearedAt ?? v2Core?.activeMockExamClearedAt ?? legacyState.activeMockExamClearedAt ?? defaultState.activeMockExamClearedAt,
     focusTimer: activity?.focusTimer ?? v2Core?.focusTimer ?? legacyState.focusTimer ?? defaultState.focusTimer,
     sessions: sessions?.sessions ?? v2Core?.sessions ?? legacyState.sessions ?? defaultState.sessions,
     planProgress: progress?.planProgress ?? v2Core?.planProgress ?? legacyState.planProgress ?? defaultState.planProgress,
@@ -824,6 +827,75 @@ function getStatAttemptScore(stat = {}) {
   return (Number(stat.attempts) || 0) + ((stat.answerHistory || []).length / 100);
 }
 
+function getAnswerEventMergeKey(event = {}) {
+  if (event.attemptId) return `attempt:${event.attemptId}`;
+  return ['legacy', event.date, event.mode, event.questionId, event.selected, event.rating, event.isCorrect].join('|');
+}
+
+function mergeAnswerEvents(secondaryEvents = [], primaryEvents = []) {
+  const byKey = new Map();
+  [...secondaryEvents, ...primaryEvents].forEach((event) => {
+    byKey.set(getAnswerEventMergeKey(event), event);
+  });
+  return [...byKey.values()].slice(-50);
+}
+
+function getSessionFreshness(session = {}) {
+  return [session.statsCommittedAt, session.attemptsCommittedAt, session.submittedAt, session.updatedAt, session.createdAt]
+    .filter(Boolean)
+    .sort()
+    .at(-1) || '';
+}
+
+function mergeDailySession(cloudSession = {}, localSession = {}) {
+  const localIsNewer = getSessionFreshness(localSession) >= getSessionFreshness(cloudSession);
+  const primary = localIsNewer ? localSession : cloudSession;
+  const secondary = localIsNewer ? cloudSession : localSession;
+  if (primary.attemptId && secondary.attemptId && primary.attemptId !== secondary.attemptId) return primary;
+  return {
+    ...secondary,
+    ...primary,
+    questionIds: (primary.questionIds || []).length >= (secondary.questionIds || []).length ? primary.questionIds : secondary.questionIds,
+    practiceDrafts: { ...(secondary.practiceDrafts || {}), ...(primary.practiceDrafts || {}) },
+    gradingResults: (primary.gradingResults || []).length >= (secondary.gradingResults || []).length
+      ? primary.gradingResults
+      : secondary.gradingResults,
+    attemptsCommittedAt: [cloudSession.attemptsCommittedAt, localSession.attemptsCommittedAt].filter(Boolean).sort().at(-1) || null,
+    statsCommittedAt: [cloudSession.statsCommittedAt, localSession.statsCommittedAt].filter(Boolean).sort().at(-1) || null,
+    completed: Boolean(cloudSession.completed || localSession.completed),
+  };
+}
+
+function mergeDailySessions(cloudSessions = {}, localSessions = {}) {
+  const merged = { ...(cloudSessions || {}) };
+  Object.entries(localSessions || {}).forEach(([date, localSession]) => {
+    merged[date] = merged[date] ? mergeDailySession(merged[date], localSession) : localSession;
+  });
+  return merged;
+}
+
+function getMockExamFreshness(exam = {}) {
+  return [exam.persistedAt, exam.completedAt, exam.scoredAt, exam.startedAt].filter(Boolean).sort().at(-1) || '';
+}
+
+function mergeMockExamHistory(cloudExams = [], localExams = []) {
+  const byId = new Map();
+  [...cloudExams, ...localExams].forEach((exam) => {
+    if (!exam?.id) return;
+    const current = byId.get(exam.id);
+    if (!current || getMockExamFreshness(exam) >= getMockExamFreshness(current)) byId.set(exam.id, exam);
+  });
+  return [...byId.values()].sort((a, b) => getMockExamFreshness(b).localeCompare(getMockExamFreshness(a))).slice(0, 20);
+}
+
+function mergeActiveMockExam(localState = {}, cloudState = {}) {
+  const clearedAt = [localState.activeMockExamClearedAt, cloudState.activeMockExamClearedAt].filter(Boolean).sort().at(-1) || '';
+  const candidates = [cloudState.activeMockExam, localState.activeMockExam]
+    .filter((draft) => draft?.updatedAt && draft.updatedAt > clearedAt)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return { activeMockExam: candidates[0] || null, activeMockExamClearedAt: clearedAt || null };
+}
+
 function mergeQuestionStats(cloudStats = {}, localStats = {}) {
   const merged = { ...(cloudStats || {}) };
   Object.entries(localStats || {}).forEach(([id, localStat]) => {
@@ -837,33 +909,18 @@ function mergeQuestionStats(cloudStats = {}, localStats = {}) {
     const cloudScore = getStatAttemptScore(cloudStat);
     const primary = localScore >= cloudScore ? localStat : cloudStat;
     const secondary = primary === localStat ? cloudStat : localStat;
+    const localEventKeys = new Set((localStat.answerHistory || []).map(getAnswerEventMergeKey));
+    const cloudEventKeys = new Set((cloudStat.answerHistory || []).map(getAnswerEventMergeKey));
+    const sameEventSet = localEventKeys.size > 0
+      && localEventKeys.size === cloudEventKeys.size
+      && [...localEventKeys].every((key) => cloudEventKeys.has(key));
     merged[id] = {
       ...secondary,
       ...primary,
-      attempts: Math.max(Number(localStat.attempts) || 0, Number(cloudStat.attempts) || 0),
-      correct: Math.max(Number(localStat.correct) || 0, Number(cloudStat.correct) || 0),
-      wrong: Math.max(Number(localStat.wrong) || 0, Number(cloudStat.wrong) || 0),
-      answerHistory: [
-        ...(cloudStat.answerHistory || []),
-        ...(localStat.answerHistory || []),
-      ].filter((event, index, events) => {
-        const key = [
-          event?.date,
-          event?.mode,
-          event?.questionId,
-          event?.selected,
-          event?.rating,
-          event?.isCorrect,
-        ].join('|');
-        return events.findIndex((candidate) => [
-          candidate?.date,
-          candidate?.mode,
-          candidate?.questionId,
-          candidate?.selected,
-          candidate?.rating,
-          candidate?.isCorrect,
-        ].join('|') === key) === index;
-      }).slice(-50),
+      attempts: sameEventSet ? (Number(primary.attempts) || 0) : Math.max(Number(localStat.attempts) || 0, Number(cloudStat.attempts) || 0),
+      correct: sameEventSet ? (Number(primary.correct) || 0) : Math.max(Number(localStat.correct) || 0, Number(cloudStat.correct) || 0),
+      wrong: sameEventSet ? (Number(primary.wrong) || 0) : Math.max(Number(localStat.wrong) || 0, Number(cloudStat.wrong) || 0),
+      answerHistory: mergeAnswerEvents(secondary.answerHistory || [], primary.answerHistory || []),
       confidenceHistory: [
         ...(cloudStat.confidenceHistory || []),
         ...(localStat.confidenceHistory || []),
@@ -877,12 +934,12 @@ function mergeQuestionStats(cloudStats = {}, localStats = {}) {
         ...(localStat.errorTypes || []),
       ])].slice(-20),
       remediationTasks: [
-        ...(cloudStat.remediationTasks || []),
-        ...(localStat.remediationTasks || []),
+        ...(secondary.remediationTasks || []),
+        ...(primary.remediationTasks || []),
       ].filter((task, index, tasks) => {
-        const key = [task?.date, task?.questionId, task?.errorType, task?.task].join('|');
-        return tasks.findIndex((candidate) => [candidate?.date, candidate?.questionId, candidate?.errorType, candidate?.task].join('|') === key) === index;
-      }).slice(0, 20),
+        const key = task?.attemptId || [task?.date, task?.questionId, task?.errorType, task?.task].join('|');
+        return tasks.findLastIndex((candidate) => (candidate?.attemptId || [candidate?.date, candidate?.questionId, candidate?.errorType, candidate?.task].join('|')) === key) === index;
+      }).slice(-20),
       bookmarked: Boolean(localStat.bookmarked || cloudStat.bookmarked),
       wrongNotes: localStat.wrongNotes || cloudStat.wrongNotes || '',
       explanation: localStat.explanation || cloudStat.explanation || '',
@@ -904,15 +961,13 @@ function mergeCloudState(localState, cloudState) {
   const planResetOwner = localPlanResetAt > cloudPlanResetAt ? 'local' : cloudPlanResetAt > localPlanResetAt ? 'cloud' : 'none';
   const gameResetOwner = localGameResetAt > cloudGameResetAt ? 'local' : cloudGameResetAt > localGameResetAt ? 'cloud' : 'none';
   const mergedFocusSessions = mergeFocusSessions(cloudState.focusSessions, localState.focusSessions);
+  const mergedActiveMockExam = mergeActiveMockExam(localState, cloudState);
 
   return normalizeState({
     ...defaultState,
     ...cloudState,
     ...localState,
-    sessions: {
-      ...(cloudState.sessions || {}),
-      ...(localState.sessions || {}),
-    },
+    sessions: mergeDailySessions(cloudState.sessions, localState.sessions),
     focusSessions: mergedFocusSessions,
     focusTimer: removeCompletedActiveFocusSession(mergeFocusTimer(cloudState.focusTimer, localState.focusTimer), mergedFocusSessions),
     stats: mergeQuestionStats(cloudState.stats, localState.stats),
@@ -962,10 +1017,8 @@ function mergeCloudState(localState, cloudState) {
       ...(cloudState.deletedQuestionIds || {}),
       ...(localState.deletedQuestionIds || {}),
     },
-    mockExams: [
-      ...(cloudState.mockExams || []),
-      ...(localState.mockExams || []),
-    ].filter((exam, index, exams) => exam?.id && exams.findIndex((x) => x.id === exam.id) === index),
+    mockExams: mergeMockExamHistory(cloudState.mockExams, localState.mockExams),
+    ...mergedActiveMockExam,
     deletedFlashcardIds,
     flashcards: mergeFlashcardMaps(cloudState.flashcards, localState.flashcards, deletedFlashcardIds),
     flashcardStats: {
@@ -1073,6 +1126,7 @@ function hydrateStateFromCloudSlices(sliceMap = {}) {
     focusSessions: activity.focusSessions ?? defaultState.focusSessions,
     mockExams: activity.mockExams ?? defaultState.mockExams,
     activeMockExam: activity.activeMockExam ?? defaultState.activeMockExam,
+    activeMockExamClearedAt: activity.activeMockExamClearedAt ?? defaultState.activeMockExamClearedAt,
     focusTimer: activity.focusTimer ?? defaultState.focusTimer,
     sessions: sessions.sessions ?? defaultState.sessions,
     planProgress: progress.planProgress ?? defaultState.planProgress,
@@ -8457,7 +8511,11 @@ export default function App() {
   }, [updateState]);
 
   const clearActiveMockExam = useCallback(() => {
-    updateState((prev) => prev.activeMockExam ? { ...prev, activeMockExam: null } : prev, ['activity']);
+    updateState((prev) => ({
+      ...prev,
+      activeMockExam: null,
+      activeMockExamClearedAt: new Date().toISOString(),
+    }), ['activity']);
   }, [updateState]);
 
   const finishMockExam = (completedExam) => {
