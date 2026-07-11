@@ -833,11 +833,86 @@ function getAnswerEventMergeKey(event = {}) {
 }
 
 function mergeAnswerEvents(secondaryEvents = [], primaryEvents = []) {
-  const byKey = new Map();
-  [...secondaryEvents, ...primaryEvents].forEach((event) => {
-    byKey.set(getAnswerEventMergeKey(event), event);
+  const merged = [];
+  secondaryEvents.forEach((event) => {
+    if (!event.attemptId) {
+      merged.push(event);
+      return;
+    }
+    const existingIndex = merged.findIndex((candidate) => candidate.attemptId === event.attemptId);
+    if (existingIndex >= 0) merged[existingIndex] = event;
+    else merged.push(event);
   });
-  return [...byKey.values()].slice(-50);
+  const matchedSecondaryIndexes = new Set();
+  primaryEvents.forEach((event) => {
+    const key = getAnswerEventMergeKey(event);
+    if (event.attemptId) {
+      const stableIndex = merged.findIndex((candidate) => candidate.attemptId === event.attemptId);
+      if (stableIndex >= 0) merged[stableIndex] = event;
+      else merged.push(event);
+      return;
+    }
+    const matchingIndex = merged.findIndex((candidate, index) => (
+      !matchedSecondaryIndexes.has(index) && getAnswerEventMergeKey(candidate) === key
+    ));
+    if (matchingIndex >= 0) {
+      merged[matchingIndex] = event;
+      matchedSecondaryIndexes.add(matchingIndex);
+    } else {
+      merged.push(event);
+    }
+  });
+  return merged.slice(-50);
+}
+
+function haveSameEventOccurrences(leftEvents = [], rightEvents = []) {
+  const countKeys = (events) => events.reduce((counts, event) => {
+    const key = getAnswerEventMergeKey(event);
+    counts.set(key, (counts.get(key) || 0) + 1);
+    return counts;
+  }, new Map());
+  const leftCounts = countKeys(leftEvents);
+  const rightCounts = countKeys(rightEvents);
+  return leftEvents.length > 0
+    && leftEvents.length === rightEvents.length
+    && [...leftCounts].every(([key, count]) => rightCounts.get(key) === count);
+}
+
+function getRemediationMergeKey(task = {}) {
+  return task.attemptId ? `attempt:${task.attemptId}` : ['legacy', task.date, task.questionId, task.errorType, task.task].join('|');
+}
+
+function mergeRemediationTasks(secondaryTasks = [], primaryTasks = []) {
+  const merged = [];
+  secondaryTasks.forEach((task) => {
+    if (!task.attemptId) {
+      merged.push(task);
+      return;
+    }
+    const existingIndex = merged.findIndex((candidate) => candidate.attemptId === task.attemptId);
+    if (existingIndex >= 0) merged[existingIndex] = task;
+    else merged.push(task);
+  });
+  const matchedSecondaryIndexes = new Set();
+  primaryTasks.forEach((task) => {
+    const key = getRemediationMergeKey(task);
+    if (task.attemptId) {
+      const stableIndex = merged.findIndex((candidate) => candidate.attemptId === task.attemptId);
+      if (stableIndex >= 0) merged[stableIndex] = task;
+      else merged.push(task);
+      return;
+    }
+    const matchingIndex = merged.findIndex((candidate, index) => (
+      !matchedSecondaryIndexes.has(index) && getRemediationMergeKey(candidate) === key
+    ));
+    if (matchingIndex >= 0) {
+      merged[matchingIndex] = task;
+      matchedSecondaryIndexes.add(matchingIndex);
+    } else {
+      merged.push(task);
+    }
+  });
+  return merged.slice(-20);
 }
 
 function getSessionFreshness(session = {}) {
@@ -909,37 +984,24 @@ function mergeQuestionStats(cloudStats = {}, localStats = {}) {
     const cloudScore = getStatAttemptScore(cloudStat);
     const primary = localScore >= cloudScore ? localStat : cloudStat;
     const secondary = primary === localStat ? cloudStat : localStat;
-    const localEventKeys = new Set((localStat.answerHistory || []).map(getAnswerEventMergeKey));
-    const cloudEventKeys = new Set((cloudStat.answerHistory || []).map(getAnswerEventMergeKey));
-    const sameEventSet = localEventKeys.size > 0
-      && localEventKeys.size === cloudEventKeys.size
-      && [...localEventKeys].every((key) => cloudEventKeys.has(key));
+    const sameEventSet = haveSameEventOccurrences(localStat.answerHistory, cloudStat.answerHistory);
+    const answerHistory = mergeAnswerEvents(secondary.answerHistory || [], primary.answerHistory || []);
+    const mergedConfidenceHistory = answerHistory.flatMap((event) => event.confidence == null ? [] : [Number(event.confidence)]).filter(Number.isFinite).slice(-50);
+    const mergedTimeHistory = answerHistory.flatMap((event) => event.timeSpentSec == null ? [] : [Number(event.timeSpentSec)]).filter(Number.isFinite).slice(-50);
     merged[id] = {
       ...secondary,
       ...primary,
       attempts: sameEventSet ? (Number(primary.attempts) || 0) : Math.max(Number(localStat.attempts) || 0, Number(cloudStat.attempts) || 0),
       correct: sameEventSet ? (Number(primary.correct) || 0) : Math.max(Number(localStat.correct) || 0, Number(cloudStat.correct) || 0),
       wrong: sameEventSet ? (Number(primary.wrong) || 0) : Math.max(Number(localStat.wrong) || 0, Number(cloudStat.wrong) || 0),
-      answerHistory: mergeAnswerEvents(secondary.answerHistory || [], primary.answerHistory || []),
-      confidenceHistory: [
-        ...(cloudStat.confidenceHistory || []),
-        ...(localStat.confidenceHistory || []),
-      ].slice(-50),
-      timeHistory: [
-        ...(cloudStat.timeHistory || []),
-        ...(localStat.timeHistory || []),
-      ].slice(-50),
+      answerHistory,
+      confidenceHistory: mergedConfidenceHistory.length ? mergedConfidenceHistory : (primary.confidenceHistory || secondary.confidenceHistory || []).slice(-50),
+      timeHistory: mergedTimeHistory.length ? mergedTimeHistory : (primary.timeHistory || secondary.timeHistory || []).slice(-50),
       errorTypes: [...new Set([
         ...(cloudStat.errorTypes || []),
         ...(localStat.errorTypes || []),
       ])].slice(-20),
-      remediationTasks: [
-        ...(secondary.remediationTasks || []),
-        ...(primary.remediationTasks || []),
-      ].filter((task, index, tasks) => {
-        const key = task?.attemptId || [task?.date, task?.questionId, task?.errorType, task?.task].join('|');
-        return tasks.findLastIndex((candidate) => (candidate?.attemptId || [candidate?.date, candidate?.questionId, candidate?.errorType, candidate?.task].join('|')) === key) === index;
-      }).slice(-20),
+      remediationTasks: mergeRemediationTasks(secondary.remediationTasks || [], primary.remediationTasks || []),
       bookmarked: Boolean(localStat.bookmarked || cloudStat.bookmarked),
       wrongNotes: primary.wrongNotes ?? secondary.wrongNotes ?? '',
       explanation: primary.explanation ?? secondary.explanation ?? '',
@@ -2099,6 +2161,13 @@ function nextIntervalByRating(rating, stat) {
   return getAnkiIntervalDays(rating, stat);
 }
 
+function getMasteryDeltaByRating(rating) {
+  if (rating === 'Again') return -1;
+  if (rating === 'Hard') return 0;
+  if (rating === 'Easy') return 2;
+  return 1;
+}
+
 function applyBatchQuestionResults(stats, results, mode, attemptId) {
   const nextStats = { ...(stats || {}) };
 
@@ -2107,7 +2176,9 @@ function applyBatchQuestionResults(stats, results, mode, attemptId) {
     const previous = { ...emptyStat(), ...(nextStats[result.questionId] || {}) };
     if ((previous.answerHistory || []).some((event) => event?.attemptId === attemptId)) return;
 
-    const rating = result.isCorrect ? 'Good' : 'Again';
+    const rating = FLASHCARD_RATINGS[result.rating]
+      ? result.rating
+      : (result.isCorrect ? 'Good' : 'Again');
     const interval = nextIntervalByRating(rating, previous);
     const wasPreviouslyWrong = (previous.wrong || 0) > 0;
     const remediation = !result.isCorrect && result.errorType ? getRemediationForErrorType(result.errorType) : null;
@@ -2152,7 +2223,7 @@ function applyBatchQuestionResults(stats, results, mode, attemptId) {
       lastRating: rating,
       lastAttemptAt: TODAY,
       nextReviewDate: addDays(TODAY, interval),
-      mastery: result.isCorrect ? Math.min(5, (previous.mastery || 0) + 1) : Math.max(0, (previous.mastery || 0) - 1),
+      mastery: Math.max(0, Math.min(5, (previous.mastery || 0) + getMasteryDeltaByRating(rating))),
       intervalDays: interval,
       userAnswer: result.selected,
       correctAnswer: result.correctAnswer,
@@ -2187,11 +2258,12 @@ function regradeBatchQuestionResult(stats, result, mode, attemptId) {
   if (
     previousEvent.correctAnswer === result.correctAnswer
     && previousEvent.isCorrect === result.isCorrect
+    && previousEvent.rating === (result.rating || (result.isCorrect ? 'Good' : 'Again'))
   ) return stats;
 
   const previousWasWrongRetest = previousEvent.wasPreviouslyWrong
     ?? ((previous.wrong || 0) - (previousEvent.isCorrect ? 0 : 1) > 0);
-  const oldMasteryDelta = previousEvent.isCorrect ? 1 : -1;
+  const oldMasteryDelta = getMasteryDeltaByRating(previousEvent.rating || (previousEvent.isCorrect ? 'Good' : 'Again'));
   const previousSnapshot = previousEvent.previousStat || {};
   const remainingHistory = (previous.answerHistory || []).filter((event) => event?.attemptId !== attemptId);
   const trailingWrong = [...remainingHistory].reverse().findIndex((event) => event?.isCorrect);
@@ -2888,7 +2960,7 @@ function hasDailyPracticeRating(state, id, date = TODAY) {
     event?.date === date
     && event?.mode === 'daily'
     && event?.questionId === id
-  )) || (stat.lastAttemptAt === date && (stat.attempts || 0) > 0);
+  ));
 }
 
 function getDailyWrongErrorTypeStatus(state, questionIds = [], date = TODAY) {
@@ -3194,7 +3266,7 @@ function getAnswerEventsByDate(state) {
   const byDate = {};
   Object.values(state.stats || {}).forEach((stat) => {
     (stat.answerHistory || []).forEach((event) => {
-      if (!event?.date) return;
+      if (!event?.date || event.isCorrect == null) return;
       if (!byDate[event.date]) byDate[event.date] = { attempts: 0, correct: 0, wrong: 0 };
       byDate[event.date].attempts += 1;
       byDate[event.date].correct += event.isCorrect ? 1 : 0;
@@ -3209,7 +3281,7 @@ function getTodayAttemptSummary(state, date = TODAY) {
   if (fromHistory) return fromHistory;
 
   return Object.values(state.stats || {}).reduce((acc, stat) => {
-    if (stat.lastAttemptAt !== date) return acc;
+    if (stat.lastAttemptAt !== date || !['correct', 'wrong'].includes(stat.lastResult)) return acc;
     acc.attempts += 1;
     acc.correct += stat.lastResult === 'correct' ? 1 : 0;
     acc.wrong += stat.lastResult === 'wrong' ? 1 : 0;
@@ -4888,18 +4960,18 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                     <span>{selectedErrorRemediation.action}</span>
                   </div>
                 )}
-                {!practiceMode && <label>
+                {(!practiceMode || batchSubmitted) && <label>
                   Mastery
-                  <select value={stat.mastery || 0} onChange={(e) => onUpdateStat(question.id, { ...stat, mastery: Number(e.target.value) })}>
+                  <select disabled={practiceMode} value={stat.mastery || 0} onChange={(e) => onUpdateStat(question.id, { ...stat, mastery: Number(e.target.value) })}>
                     {[0, 1, 2, 3, 4, 5].map((x) => <option key={x} value={x}>{x}</option>)}
                   </select>
                 </label>}
-                {!practiceMode && (answerIsSingleChoice ? (
+                {(!practiceMode || batchSubmitted) && (answerIsSingleChoice ? (
                   <div className="rating-buttons">
                     <button
                       className="rating-button again"
                       title={`Again（重複）：重新學習，下次 ${ratingSchedulePreviews.Again.dueLabel}`}
-                      onClick={() => recordRating('Again', { countAttempt: !hasRecordedCurrentPracticeAttempt })}
+                      onClick={() => practiceMode ? onPracticeChange?.({ rated: true, rating: 'Again' }) : recordRating('Again', { countAttempt: !hasRecordedCurrentPracticeAttempt })}
                     >
                       🔁 Again
                       <div className="rating-sub">重學 · {ratingSchedulePreviews.Again.shortLabel}</div>
@@ -4907,7 +4979,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                     <button
                       className="rating-button hard"
                       title={`Hard（難）：答對但不穩，下次 ${ratingSchedulePreviews.Hard.dueLabel}`}
-                      onClick={() => recordRating('Hard', { countAttempt: !hasRecordedCurrentPracticeAttempt })}
+                      onClick={() => practiceMode ? onPracticeChange?.({ rated: true, rating: 'Hard' }) : recordRating('Hard', { countAttempt: !hasRecordedCurrentPracticeAttempt })}
                     >
                       🟠 Hard
                       <div className="rating-sub">偏難 · {ratingSchedulePreviews.Hard.shortLabel}</div>
@@ -4915,7 +4987,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                     <button
                       className="rating-button good"
                       title={`Good（好）：正常答對，下次 ${ratingSchedulePreviews.Good.dueLabel}`}
-                      onClick={() => recordRating('Good', { countAttempt: !hasRecordedCurrentPracticeAttempt })}
+                      onClick={() => practiceMode ? onPracticeChange?.({ rated: true, rating: 'Good' }) : recordRating('Good', { countAttempt: !hasRecordedCurrentPracticeAttempt })}
                     >
                       ✅ Good
                       <div className="rating-sub">正常 · {ratingSchedulePreviews.Good.shortLabel}</div>
@@ -4923,7 +4995,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                     <button
                       className="rating-button easy"
                       title={`Easy（非常熟）：秒答且熟悉，下次 ${ratingSchedulePreviews.Easy.dueLabel}`}
-                      onClick={() => recordRating('Easy', { countAttempt: !hasRecordedCurrentPracticeAttempt })}
+                      onClick={() => practiceMode ? onPracticeChange?.({ rated: true, rating: 'Easy' }) : recordRating('Easy', { countAttempt: !hasRecordedCurrentPracticeAttempt })}
                     >
                       ✨ Easy
                       <div className="rating-sub">熟悉 · {ratingSchedulePreviews.Easy.shortLabel}</div>
@@ -7976,18 +8048,19 @@ export default function App() {
       let gradingResults = sess.gradingResults || [];
       let nextStats = prev.stats;
       const hasNotePatch = patch.explanation !== undefined || patch.wrongNotes !== undefined;
-      if (sess.submittedAt && (patch.correctAnswer !== undefined || hasNotePatch)) {
+      if (sess.submittedAt && (patch.correctAnswer !== undefined || patch.rating !== undefined || hasNotePatch)) {
         gradingResults = gradingResults.map((result) => result.questionId === questionId ? {
           ...result,
           ...(patch.correctAnswer !== undefined ? {
             correctAnswer: String(patch.correctAnswer || '').trim().toUpperCase(),
             isCorrect: patch.correctAnswer ? result.selected === String(patch.correctAnswer).trim().toUpperCase() : null,
           } : {}),
+          ...(patch.rating !== undefined ? { rating: patch.rating } : {}),
           ...(patch.explanation !== undefined ? { explanation: patch.explanation } : {}),
           ...(patch.wrongNotes !== undefined ? { wrongNotes: patch.wrongNotes } : {}),
         } : result);
         const updatedResult = gradingResults.find((result) => result.questionId === questionId);
-        if (patch.correctAnswer !== undefined && updatedResult?.isCorrect != null) {
+        if ((patch.correctAnswer !== undefined || patch.rating !== undefined) && updatedResult?.isCorrect != null) {
           nextStats = regradeBatchQuestionResult(nextStats, updatedResult, 'daily', sess.attemptId);
         }
         if (hasNotePatch) nextStats = applyBatchQuestionNotes(nextStats, questionId, sess.attemptId, patch);
@@ -8005,7 +8078,7 @@ export default function App() {
           },
         },
       };
-    }, patch.correctAnswer !== undefined || patch.explanation !== undefined || patch.wrongNotes !== undefined ? ['stats', 'sessions'] : ['sessions']);
+    }, patch.correctAnswer !== undefined || patch.rating !== undefined || patch.explanation !== undefined || patch.wrongNotes !== undefined ? ['stats', 'sessions'] : ['sessions']);
   };
 
   const submitDailyPractice = () => {
