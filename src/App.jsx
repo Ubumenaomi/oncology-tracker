@@ -941,8 +941,8 @@ function mergeQuestionStats(cloudStats = {}, localStats = {}) {
         return tasks.findLastIndex((candidate) => (candidate?.attemptId || [candidate?.date, candidate?.questionId, candidate?.errorType, candidate?.task].join('|')) === key) === index;
       }).slice(-20),
       bookmarked: Boolean(localStat.bookmarked || cloudStat.bookmarked),
-      wrongNotes: localStat.wrongNotes || cloudStat.wrongNotes || '',
-      explanation: localStat.explanation || cloudStat.explanation || '',
+      wrongNotes: primary.wrongNotes ?? secondary.wrongNotes ?? '',
+      explanation: primary.explanation ?? secondary.explanation ?? '',
     };
   });
   return merged;
@@ -2156,6 +2156,8 @@ function applyBatchQuestionResults(stats, results, mode, attemptId) {
       intervalDays: interval,
       userAnswer: result.selected,
       correctAnswer: result.correctAnswer,
+      explanation: result.explanation ?? previous.explanation,
+      wrongNotes: result.wrongNotes ?? previous.wrongNotes,
       lastConfidence: result.confidence,
       lastErrorType: result.isCorrect ? '' : (result.errorType || previous.lastErrorType || ''),
       confidenceHistory: [...(previous.confidenceHistory || []), result.confidence].slice(-50),
@@ -2216,6 +2218,29 @@ function regradeBatchQuestionResult(stats, result, mode, attemptId) {
     remediationTasks: (previous.remediationTasks || []).filter((task) => task?.attemptId !== attemptId),
   };
   return applyBatchQuestionResults({ ...(stats || {}), [result.questionId]: cleanedStat }, [result], mode, attemptId);
+}
+
+function applyBatchQuestionNotes(stats, questionId, attemptId, patch = {}) {
+  const previous = stats?.[questionId];
+  if (!previous || !(previous.answerHistory || []).some((event) => event?.attemptId === attemptId)) return stats;
+  const notePatch = {
+    ...(patch.explanation !== undefined ? { explanation: patch.explanation } : {}),
+    ...(patch.wrongNotes !== undefined ? { wrongNotes: patch.wrongNotes } : {}),
+  };
+  if (!Object.keys(notePatch).length) return stats;
+  const attemptEvent = (previous.answerHistory || []).find((event) => event?.attemptId === attemptId);
+  const alreadySynced = Object.entries(notePatch).every(([key, value]) => previous[key] === value && attemptEvent?.[key] === value);
+  if (alreadySynced) return stats;
+  return {
+    ...(stats || {}),
+    [questionId]: {
+      ...previous,
+      ...notePatch,
+      answerHistory: (previous.answerHistory || []).map((event) => (
+        event?.attemptId === attemptId ? { ...event, ...notePatch } : event
+      )),
+    },
+  };
 }
 
 function applyBatchRemediationsToStats(stats, results, attemptId) {
@@ -7851,6 +7876,16 @@ export default function App() {
   const dailyBatchAttemptsRecorded = dailyGradeableResults.length > 0 && dailyGradeableResults.every((result) => (
     (getStat(state, result.questionId).answerHistory || []).some((event) => event?.attemptId === todaySession?.attemptId)
   ));
+  const dailyBatchNotesSynced = dailyBatchResults.every((result) => {
+    const stat = getStat(state, result.questionId);
+    const event = (stat.answerHistory || []).find((item) => item?.attemptId === todaySession?.attemptId);
+    if (!event) return true;
+    const draft = todaySession?.practiceDrafts?.[result.questionId] || {};
+    const explanation = draft.explanation ?? result.explanation;
+    const wrongNotes = draft.wrongNotes ?? result.wrongNotes;
+    return (explanation === undefined || (stat.explanation === explanation && event.explanation === explanation))
+      && (wrongNotes === undefined || (stat.wrongNotes === wrongNotes && event.wrongNotes === wrongNotes));
+  });
   const dailyBatchCorrect = dailyBatchResults.filter((result) => result.isCorrect).length;
   const dailyBatchWrong = dailyBatchResults.filter((result) => result.isCorrect === false).length;
   const dailyBatchPending = dailyBatchResults.filter((result) => result.isCorrect == null).length;
@@ -7940,17 +7975,22 @@ export default function App() {
 
       let gradingResults = sess.gradingResults || [];
       let nextStats = prev.stats;
-      if (sess.submittedAt && patch.correctAnswer !== undefined) {
-        const correctAnswer = String(patch.correctAnswer || '').trim().toUpperCase();
+      const hasNotePatch = patch.explanation !== undefined || patch.wrongNotes !== undefined;
+      if (sess.submittedAt && (patch.correctAnswer !== undefined || hasNotePatch)) {
         gradingResults = gradingResults.map((result) => result.questionId === questionId ? {
           ...result,
-          correctAnswer,
-          isCorrect: correctAnswer ? result.selected === correctAnswer : null,
+          ...(patch.correctAnswer !== undefined ? {
+            correctAnswer: String(patch.correctAnswer || '').trim().toUpperCase(),
+            isCorrect: patch.correctAnswer ? result.selected === String(patch.correctAnswer).trim().toUpperCase() : null,
+          } : {}),
+          ...(patch.explanation !== undefined ? { explanation: patch.explanation } : {}),
+          ...(patch.wrongNotes !== undefined ? { wrongNotes: patch.wrongNotes } : {}),
         } : result);
         const updatedResult = gradingResults.find((result) => result.questionId === questionId);
-        if (updatedResult?.isCorrect != null) {
-          nextStats = regradeBatchQuestionResult(prev.stats, updatedResult, 'daily', sess.attemptId);
+        if (patch.correctAnswer !== undefined && updatedResult?.isCorrect != null) {
+          nextStats = regradeBatchQuestionResult(nextStats, updatedResult, 'daily', sess.attemptId);
         }
+        if (hasNotePatch) nextStats = applyBatchQuestionNotes(nextStats, questionId, sess.attemptId, patch);
       }
 
       return {
@@ -7965,7 +8005,7 @@ export default function App() {
           },
         },
       };
-    }, patch.correctAnswer !== undefined ? ['stats', 'sessions'] : ['sessions']);
+    }, patch.correctAnswer !== undefined || patch.explanation !== undefined || patch.wrongNotes !== undefined ? ['stats', 'sessions'] : ['sessions']);
   };
 
   const submitDailyPractice = () => {
@@ -7997,6 +8037,8 @@ export default function App() {
         correctAnswer,
         isCorrect: correctAnswer ? selected === correctAnswer : null,
         confidence: Number(draft.confidence) || 3,
+        explanation: draft.explanation ?? question?.explanation ?? '',
+        wrongNotes: draft.wrongNotes ?? '',
         cancer: question?.cancer,
         topic: question?.topic,
         submittedAt,
@@ -8081,6 +8123,35 @@ export default function App() {
       };
     }, ['stats', 'sessions']);
   }, [dailyBatchAttemptsRecorded, dailyBatchSubmitted, dailyGradeableResults.length, updateState]);
+
+  useEffect(() => {
+    if (!dailyBatchSubmitted || dailyBatchNotesSynced) return;
+    updateState((prev) => {
+      const session = prev.sessions?.[TODAY] || {};
+      const results = (session.gradingResults || []).map((result) => {
+        const draft = session.practiceDrafts?.[result.questionId] || {};
+        return {
+          ...result,
+          explanation: draft.explanation ?? result.explanation,
+          wrongNotes: draft.wrongNotes ?? result.wrongNotes,
+        };
+      });
+      const stats = results.reduce((nextStats, result) => applyBatchQuestionNotes(
+        nextStats,
+        result.questionId,
+        session.attemptId,
+        { explanation: result.explanation, wrongNotes: result.wrongNotes },
+      ), prev.stats);
+      return {
+        ...prev,
+        stats,
+        sessions: {
+          ...(prev.sessions || {}),
+          [TODAY]: { ...session, gradingResults: results },
+        },
+      };
+    }, ['stats', 'sessions']);
+  }, [dailyBatchNotesSynced, dailyBatchSubmitted, updateState]);
 
   const createTodaySession = ({ force = false } = {}) => {
     if (isCreatingPracticeRef.current) return;
