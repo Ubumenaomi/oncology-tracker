@@ -2161,6 +2161,13 @@ function nextIntervalByRating(rating, stat) {
   return getAnkiIntervalDays(rating, stat);
 }
 
+function getMasteryDeltaByRating(rating) {
+  if (rating === 'Again') return -1;
+  if (rating === 'Hard') return 0;
+  if (rating === 'Easy') return 2;
+  return 1;
+}
+
 function applyBatchQuestionResults(stats, results, mode, attemptId) {
   const nextStats = { ...(stats || {}) };
 
@@ -2169,7 +2176,9 @@ function applyBatchQuestionResults(stats, results, mode, attemptId) {
     const previous = { ...emptyStat(), ...(nextStats[result.questionId] || {}) };
     if ((previous.answerHistory || []).some((event) => event?.attemptId === attemptId)) return;
 
-    const rating = result.isCorrect ? 'Good' : 'Again';
+    const rating = FLASHCARD_RATINGS[result.rating]
+      ? result.rating
+      : (result.isCorrect ? 'Good' : 'Again');
     const interval = nextIntervalByRating(rating, previous);
     const wasPreviouslyWrong = (previous.wrong || 0) > 0;
     const remediation = !result.isCorrect && result.errorType ? getRemediationForErrorType(result.errorType) : null;
@@ -2214,7 +2223,7 @@ function applyBatchQuestionResults(stats, results, mode, attemptId) {
       lastRating: rating,
       lastAttemptAt: TODAY,
       nextReviewDate: addDays(TODAY, interval),
-      mastery: result.isCorrect ? Math.min(5, (previous.mastery || 0) + 1) : Math.max(0, (previous.mastery || 0) - 1),
+      mastery: Math.max(0, Math.min(5, (previous.mastery || 0) + getMasteryDeltaByRating(rating))),
       intervalDays: interval,
       userAnswer: result.selected,
       correctAnswer: result.correctAnswer,
@@ -2249,11 +2258,12 @@ function regradeBatchQuestionResult(stats, result, mode, attemptId) {
   if (
     previousEvent.correctAnswer === result.correctAnswer
     && previousEvent.isCorrect === result.isCorrect
+    && previousEvent.rating === (result.rating || (result.isCorrect ? 'Good' : 'Again'))
   ) return stats;
 
   const previousWasWrongRetest = previousEvent.wasPreviouslyWrong
     ?? ((previous.wrong || 0) - (previousEvent.isCorrect ? 0 : 1) > 0);
-  const oldMasteryDelta = previousEvent.isCorrect ? 1 : -1;
+  const oldMasteryDelta = getMasteryDeltaByRating(previousEvent.rating || (previousEvent.isCorrect ? 'Good' : 'Again'));
   const previousSnapshot = previousEvent.previousStat || {};
   const remainingHistory = (previous.answerHistory || []).filter((event) => event?.attemptId !== attemptId);
   const trailingWrong = [...remainingHistory].reverse().findIndex((event) => event?.isCorrect);
@@ -4950,18 +4960,18 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                     <span>{selectedErrorRemediation.action}</span>
                   </div>
                 )}
-                {!practiceMode && <label>
+                {(!practiceMode || batchSubmitted) && <label>
                   Mastery
-                  <select value={stat.mastery || 0} onChange={(e) => onUpdateStat(question.id, { ...stat, mastery: Number(e.target.value) })}>
+                  <select disabled={practiceMode} value={stat.mastery || 0} onChange={(e) => onUpdateStat(question.id, { ...stat, mastery: Number(e.target.value) })}>
                     {[0, 1, 2, 3, 4, 5].map((x) => <option key={x} value={x}>{x}</option>)}
                   </select>
                 </label>}
-                {!practiceMode && (answerIsSingleChoice ? (
+                {(!practiceMode || batchSubmitted) && (answerIsSingleChoice ? (
                   <div className="rating-buttons">
                     <button
                       className="rating-button again"
                       title={`Again（重複）：重新學習，下次 ${ratingSchedulePreviews.Again.dueLabel}`}
-                      onClick={() => recordRating('Again', { countAttempt: !hasRecordedCurrentPracticeAttempt })}
+                      onClick={() => practiceMode ? onPracticeChange?.({ rated: true, rating: 'Again' }) : recordRating('Again', { countAttempt: !hasRecordedCurrentPracticeAttempt })}
                     >
                       🔁 Again
                       <div className="rating-sub">重學 · {ratingSchedulePreviews.Again.shortLabel}</div>
@@ -4969,7 +4979,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                     <button
                       className="rating-button hard"
                       title={`Hard（難）：答對但不穩，下次 ${ratingSchedulePreviews.Hard.dueLabel}`}
-                      onClick={() => recordRating('Hard', { countAttempt: !hasRecordedCurrentPracticeAttempt })}
+                      onClick={() => practiceMode ? onPracticeChange?.({ rated: true, rating: 'Hard' }) : recordRating('Hard', { countAttempt: !hasRecordedCurrentPracticeAttempt })}
                     >
                       🟠 Hard
                       <div className="rating-sub">偏難 · {ratingSchedulePreviews.Hard.shortLabel}</div>
@@ -4977,7 +4987,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                     <button
                       className="rating-button good"
                       title={`Good（好）：正常答對，下次 ${ratingSchedulePreviews.Good.dueLabel}`}
-                      onClick={() => recordRating('Good', { countAttempt: !hasRecordedCurrentPracticeAttempt })}
+                      onClick={() => practiceMode ? onPracticeChange?.({ rated: true, rating: 'Good' }) : recordRating('Good', { countAttempt: !hasRecordedCurrentPracticeAttempt })}
                     >
                       ✅ Good
                       <div className="rating-sub">正常 · {ratingSchedulePreviews.Good.shortLabel}</div>
@@ -4985,7 +4995,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
                     <button
                       className="rating-button easy"
                       title={`Easy（非常熟）：秒答且熟悉，下次 ${ratingSchedulePreviews.Easy.dueLabel}`}
-                      onClick={() => recordRating('Easy', { countAttempt: !hasRecordedCurrentPracticeAttempt })}
+                      onClick={() => practiceMode ? onPracticeChange?.({ rated: true, rating: 'Easy' }) : recordRating('Easy', { countAttempt: !hasRecordedCurrentPracticeAttempt })}
                     >
                       ✨ Easy
                       <div className="rating-sub">熟悉 · {ratingSchedulePreviews.Easy.shortLabel}</div>
@@ -8038,18 +8048,19 @@ export default function App() {
       let gradingResults = sess.gradingResults || [];
       let nextStats = prev.stats;
       const hasNotePatch = patch.explanation !== undefined || patch.wrongNotes !== undefined;
-      if (sess.submittedAt && (patch.correctAnswer !== undefined || hasNotePatch)) {
+      if (sess.submittedAt && (patch.correctAnswer !== undefined || patch.rating !== undefined || hasNotePatch)) {
         gradingResults = gradingResults.map((result) => result.questionId === questionId ? {
           ...result,
           ...(patch.correctAnswer !== undefined ? {
             correctAnswer: String(patch.correctAnswer || '').trim().toUpperCase(),
             isCorrect: patch.correctAnswer ? result.selected === String(patch.correctAnswer).trim().toUpperCase() : null,
           } : {}),
+          ...(patch.rating !== undefined ? { rating: patch.rating } : {}),
           ...(patch.explanation !== undefined ? { explanation: patch.explanation } : {}),
           ...(patch.wrongNotes !== undefined ? { wrongNotes: patch.wrongNotes } : {}),
         } : result);
         const updatedResult = gradingResults.find((result) => result.questionId === questionId);
-        if (patch.correctAnswer !== undefined && updatedResult?.isCorrect != null) {
+        if ((patch.correctAnswer !== undefined || patch.rating !== undefined) && updatedResult?.isCorrect != null) {
           nextStats = regradeBatchQuestionResult(nextStats, updatedResult, 'daily', sess.attemptId);
         }
         if (hasNotePatch) nextStats = applyBatchQuestionNotes(nextStats, questionId, sess.attemptId, patch);
@@ -8067,7 +8078,7 @@ export default function App() {
           },
         },
       };
-    }, patch.correctAnswer !== undefined || patch.explanation !== undefined || patch.wrongNotes !== undefined ? ['stats', 'sessions'] : ['sessions']);
+    }, patch.correctAnswer !== undefined || patch.rating !== undefined || patch.explanation !== undefined || patch.wrongNotes !== undefined ? ['stats', 'sessions'] : ['sessions']);
   };
 
   const submitDailyPractice = () => {
