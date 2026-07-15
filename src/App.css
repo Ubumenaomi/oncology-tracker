@@ -1150,10 +1150,20 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.5; }
   padding: 12px 0;
   color: #334155;
   line-height: 1.45;
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   align-items: flex-start;
+}
+.remediation-summary {
+  min-width: 0;
+}
+.remediation-question {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+}
+.remediation-question .question-card {
+  margin-bottom: 0;
 }
 .remediation-row.done {
   border-color: rgba(21, 128, 61, 0.26);
