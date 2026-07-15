@@ -2392,6 +2392,18 @@ function getReviewSchedulePreview(rating, stat = {}, date = TODAY) {
   };
 }
 
+function getFlashcardReviewSchedulePreview(rating, stat = {}, date = TODAY) {
+  if (rating === 'Again') {
+    return {
+      intervalDays: 0,
+      nextReviewDate: date,
+      dueLabel: '本次複習 · 10 cards 後',
+      shortLabel: '10 cards 後',
+    };
+  }
+  return getReviewSchedulePreview(rating, stat, date);
+}
+
 
 function shuffleStable(items) {
   return [...items].sort(() => Math.random() - 0.5);
@@ -6668,12 +6680,12 @@ function splitEditableList(value) {
 }
 
 function FlashcardRatingButton({ rating, card, onClick, disabled = false }) {
-  const schedule = getReviewSchedulePreview(rating, card);
+  const schedule = getFlashcardReviewSchedulePreview(rating, card);
   return (
     <button
       className={`tiny schedule-rating ${rating.toLowerCase()}`}
       disabled={disabled}
-      title={`${rating}：下次 ${schedule.dueLabel}`}
+      title={rating === 'Again' ? 'Again：完成 10 次作答後重複' : `${rating}：下次 ${schedule.dueLabel}`}
       onClick={onClick}
     >
       <span>{rating}</span>
@@ -6783,27 +6795,6 @@ function FlashcardReviewPanel({ dueFlashcards, allFlashcards, onReviewCard, onOp
         </section>
       ) : (
         <section className="card-review-workspace">
-          <aside className="card-review-queue" aria-label="Card queue">
-            {sessionQueue.map((entry, index) => {
-              const item = allFlashcards.find((candidate) => candidate.id === entry.cardId) || entry.snapshot;
-              return (
-              <button
-                type="button"
-                key={entry.sessionKey}
-                className={index === activeIndex ? 'active' : ''}
-                onClick={() => {
-                  setActiveIndex(index);
-                  setShowBack(false);
-                  setAlgorithmStepCount(0);
-                }}
-              >
-                <strong>{item.topic || item.type || 'Flashcard'}</strong>
-                <span>{index < activeIndex ? 'Completed' : item.cancer || 'Unsorted'} · {formatReviewDueLabel(item.nextReviewDate || TODAY)}</span>
-              </button>
-              );
-            })}
-          </aside>
-
           <div className="single-review-card">
             <div className="question-top">
               <div>
@@ -7733,7 +7724,7 @@ export default function App() {
       const card = cards[baseCardId];
       if (!card) return prev;
       const previousStats = prev.flashcardStats?.[cardId] || prev.flashcardStats?.[baseCardId] || makeFlashcardStats(card);
-      const schedule = getReviewSchedulePreview(rating, previousStats);
+      const schedule = getFlashcardReviewSchedulePreview(rating, previousStats);
       const mastery = Math.max(0, Math.min(5, (previousStats.mastery ?? card.mastery ?? 0) + rule.masteryDelta));
       const currentQuest = getDailyQuestProgress(prev, TODAY, getTodayPlanTask(prev), todayCompleted);
       const currentTask = getStudyPlanTaskById(currentQuest.planTaskId) || getTodayPlanTask(prev);

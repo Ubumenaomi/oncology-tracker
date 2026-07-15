@@ -2822,56 +2822,8 @@ button:disabled {
 }
 
 .card-review-workspace {
-  display: grid;
-  grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
-  gap: 16px;
-  align-items: start;
-}
-
-.card-review-queue {
-  display: grid;
-  gap: 8px;
-  max-height: 720px;
-  overflow: auto;
-  padding-right: 4px;
-}
-
-.card-review-queue button {
-  display: grid;
-  gap: 4px;
-  width: 100%;
-  text-align: left;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: #fff;
-  color: var(--ink);
-  padding: 10px 12px;
-}
-
-.card-review-queue button.active {
-  border-color: rgba(37, 99, 235, 0.52);
-  background: #eff6ff;
-  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.12);
-}
-
-.card-review-queue strong,
-.card-review-queue span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.card-review-queue strong {
-  white-space: nowrap;
-  font-size: 13px;
-}
-
-.card-review-queue span {
-  display: -webkit-box;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.35;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  width: min(100%, 920px);
+  margin: 0 auto;
 }
 
 .flashcard-front.large,
@@ -2905,12 +2857,10 @@ button:disabled {
 }
 
 @media (max-width: 860px) {
-  .card-review-workspace,
   .card-manager-workspace {
     grid-template-columns: 1fr;
   }
 
-  .card-review-queue,
   .card-manager-list {
     grid-auto-flow: column;
     grid-auto-columns: minmax(190px, 72vw);
