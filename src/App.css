@@ -2734,6 +2734,80 @@ button.tiny,
   gap: 10px;
 }
 
+.card-manager-section {
+  margin-top: 18px;
+}
+
+.card-manager-search {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.card-manager-workspace {
+  display: grid;
+  grid-template-columns: minmax(240px, 340px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.card-manager-list {
+  display: grid;
+  gap: 8px;
+  max-height: 760px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.card-manager-list button {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--ink);
+  text-align: left;
+}
+
+.card-manager-list button.active {
+  border-color: rgba(37, 99, 235, 0.52);
+  background: #eff6ff;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.12);
+}
+
+.card-manager-list strong,
+.card-manager-list span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-manager-list strong {
+  display: -webkit-box;
+  font-size: 13px;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.card-manager-list span {
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.card-manager-editor {
+  min-height: 240px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: #fff;
+}
+
 button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
@@ -2831,11 +2905,13 @@ button:disabled {
 }
 
 @media (max-width: 860px) {
-  .card-review-workspace {
+  .card-review-workspace,
+  .card-manager-workspace {
     grid-template-columns: 1fr;
   }
 
-  .card-review-queue {
+  .card-review-queue,
+  .card-manager-list {
     grid-auto-flow: column;
     grid-auto-columns: minmax(190px, 72vw);
     overflow-x: auto;
