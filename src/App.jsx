@@ -2692,16 +2692,17 @@ function generateDailyQuestionIds(state, task = getTodayPlanTask(state), exclude
   return result.slice(0, modeConfig.total);
 }
 
-function fillDailyQuestionIds(state, task, existingIds = [], targetCount = PRACTICE_PAGE_SIZE, rankedHighYieldTopics = null) {
+function fillDailyQuestionIds(state, task, existingIds = [], targetCount = PRACTICE_PAGE_SIZE, rankedHighYieldTopics = null, excludedIds = []) {
   const baseIds = Array.isArray(existingIds) ? existingIds : [];
-  const generatedIds = generateDailyQuestionIds(state, task, baseIds, rankedHighYieldTopics);
+  const excluded = [...new Set([...baseIds, ...(Array.isArray(excludedIds) ? excludedIds : [])])];
+  const generatedIds = generateDailyQuestionIds(state, task, excluded, rankedHighYieldTopics);
   const questionIds = [...baseIds, ...generatedIds]
     .filter((id, index, ids) => ids.indexOf(id) === index)
     .slice(0, targetCount);
 
   if (questionIds.length >= targetCount) return questionIds;
 
-  const used = new Set(questionIds);
+  const used = new Set([...questionIds, ...excluded]);
   const { preferredYears, preferredCancers } = state.settings || {};
   const fallbackIds = getQuestionPool(state)
     .map((q) => getQuestionWithOverride(q.id, state))
@@ -7939,7 +7940,10 @@ export default function App() {
   const selectedPracticeMode = state.settings?.practiceMode || 'standard';
   const selectedPracticeConfig = getPracticeModeConfig(selectedPracticeMode);
   const todayPracticeMode = todaySession?.practiceMode || selectedPracticeMode;
-  const todayPracticeConfig = getPracticeModeConfig(todayPracticeMode);
+  const baseTodayPracticeConfig = getPracticeModeConfig(todayPracticeMode);
+  const todayPracticeConfig = todaySession?.practiceTargetCount
+    ? { ...baseTodayPracticeConfig, total: todaySession.practiceTargetCount }
+    : baseTodayPracticeConfig;
   const todayPracticeTargetCount = todayPracticeConfig.total;
   const todayPracticeTargetIds = todayIds.slice(0, todayPracticeTargetCount);
   const dailyBatchSubmitted = Boolean(todaySession?.submittedAt && todaySession?.gradingResults?.length);
@@ -8918,6 +8922,28 @@ export default function App() {
       const existing = prev.sessions?.[TODAY];
       const existingMatchesQuest = getStudyPlanTaskById(existing?.planTaskId) === questTask
         || getStudyPlanTaskById(existing?.legacyPlanTaskId) === questTask;
+      const existingModeConfig = getPracticeModeConfig(existing?.practiceMode);
+      const completedQuestionIds = existing?.submittedAt
+        ? [...new Set((existing.gradingResults || []).map((result) => result.questionId).filter(Boolean))]
+        : [];
+      const completedCount = completedQuestionIds.length
+        ? (Number(existing?.previousPracticeTotal) || 0) + completedQuestionIds.length
+        : existingModeConfig.total;
+      const startsExtraBatch = existingMatchesQuest
+        && Boolean(existing?.submittedAt && existing?.statsCommittedAt)
+        && modeConfig.total > completedCount;
+      const extraCount = startsExtraBatch ? modeConfig.total - completedCount : 0;
+      const previousQuestionIds = startsExtraBatch
+        ? [...new Set([...(existing?.excludedQuestionIds || []), ...completedQuestionIds])]
+        : [];
+      const pendingQuestionIds = startsExtraBatch
+        ? (existing.questionIds || []).filter((id) => !previousQuestionIds.includes(id)).slice(0, extraCount)
+        : [];
+      const rankedHighYieldTopics = startsExtraBatch ? getRankedHighYieldTopics(prev, questTask) : [];
+      const extraQuestionIds = startsExtraBatch
+        ? fillDailyQuestionIds(prev, questTask, pendingQuestionIds, extraCount, rankedHighYieldTopics, previousQuestionIds)
+        : [];
+      const now = new Date().toISOString();
       return {
         ...prev,
         settings: {
@@ -8928,10 +8954,33 @@ export default function App() {
         sessions: {
           ...(prev.sessions || {}),
           ...(existingMatchesQuest ? {
-            [TODAY]: {
+            [TODAY]: startsExtraBatch ? {
+              date: TODAY,
+              ...makePlanTaskSnapshot(questTask),
+              practiceMode,
+              practiceModeLabel: `加練 ${extraCount} 題`,
+              practiceTargetCount: extraCount,
+              practiceRecipe: {
+                total: extraCount,
+                newCount: Math.min(modeConfig.newCount, extraCount),
+                topicCount: modeConfig.topicCount,
+                dueCount: modeConfig.dueCount,
+                weaknessCount: modeConfig.weaknessCount,
+                highYieldCount: modeConfig.highYieldCount || 0,
+              },
+              highYieldInserts: rankedHighYieldTopics.slice(0, 5).map(({ id, label, type, priorityScore }) => ({ id, label, type, priorityScore })),
+              questionIds: extraQuestionIds,
+              excludedQuestionIds: previousQuestionIds,
+              previousPracticeTotal: completedCount,
+              createdAt: now,
+              updatedAt: now,
+              completed: false,
+              practiceDrafts: {},
+            } : {
               ...existing,
               practiceMode,
               practiceModeLabel: modeConfig.shortLabel,
+              practiceTargetCount: null,
               practiceRecipe: {
                 total: modeConfig.total,
                 newCount: modeConfig.newCount,
@@ -8939,7 +8988,7 @@ export default function App() {
                 dueCount: modeConfig.dueCount,
                 weaknessCount: modeConfig.weaknessCount,
               },
-              updatedAt: new Date().toISOString(),
+              updatedAt: now,
             },
           } : {}),
         },
