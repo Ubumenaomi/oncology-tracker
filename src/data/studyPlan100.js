@@ -3,6 +3,8 @@
 // - Keep each task.key stable; progress and session history use it as identity.
 // - id/day are display and legacy compatibility fields. Reordering is safe when key stays unchanged.
 // - New tasks need a new unique key. Do not reuse keys from deleted tasks.
+import { reconcileTrialRegistryWithPlan } from './trialRegistry.js';
+
 export const HIGH_YIELD_TOPICS = [
   {
     "id": "lung-perioperative-io",
@@ -3212,13 +3214,22 @@ const STUDY_PLAN_100_BASE = [
 ];
 
 export function buildStudyPlan100() {
-  return STUDY_PLAN_100_BASE.map((task) => ({
+  const baseTasks = STUDY_PLAN_100_BASE.map((task) => ({
     ...task,
     legacyId: task.legacyId || task.id,
   }));
+  return reconcileTrialRegistryWithPlan(baseTasks).tasks;
 }
 
-export const studyPlan100 = buildStudyPlan100();
+const trialRegistryReconciliation = reconcileTrialRegistryWithPlan(STUDY_PLAN_100_BASE);
+export const studyPlan100 = trialRegistryReconciliation.tasks.map((task) => ({
+  ...task,
+  legacyId: task.legacyId || task.id,
+}));
+export const trialRegistry = trialRegistryReconciliation.records;
+export const trialRegistryReview = {
+  unregisteredPlanItems: trialRegistryReconciliation.unregisteredPlanItems,
+};
 
 export function getStudyPlanTaskKey(task = {}) {
   return task.key || (task.id == null ? null : `day-${task.id}`);

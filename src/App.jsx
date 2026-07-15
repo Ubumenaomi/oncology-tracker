@@ -2555,39 +2555,6 @@ function questionMatchesTask(question, task, minScore = 120) {
   return hasTaskSpecificHit && scoreQuestionForTask(question, task) >= minScore;
 }
 
-function getBossWeaknessTier(question, task) {
-  if (!question || !task) return 0;
-  const questionText = getQuestionContentText(question);
-  const taskTopicText = [
-    task.topic,
-    task.details,
-    ...(task.goldenTrials || []),
-  ].filter(Boolean).join(' ').toLowerCase();
-  const topicWords = taskTopicText
-    .split(/[^a-z0-9]+/i)
-    .filter((word) => word.length >= 3 && !['and', 'the', 'with', 'for', 'from'].includes(word));
-  const topicWordHits = topicWords.filter((word) => questionText.includes(word)).length;
-  const trialHits = (task.goldenTrials || []).filter((trial) => questionText.includes(String(trial).toLowerCase())).length;
-  const focusHits = (task.focusTags || []).filter((tag) => questionText.includes(String(tag).toLowerCase())).length;
-  const topicHit = Boolean(
-    question.topic
-    && getTaskSearchText(task).includes(String(question.topic).toLowerCase())
-  );
-
-  if (trialHits > 0 || topicHit || topicWordHits >= 2) return 1;
-  if (focusHits > 0) return 2;
-  if (question.cancer === task.cancer) return 3;
-  return 0;
-}
-
-function sortBossWeaknessRows(a, b) {
-  return a.bossTier - b.bossTier
-    || (b.stat.highConfidenceWrong || 0) - (a.stat.highConfidenceWrong || 0)
-    || (b.stat.repeatedWrong || 0) - (a.stat.repeatedWrong || 0)
-    || wrongRate(b.stat) - wrongRate(a.stat)
-    || b.taskScore - a.taskScore;
-}
-
 function generateDailyQuestionIds(state, task = getTodayPlanTask(state), excludedIds = [], rankedHighYieldTopics = null) {
   const { preferredYears, preferredCancers } = state.settings;
   const modeConfig = getPracticeModeConfig(state.settings?.practiceMode);
@@ -3180,38 +3147,12 @@ function getQuestReviewHistory(state, flashcardState) {
     .slice(0, 14);
 }
 
-function getWeaknessQuestion(state, task) {
-  const rows = getQuestionPool(state)
-    .map((q) => ({ q: getQuestionWithOverride(q.id, state), stat: getStat(state, q.id) }))
-    .filter(({ q }) => q)
-    .map((row) => ({
-      ...row,
-      taskScore: scoreQuestionForTask(row.q, task),
-      bossTier: getBossWeaknessTier(row.q, task),
-    }))
-    .filter(({ stat, bossTier }) => (
-      bossTier > 0
-    ) && ((stat.wrong || 0) > 0 || (stat.highConfidenceWrong || 0) > 0 || (stat.repeatedWrong || 0) > 0))
-    .sort(sortBossWeaknessRows);
-
-  if (rows[0]) return rows[0].q;
-
-  return getQuestionPool(state)
-    .map((q) => getQuestionWithOverride(q.id, state))
-    .filter(Boolean)
-    .map((q) => ({
-      q,
-      stat: getStat(state, q.id),
-      taskScore: scoreQuestionForTask(q, task),
-      bossTier: getBossWeaknessTier(q, task),
-    }))
-    .filter(({ bossTier }) => bossTier > 0)
-    .sort(sortBossWeaknessRows)[0]?.q || null;
-}
-
-function buildBossChallenges(task, state) {
-  const firstTrial = task?.goldenTrials?.[0] || 'today golden trial';
-  const weakness = getWeaknessQuestion(state, task);
+function buildBossChallenges(task) {
+  const goldenTrials = [...new Set(task?.goldenTrials || [])];
+  const relatedTrials = [...new Set(task?.relatedTrials || [])];
+  const firstTrial = goldenTrials[0] || relatedTrials[0] || '本日無可回想 Trial';
+  const goldenTrialList = goldenTrials.length ? goldenTrials.join('、') : '本日無 Golden Trial';
+  const relatedTrialList = relatedTrials.length ? relatedTrials.join('、') : '本日無 Related Trial';
   const topicLabel = `${task?.day || 'Today'}｜${task?.topic || 'today topic'}`;
   return [
     {
@@ -3219,19 +3160,25 @@ function buildBossChallenges(task, state) {
       title: 'Boss 1｜Trial Recall',
       prompt: `${topicLabel}\n${firstTrial}: population / endpoint / implication`,
       answerHint: '說出 P/I/C/O、primary endpoint，以及正式考最可能改寫的陷阱。',
+      available: goldenTrials.length + relatedTrials.length > 0,
     },
     {
-      id: 'algorithm',
-      title: 'Boss 2｜Algorithm Recall',
-      prompt: `${topicLabel} treatment sequencing / decision algorithm`,
-      answerHint: task?.details || '從 first-line 到 relapse/salvage 用空白回想講一次。',
+      id: 'golden-trial-list',
+      title: 'Boss 2｜Golden Trial 整理',
+      prompt: `${topicLabel}\n確認本日 Golden Trial：${goldenTrialList}`,
+      answerHint: goldenTrials.length
+        ? `本日 Golden Trial 共 ${goldenTrials.length} 個：${goldenTrialList}。確認名稱後再按 Pass。`
+        : '本日沒有已通過審核且分配完成的 Golden Trial。',
+      available: goldenTrials.length > 0,
     },
     {
-      id: 'weakness',
-      title: 'Boss 3｜Weakness Retry',
-      prompt: weakness ? `${weakness.id}｜${weakness.cancer}｜${weakness.topic}\n${weakness.stem}` : `${task?.topic || 'today topic'} weakness retry`,
-      answerHint: weakness ? `正解：${weakness.answer || '尚未輸入'}。先講出為什麼其他選項不對。` : '沒有舊錯題時，改用今日主題做 60 秒 oral recall。',
-      questionId: weakness?.id || null,
+      id: 'related-trial-list',
+      title: 'Boss 3｜Related Trial 整理',
+      prompt: `${topicLabel}\n確認本日 Related Trial：${relatedTrialList}`,
+      answerHint: relatedTrials.length
+        ? `本日 Related Trial 共 ${relatedTrials.length} 個：${relatedTrialList}。確認它們與 Golden Trial 的差異後再按 Pass。`
+        : '本日沒有已通過審核且分配完成的 Related Trial。',
+      available: relatedTrials.length > 0,
     },
   ];
 }
@@ -6287,8 +6234,8 @@ function QuestPanel({
                 {open && <p className="recall-back">{boss.answerHint}</p>}
                 <div className="inline-actions">
                   <button className="secondary" onClick={() => setOpenBossId(open ? '' : boss.id)}>{open ? '收合提示' : '看提示'}</button>
-                  <button className="good" onClick={() => onSetBossResult(boss.id, true)}>Pass</button>
-                  <button className="bad" onClick={() => onSetBossResult(boss.id, false)}>Fail</button>
+                  <button className="good" disabled={!boss.available} onClick={() => onSetBossResult(boss.id, true)}>Pass</button>
+                  <button className="bad" disabled={!boss.available} onClick={() => onSetBossResult(boss.id, false)}>Fail</button>
                 </div>
               </article>
             );
