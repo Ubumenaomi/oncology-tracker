@@ -7220,6 +7220,7 @@ export default function App() {
   const completedPomodoroPhaseRef = useRef('');
   const [practicePage, setPracticePage] = useState(0);
   const [practicePageMessage, setPracticePageMessage] = useState('');
+  const [activeRemediationQuestionId, setActiveRemediationQuestionId] = useState(null);
   const [focusTick, setFocusTick] = useState(() => Date.now());
   const focusTimer = normalizeFocusTimer(state.focusTimer);
   const activeFocusSession = focusTimer.activeSession;
@@ -9461,7 +9462,7 @@ export default function App() {
             <h3>錯因訂正</h3>
             {remediationQueue.length === 0 ? <p className="muted">答錯並選擇 Error type 後，這裡會自動排入訂正清單；先修正判斷，再決定要不要整理成卡片。</p> : remediationQueue.slice(0, 20).map(({ q, stat, remediation }) => (
               <div className={isReviewQueueItemComplete(q.id) ? 'remediation-row done' : 'remediation-row'} key={`${q.id}-${remediation.errorType || remediation.task}`}>
-                <div>
+                <div className="remediation-summary">
                   <strong>{q.id}</strong> · {q.cancer} · {q.topic} · wrong rate {wrongRate(stat)}%
                   <p>{remediation.errorType || stat.lastErrorType} → {remediation.task}</p>
                   <span>{remediation.action}</span>
@@ -9469,14 +9470,30 @@ export default function App() {
                 <div className="review-queue-actions">
                   <span className="optional-card-hint">後續可整理：{remediation.cardType}</span>
                   <button
+                    className="tiny"
+                    type="button"
+                    aria-expanded={activeRemediationQuestionId === q.id}
+                    onClick={() => setActiveRemediationQuestionId((currentId) => currentId === q.id ? null : q.id)}
+                  >
+                    {activeRemediationQuestionId === q.id ? '收合原題' : '開啟原題訂正'}
+                  </button>
+                  <button
                     className={isReviewQueueItemComplete(q.id) ? 'tiny good' : 'tiny'}
                     type="button"
                     disabled={isReviewQueueItemComplete(q.id)}
-                    onClick={() => markReviewQueueComplete(q.id)}
+                    onClick={() => {
+                      markReviewQueueComplete(q.id);
+                      setActiveRemediationQuestionId((currentId) => currentId === q.id ? null : currentId);
+                    }}
                   >
                     {isReviewQueueItemComplete(q.id) ? '已訂正' : '完成訂正'}
                   </button>
                 </div>
+                {activeRemediationQuestionId === q.id && (
+                  <div className="remediation-question">
+                    <QuestionCard question={q} stat={stat} onUpdateStat={updateStat} />
+                  </div>
+                )}
               </div>
             ))}
           </div>
