@@ -573,6 +573,8 @@ const defaultState = {
   mockExams: [],
   activeMockExam: null,
   activeMockExamClearedAt: null,
+  activeFlashcardReview: null,
+  activeFlashcardReviewClearedAt: null,
   flashcards: {},
   flashcardStats: {},
   deletedFlashcardIds: {},
@@ -625,6 +627,8 @@ function buildStorageSlices(state) {
       mockExams: state.mockExams || [],
       activeMockExam: state.activeMockExam || null,
       activeMockExamClearedAt: state.activeMockExamClearedAt || null,
+      activeFlashcardReview: state.activeFlashcardReview || null,
+      activeFlashcardReviewClearedAt: state.activeFlashcardReviewClearedAt || null,
       focusTimer: state.focusTimer || defaultState.focusTimer,
     },
     sessions: {
@@ -690,6 +694,8 @@ function hydrateStateFromStorage() {
     mockExams: activity?.mockExams ?? v2Core?.mockExams ?? legacyState.mockExams ?? defaultState.mockExams,
     activeMockExam: activity?.activeMockExam ?? v2Core?.activeMockExam ?? legacyState.activeMockExam ?? defaultState.activeMockExam,
     activeMockExamClearedAt: activity?.activeMockExamClearedAt ?? v2Core?.activeMockExamClearedAt ?? legacyState.activeMockExamClearedAt ?? defaultState.activeMockExamClearedAt,
+    activeFlashcardReview: activity?.activeFlashcardReview ?? v2Core?.activeFlashcardReview ?? legacyState.activeFlashcardReview ?? defaultState.activeFlashcardReview,
+    activeFlashcardReviewClearedAt: activity?.activeFlashcardReviewClearedAt ?? v2Core?.activeFlashcardReviewClearedAt ?? legacyState.activeFlashcardReviewClearedAt ?? defaultState.activeFlashcardReviewClearedAt,
     focusTimer: activity?.focusTimer ?? v2Core?.focusTimer ?? legacyState.focusTimer ?? defaultState.focusTimer,
     sessions: sessions?.sessions ?? v2Core?.sessions ?? legacyState.sessions ?? defaultState.sessions,
     planProgress: progress?.planProgress ?? v2Core?.planProgress ?? legacyState.planProgress ?? defaultState.planProgress,
@@ -971,6 +977,57 @@ function mergeActiveMockExam(localState = {}, cloudState = {}) {
   return { activeMockExam: candidates[0] || null, activeMockExamClearedAt: clearedAt || null };
 }
 
+function mergeFlashcardStats(cloudStats = {}, localStats = {}) {
+  const merged = { ...(cloudStats || {}) };
+  Object.entries(localStats || {}).forEach(([id, localStat]) => {
+    const cloudStat = merged[id];
+    if (!cloudStat) {
+      merged[id] = localStat;
+      return;
+    }
+    const localUpdatedAt = localStat?.updatedAt || localStat?.lastReviewedAt || localStat?.createdAt || '';
+    const cloudUpdatedAt = cloudStat?.updatedAt || cloudStat?.lastReviewedAt || cloudStat?.createdAt || '';
+    merged[id] = localUpdatedAt >= cloudUpdatedAt ? localStat : cloudStat;
+  });
+  return merged;
+}
+
+function normalizeActiveFlashcardReview(review, flashcards = {}) {
+  if (!review || !Array.isArray(review.queue)) return null;
+  const cards = normalizeFlashcards(flashcards);
+  const originalIndex = Math.max(0, Math.min(review.queue.length, Number(review.activeIndex) || 0));
+  let retainedBeforeIndex = 0;
+  const queue = review.queue.flatMap((entry, index) => {
+    if (!entry?.cardId || !cards[getFlashcardBaseId(entry.cardId)]) return [];
+    if (index < originalIndex) retainedBeforeIndex += 1;
+    return [{
+      sessionKey: String(entry.sessionKey || `${entry.cardId}-${index}`),
+      cardId: String(entry.cardId),
+    }];
+  });
+  return {
+    id: String(review.id || `flashcard-review-${review.startedAt || Date.now()}`),
+    mode: review.mode === 'all' ? 'all' : 'due',
+    queue,
+    activeIndex: Math.min(retainedBeforeIndex, queue.length),
+    startedAt: review.startedAt || review.updatedAt || new Date().toISOString(),
+    updatedAt: review.updatedAt || review.startedAt || null,
+  };
+}
+
+function mergeActiveFlashcardReview(localState = {}, cloudState = {}, flashcards = {}) {
+  const clearedAt = [localState.activeFlashcardReviewClearedAt, cloudState.activeFlashcardReviewClearedAt]
+    .filter(Boolean).sort().at(-1) || '';
+  const candidates = [cloudState.activeFlashcardReview, localState.activeFlashcardReview]
+    .map((review) => normalizeActiveFlashcardReview(review, flashcards))
+    .filter((review) => review?.updatedAt && review.updatedAt > clearedAt)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return {
+    activeFlashcardReview: candidates[0] || null,
+    activeFlashcardReviewClearedAt: clearedAt || null,
+  };
+}
+
 function mergeQuestionStats(cloudStats = {}, localStats = {}) {
   const merged = { ...(cloudStats || {}) };
   Object.entries(localStats || {}).forEach(([id, localStat]) => {
@@ -1024,6 +1081,8 @@ function mergeCloudState(localState, cloudState) {
   const gameResetOwner = localGameResetAt > cloudGameResetAt ? 'local' : cloudGameResetAt > localGameResetAt ? 'cloud' : 'none';
   const mergedFocusSessions = mergeFocusSessions(cloudState.focusSessions, localState.focusSessions);
   const mergedActiveMockExam = mergeActiveMockExam(localState, cloudState);
+  const mergedFlashcards = mergeFlashcardMaps(cloudState.flashcards, localState.flashcards, deletedFlashcardIds);
+  const mergedActiveFlashcardReview = mergeActiveFlashcardReview(localState, cloudState, mergedFlashcards);
 
   return normalizeState({
     ...defaultState,
@@ -1081,12 +1140,10 @@ function mergeCloudState(localState, cloudState) {
     },
     mockExams: mergeMockExamHistory(cloudState.mockExams, localState.mockExams),
     ...mergedActiveMockExam,
+    ...mergedActiveFlashcardReview,
     deletedFlashcardIds,
-    flashcards: mergeFlashcardMaps(cloudState.flashcards, localState.flashcards, deletedFlashcardIds),
-    flashcardStats: {
-      ...(cloudState.flashcardStats || {}),
-      ...(localState.flashcardStats || {}),
-    },
+    flashcards: mergedFlashcards,
+    flashcardStats: mergeFlashcardStats(cloudState.flashcardStats, localState.flashcardStats),
     game: gameResetOwner === 'local'
       ? mergeGameState({}, localState.game)
       : gameResetOwner === 'cloud'
@@ -1189,6 +1246,8 @@ function hydrateStateFromCloudSlices(sliceMap = {}) {
     mockExams: activity.mockExams ?? defaultState.mockExams,
     activeMockExam: activity.activeMockExam ?? defaultState.activeMockExam,
     activeMockExamClearedAt: activity.activeMockExamClearedAt ?? defaultState.activeMockExamClearedAt,
+    activeFlashcardReview: activity.activeFlashcardReview ?? defaultState.activeFlashcardReview,
+    activeFlashcardReviewClearedAt: activity.activeFlashcardReviewClearedAt ?? defaultState.activeFlashcardReviewClearedAt,
     focusTimer: activity.focusTimer ?? defaultState.focusTimer,
     sessions: sessions.sessions ?? defaultState.sessions,
     planProgress: progress.planProgress ?? defaultState.planProgress,
@@ -1684,6 +1743,7 @@ function normalizeState(state) {
   };
   const deletedFlashcardIds = state?.deletedFlashcardIds || {};
   const flashcards = removeDeletedFlashcardRecords(normalizeFlashcards(state?.flashcards), deletedFlashcardIds);
+  const activeFlashcardReview = normalizeActiveFlashcardReview(state?.activeFlashcardReview, flashcards);
   return {
     ...defaultState,
     ...state,
@@ -1707,6 +1767,8 @@ function normalizeState(state) {
     focusTimer: normalizeFocusTimer(state?.focusTimer),
     flashcards,
     flashcardStats: normalizeFlashcardStats(removeDeletedFlashcardRecords(state?.flashcardStats, deletedFlashcardIds), flashcards),
+    activeFlashcardReview,
+    activeFlashcardReviewClearedAt: state?.activeFlashcardReviewClearedAt || null,
     game: { ...game, xp, level: xpLevel(xp), streak: player.streak, badges: player.badges },
     player,
   };
@@ -6647,20 +6709,36 @@ function makeFlashcardReviewQueue(cards, mode) {
   return cards.map((card, index) => ({
     sessionKey: `${mode}-${queueStartedAt}-${index}-${card.id}`,
     cardId: card.id,
-    snapshot: card,
   }));
 }
 
-function FlashcardReviewPanel({ dueFlashcards, allFlashcards, onReviewCard, onOpenManager }) {
-  const [queueMode, setQueueMode] = useState('due');
-  const [sessionQueue, setSessionQueue] = useState(() => makeFlashcardReviewQueue(dueFlashcards, 'due'));
-  const [activeIndex, setActiveIndex] = useState(0);
+function makeFlashcardReviewSession(cards, mode) {
+  const now = new Date().toISOString();
+  return {
+    id: `flashcard-review-${Date.now()}`,
+    mode,
+    queue: makeFlashcardReviewQueue(cards, mode),
+    activeIndex: 0,
+    startedAt: now,
+    updatedAt: now,
+  };
+}
+
+function FlashcardReviewPanel({ dueFlashcards, allFlashcards, persistedSession, onReviewCard, onSessionChange, onOpenManager }) {
+  const [session, setSession] = useState(() => (
+    normalizeActiveFlashcardReview(persistedSession, cardsToMap(allFlashcards))
+    || makeFlashcardReviewSession(dueFlashcards, 'due')
+  ));
   const [showBack, setShowBack] = useState(false);
   const [algorithmStepCount, setAlgorithmStepCount] = useState(0);
   const repeatSequenceRef = useRef(0);
+  const hasInitializedSessionRef = useRef(Boolean(persistedSession));
+  const queueMode = session.mode;
+  const sessionQueue = session.queue;
+  const activeIndex = session.activeIndex;
   const activeEntry = sessionQueue[activeIndex] || null;
   const card = activeEntry
-    ? allFlashcards.find((item) => item.id === activeEntry.cardId) || activeEntry.snapshot
+    ? allFlashcards.find((item) => item.id === activeEntry.cardId)
     : null;
   const trialCards = allFlashcards.filter((item) => item.sourceType === 'trial' || item.type === 'Trial Card');
   const weakCards = allFlashcards.filter((item) => (item.mastery || 0) <= 2);
@@ -6673,30 +6751,51 @@ function FlashcardReviewPanel({ dueFlashcards, allFlashcards, onReviewCard, onOp
     setAlgorithmStepCount(0);
   }, [card]);
 
-  const rateCard = (rating) => {
-    if (!card || !activeEntry) return;
-    onReviewCard(getFlashcardReviewId(card), rating);
-    if (rating === 'Again') {
-      setSessionQueue((currentQueue) => {
-        const insertionIndex = Math.min(activeIndex + 11, currentQueue.length);
-        const nextQueue = [...currentQueue];
-        repeatSequenceRef.current += 1;
-        nextQueue.splice(insertionIndex, 0, {
-          ...activeEntry,
-          sessionKey: `${activeEntry.cardId}-again-${repeatSequenceRef.current}`,
-        });
-        return nextQueue;
-      });
-    }
+  useEffect(() => {
+    const incoming = normalizeActiveFlashcardReview(persistedSession, cardsToMap(allFlashcards));
+    if (!incoming || incoming.updatedAt <= (session.updatedAt || '')) return;
+    setSession(incoming);
     setShowBack(false);
     setAlgorithmStepCount(0);
-    setActiveIndex((index) => index + 1);
+  }, [allFlashcards, persistedSession, session.updatedAt]);
+
+  useEffect(() => {
+    if (hasInitializedSessionRef.current) return;
+    hasInitializedSessionRef.current = true;
+    if (session.queue.length > 0) onSessionChange(session);
+  }, [onSessionChange, session]);
+
+  const rateCard = (rating) => {
+    if (!card || !activeEntry) return;
+    const now = new Date().toISOString();
+    let nextQueue = sessionQueue;
+    if (rating === 'Again') {
+      const insertionIndex = Math.min(activeIndex + 11, sessionQueue.length);
+      nextQueue = [...sessionQueue];
+      repeatSequenceRef.current += 1;
+      nextQueue.splice(insertionIndex, 0, {
+        ...activeEntry,
+        sessionKey: `${activeEntry.cardId}-again-${now}-${repeatSequenceRef.current}`,
+      });
+    }
+    const nextIndex = activeIndex + 1;
+    const isComplete = nextIndex >= nextQueue.length;
+    const nextSession = isComplete ? null : {
+      ...session,
+      queue: nextQueue,
+      activeIndex: nextIndex,
+      updatedAt: now,
+    };
+    setSession(nextSession || { ...session, queue: nextQueue, activeIndex: nextIndex, updatedAt: now });
+    onReviewCard(getFlashcardReviewId(card), rating, nextSession, isComplete ? now : null);
+    setShowBack(false);
+    setAlgorithmStepCount(0);
   };
 
   const selectQueueMode = (mode) => {
-    setQueueMode(mode);
-    setSessionQueue(makeFlashcardReviewQueue(mode === 'all' ? allFlashcards : dueFlashcards, mode));
-    setActiveIndex(0);
+    const nextSession = makeFlashcardReviewSession(mode === 'all' ? allFlashcards : dueFlashcards, mode);
+    setSession(nextSession);
+    onSessionChange(nextSession);
     setShowBack(false);
     setAlgorithmStepCount(0);
   };
@@ -7662,7 +7761,7 @@ export default function App() {
     }), ['flashcards', 'flashcardStats']);
   };
 
-  const reviewFlashcard = (cardId, rating) => {
+  const reviewFlashcard = (cardId, rating, nextReviewSession = null, completedAt = null) => {
     const rule = FLASHCARD_RATINGS[rating] || FLASHCARD_RATINGS.Good;
     const isWrong = rating === 'Again';
     playResultFeedback(isWrong ? 'wrong' : 'correct');
@@ -7709,9 +7808,18 @@ export default function App() {
           ...(prev.dailyQuestProgress || {}),
           [TODAY]: writeDailyQuestTask(prev, TODAY, currentTask.id, dailyQuestProgress),
         },
+        activeFlashcardReview: nextReviewSession,
+        activeFlashcardReviewClearedAt: completedAt || prev.activeFlashcardReviewClearedAt || null,
       };
-    }, ['flashcards', 'flashcardStats', 'quest']);
+    }, ['flashcards', 'flashcardStats', 'quest', 'activity']);
   };
+
+  const updateActiveFlashcardReview = useCallback((review) => {
+    updateState((prev) => ({
+      ...prev,
+      activeFlashcardReview: review,
+    }), ['activity']);
+  }, [updateState]);
 
   const updateFlashcard = (cardId, patch) => {
     updateState((prev) => {
@@ -9295,7 +9403,9 @@ export default function App() {
         <FlashcardReviewPanel
           dueFlashcards={dueFlashcards}
           allFlashcards={allFlashcards}
+          persistedSession={state.activeFlashcardReview}
           onReviewCard={reviewFlashcard}
+          onSessionChange={updateActiveFlashcardReview}
           onOpenManager={() => setTab('flashcards')}
         />
       )}
