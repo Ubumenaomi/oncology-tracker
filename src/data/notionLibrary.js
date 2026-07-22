@@ -1,0 +1,186 @@
+const LIBRARY_CACHE_KEY = 'oncology-tracker.notion-library.v1';
+const PREVIEW_CACHE_KEY = 'oncology-tracker.notion-preview.v1';
+const MAX_PREVIEW_CACHE_ITEMS = 20;
+
+const CANCER_ALIASES = {
+  Lung: ['lung cancer', 'methothelioma', 'mesothelioma'],
+  Breast: ['breast cancer', 'breast'],
+  GI: ['gastric cancer', 'esophageal cancer', 'colon cancer', 'hcc', 'pancreatic cancer', 'cholangiocarcinoma', 'biliary tract', 'small bowel'],
+  GU: ['gu', 'prostatic cancer'],
+  GYN: ['gyn', 'endometrial adenocarcinoma'],
+  'Head & Neck': ['head and neck', 'npc'],
+  Heme: ['aml', 'hodgkin lymphoma'],
+  Other: ['rare cancer', 'soft tissue', 'gist', 'thymoma', 'melanoma', 'adenoid cystic carcinoma', 'adrenal gland carcinoma', 'cns'],
+  'Supportive/Stats': ['drug toxicity'],
+};
+
+function unique(items = []) {
+  const values = new Map();
+  (items || []).forEach((item) => {
+    const value = String(item || '').trim();
+    if (value) values.set(value.toLowerCase(), value);
+  });
+  return [...values.values()];
+}
+
+function normalizeList(value = []) {
+  if (Array.isArray(value)) return unique(value);
+  return unique(String(value || '').split(',').map((item) => item.trim()));
+}
+
+export function normalizeNotionLibraryItem(item = {}) {
+  const normalized = {
+    id: item.id,
+    sourceType: 'notion',
+    source: item.source || 'Notion · Fellow training',
+    title: item.title || 'Untitled',
+    url: item.url || '',
+    createdTime: item.createdTime || item.publishedAt || null,
+    lastEditedTime: item.lastEditedTime || item.publishedAt || item.createdTime || null,
+    cancerTypes: normalizeList(item.cancerTypes),
+    subtypes: normalizeList(item.subtypes),
+    tags: normalizeList(item.tags),
+    treatments: normalizeList(item.treatments),
+    genes: normalizeList(item.genes),
+    drugs: normalizeList(item.drugs),
+    nccn: item.nccn || null,
+    trackerId: item.trackerId || '',
+    flashcardCreated: Boolean(item.flashcardCreated),
+    plainText: item.plainText || '',
+    headings: Array.isArray(item.headings) ? item.headings : [],
+  };
+  normalized.searchText = [
+    normalized.title,
+    normalized.trackerId,
+    ...normalized.cancerTypes,
+    ...normalized.subtypes,
+    ...normalized.tags,
+    ...normalized.treatments,
+    ...normalized.genes,
+    ...normalized.drugs,
+    normalized.plainText,
+  ].filter(Boolean).join(' ').toLowerCase();
+  return normalized;
+}
+
+export function normalizeNotionLibraryItems(items = []) {
+  return [...new Map((items || [])
+    .map(normalizeNotionLibraryItem)
+    .filter((item) => item.id && item.url)
+    .map((item) => [item.id, item])).values()];
+}
+
+function readStorage(storage, key) {
+  try {
+    return JSON.parse(storage?.getItem(key) || 'null');
+  } catch {
+    return null;
+  }
+}
+
+function writeStorage(storage, key, payload) {
+  try {
+    storage?.setItem(key, JSON.stringify(payload));
+  } catch {
+    // Storage is an optional cache; a quota/privacy failure must not block Knowledge Hub.
+  }
+}
+
+export function loadNotionLibraryCache() {
+  if (typeof window === 'undefined') return null;
+  const cached = readStorage(window.localStorage, LIBRARY_CACHE_KEY);
+  if (!cached?.items?.length) return null;
+  return { ...cached, items: normalizeNotionLibraryItems(cached.items) };
+}
+
+export function saveNotionLibraryCache(payload) {
+  if (typeof window === 'undefined') return;
+  writeStorage(window.localStorage, LIBRARY_CACHE_KEY, {
+    items: normalizeNotionLibraryItems(payload.items),
+    fetchedAt: payload.fetchedAt || new Date().toISOString(),
+    truncated: Boolean(payload.truncated),
+  });
+}
+
+export function loadNotionPreviewCache(pageId) {
+  if (typeof window === 'undefined') return null;
+  const cache = readStorage(window.sessionStorage, PREVIEW_CACHE_KEY) || {};
+  return cache[pageId] ? normalizeNotionLibraryItem(cache[pageId]) : null;
+}
+
+export function saveNotionPreviewCache(item) {
+  if (typeof window === 'undefined' || !item?.id) return;
+  const cache = readStorage(window.sessionStorage, PREVIEW_CACHE_KEY) || {};
+  cache[item.id] = normalizeNotionLibraryItem(item);
+  const trimmed = Object.entries(cache)
+    .sort((a, b) => new Date(b[1].lastEditedTime || 0) - new Date(a[1].lastEditedTime || 0))
+    .slice(0, MAX_PREVIEW_CACHE_ITEMS);
+  writeStorage(window.sessionStorage, PREVIEW_CACHE_KEY, Object.fromEntries(trimmed));
+}
+
+function includesAny(values = [], aliases = []) {
+  const normalizedValues = values.map((value) => String(value).toLowerCase());
+  return aliases.some((alias) => normalizedValues.includes(String(alias).toLowerCase()));
+}
+
+function meaningfulTerms(values = []) {
+  return unique(values)
+    .map((value) => value.toLowerCase().replace(/^#/, '').trim())
+    .filter((value) => value.length >= 3);
+}
+
+export function scoreNotionNoteForTopic(note, topic) {
+  if (!note || !topic) return 0;
+  const noteText = note.searchText || normalizeNotionLibraryItem(note).searchText;
+  const cancerAliases = CANCER_ALIASES[topic.cancer] || [String(topic.cancer || '').toLowerCase()];
+  const sameCancer = includesAny(note.cancerTypes || [], cancerAliases);
+  const trials = meaningfulTerms(topic.trials || topic.task?.goldenTrials || []);
+  const focusTerms = meaningfulTerms([
+    ...(topic.focusTags || []),
+    ...(topic.task?.focusTags || []),
+    ...(topic.task?.details || '').split(/[,;/]/),
+  ]);
+  const titleTerms = meaningfulTerms(String(topic.title || '').split(/\s+|\//));
+  const trialHits = trials.filter((term) => noteText.includes(term)).length;
+  const focusHits = focusTerms.filter((term) => noteText.includes(term)).length;
+  const titleHits = titleTerms.filter((term) => noteText.includes(term)).length;
+  const geneHits = (note.genes || []).filter((gene) => (
+    focusTerms.includes(String(gene).toLowerCase()) || String(topic.details || '').toLowerCase().includes(String(gene).toLowerCase())
+  )).length;
+  if (!sameCancer && trialHits === 0 && focusHits < 2) return 0;
+  return (sameCancer ? 60 : 0)
+    + (trialHits * 55)
+    + (focusHits * 16)
+    + (titleHits * 10)
+    + (geneHits * 24);
+}
+
+export function getLinkedNotionNotes(notes = [], topic, limit = 16) {
+  return (notes || [])
+    .map((note) => ({ ...note, topicMatchScore: scoreNotionNoteForTopic(note, topic) }))
+    .filter((note) => note.topicMatchScore >= 90)
+    .sort((a, b) => b.topicMatchScore - a.topicMatchScore
+      || new Date(b.lastEditedTime || 0) - new Date(a.lastEditedTime || 0))
+    .slice(0, limit);
+}
+
+export function filterNotionLibrary(notes = [], filters = {}) {
+  const query = String(filters.query || '').trim().toLowerCase();
+  return (notes || []).filter((note) => (
+    (!query || note.searchText.includes(query))
+    && (!filters.cancer || filters.cancer === 'All' || note.cancerTypes.includes(filters.cancer))
+    && (!filters.gene || filters.gene === 'All' || note.genes.includes(filters.gene))
+    && (filters.flashcard === 'All'
+      || (filters.flashcard === 'Ready' && note.flashcardCreated)
+      || (filters.flashcard === 'Missing' && !note.flashcardCreated))
+  ));
+}
+
+export function inferNotionNoteType(note = {}) {
+  const text = String(note.title || '').toLowerCase();
+  if (/trial|study|phase\s*[123]|研究/.test(text)) return 'Trial Note';
+  if (/toxicity|toxic|副作用|不良反應|irae/.test(text)) return 'Toxicity';
+  if (/algorithm|sequenc|流程|治療選擇/.test(text)) return 'Algorithm';
+  if (/rapid|review|重點|整理/.test(text)) return 'Rapid Review';
+  return 'Master Note';
+}

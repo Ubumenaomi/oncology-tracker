@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import { AlertTriangle, BarChart3, BookOpen, ChevronDown, ClipboardList, Clock3, ExternalLink, Home, Newspaper, Pause, Play, RotateCcw, Settings2 } from 'lucide-react';
+import { AlertTriangle, BarChart3, BookOpen, ChevronDown, ClipboardList, Clock3, ExternalLink, FileText, Home, Newspaper, Pause, Play, RefreshCw, RotateCcw, Settings2 } from 'lucide-react';
 import './App.css';
 import { QUESTION_BANK_TOTAL, QUESTION_YEARS, cancerCategories } from './data/questionBankMeta.js';
 import { buildFlashcardTags } from './data/taxonomy.js';
@@ -9,6 +9,17 @@ import {
   getNotionNewsCriteriaForTask,
   rankNotionNewsItems,
 } from './data/notionNewsMatching.js';
+import {
+  filterNotionLibrary,
+  getLinkedNotionNotes,
+  inferNotionNoteType,
+  loadNotionLibraryCache,
+  loadNotionPreviewCache,
+  normalizeNotionLibraryItems,
+  saveNotionLibraryCache,
+  saveNotionPreviewCache,
+} from './data/notionLibrary.js';
+import { fetchNotionLibrary, fetchNotionPagePreview } from './data/notionLibraryClient.js';
 import {
   HIGH_YIELD_TOPICS,
   dailyCompletionCriteria,
@@ -6428,8 +6439,93 @@ function QuestPanel({
   );
 }
 
+function formatLibrarySyncTime(value) {
+  if (!value) return '尚未同步';
+  return new Intl.DateTimeFormat('zh-TW', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date(value));
+}
+
+function getNotionPreviewPageId(note = {}) {
+  const id = String(note.id || '');
+  if (/^[0-9a-f-]{32,36}$/i.test(id)) return id;
+  const urlId = String(note.url || '').match(/([0-9a-f]{32})(?:[?/#]|$)/i)?.[1];
+  return urlId || '';
+}
+
+function NotionLibraryCard({ note, onPreview, compact = false }) {
+  const labels = [
+    ...(note.cancerTypes || []),
+    ...(note.genes || []),
+    ...(note.tags || []),
+  ].slice(0, compact ? 3 : 5);
+  return (
+    <article className={`notion-library-card ${compact ? 'compact' : ''}`}>
+      <div className="notion-library-card-top">
+        <span>{inferNotionNoteType(note)}</span>
+        <em className={note.flashcardCreated ? 'ready' : 'missing'}>{note.flashcardCreated ? 'Flashcard ready' : 'Not yet carded'}</em>
+      </div>
+      <strong>{note.title}</strong>
+      {labels.length > 0 && (
+        <div className="knowledge-chip-row">
+          {labels.map((label) => <span className="knowledge-tag" key={`${note.id}-${label}`}>{label}</span>)}
+        </div>
+      )}
+      <small>Updated {formatLibrarySyncTime(note.lastEditedTime || note.createdTime)}</small>
+      <div className="notion-library-card-actions">
+        {getNotionPreviewPageId(note) && <button type="button" className="secondary tiny" onClick={() => onPreview(note)}>Preview</button>}
+        <a href={note.url} target="_blank" rel="noreferrer">Open in Notion <ExternalLink size={14} /></a>
+      </div>
+    </article>
+  );
+}
+
+function NotionPreviewPanel({ preview, onClose }) {
+  if (!preview?.id) return null;
+  const note = preview.item;
+  return (
+    <section className="notion-preview-panel" aria-label="Fellow training note preview">
+      <div className="section-head">
+        <div>
+          <div className="knowledge-kicker">Read-only Notion preview</div>
+          <h3>{note?.title || preview.title || 'Loading note...'}</h3>
+          <p className="muted">內容只從 Fellow training 讀取；Tracker 不會修改原筆記。</p>
+        </div>
+        <button type="button" className="secondary tiny" onClick={onClose}>Close preview</button>
+      </div>
+      {preview.status === 'loading' && <p className="notion-preview-status">正在載入筆記內容…</p>}
+      {preview.status === 'error' && <p className="notion-preview-status error">{preview.error}</p>}
+      {preview.status === 'ready' && note && (
+        <div className="notion-preview-layout">
+          <aside>
+            <strong>Table of contents</strong>
+            {note.headings?.length ? (
+              <ol>
+                {note.headings.slice(0, 24).map((heading) => (
+                  <li className={`level-${heading.level}`} key={heading.id}>{heading.text}</li>
+                ))}
+              </ol>
+            ) : <p className="muted">這篇筆記沒有 heading。</p>}
+            <a href={note.url} target="_blank" rel="noreferrer">Open full note <ExternalLink size={14} /></a>
+          </aside>
+          <div className="notion-preview-copy">
+            {note.plainText ? note.plainText.slice(0, 16000) : '這篇筆記目前沒有可顯示的純文字內容。'}
+            {note.plainText?.length > 16000 && '\n\nPreview truncated. Open in Notion to read the full note.'}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function KnowledgeHubPanel({
   topics,
+  fallbackNotes,
+  user,
   onOpenQuestion,
   onOpenCards,
   onOpenPlan,
@@ -6438,6 +6534,26 @@ function KnowledgeHubPanel({
   const [cancerFilter, setCancerFilter] = useState('All');
   const [query, setQuery] = useState('');
   const [selectedTopicId, setSelectedTopicId] = useState('');
+  const [libraryQuery, setLibraryQuery] = useState('');
+  const [libraryCancer, setLibraryCancer] = useState('All');
+  const [libraryGene, setLibraryGene] = useState('All');
+  const [libraryFlashcard, setLibraryFlashcard] = useState('All');
+  const [notePreview, setNotePreview] = useState({ id: '', title: '', status: 'idle', item: null, error: '' });
+  const autoSyncedUserRef = useRef('');
+  const [libraryState, setLibraryState] = useState(() => {
+    const cached = loadNotionLibraryCache();
+    if (cached?.items?.length) {
+      return { items: cached.items, status: 'cached', error: '', fetchedAt: cached.fetchedAt, truncated: cached.truncated, source: 'cache' };
+    }
+    return {
+      items: normalizeNotionLibraryItems(fallbackNotes),
+      status: 'idle',
+      error: '',
+      fetchedAt: null,
+      truncated: false,
+      source: 'snapshot',
+    };
+  });
   const normalizedQuery = query.trim().toLowerCase();
   const coreTopics = useMemo(
     () => topics.filter((topic) => KNOWLEDGE_CANCER_DOMAINS.has(topic.cancer)),
@@ -6446,19 +6562,106 @@ function KnowledgeHubPanel({
   const programTopicCount = topics.length - coreTopics.length;
   const cancers = [...new Set(coreTopics.map((topic) => topic.cancer))];
   const selectedTopic = coreTopics.find((topic) => topic.id === selectedTopicId) || null;
+  const libraryItems = libraryState.items;
+  const topicNoteIndex = useMemo(() => new Map(coreTopics.map((topic) => [
+    topic.id,
+    getLinkedNotionNotes(libraryItems, topic),
+  ])), [coreTopics, libraryItems]);
   const filteredTopics = coreTopics.filter((topic) => (
     (cancerFilter === 'All' || topic.cancer === cancerFilter)
-    && (!normalizedQuery || topic.searchText.includes(normalizedQuery))
+    && (!normalizedQuery
+      || topic.searchText.includes(normalizedQuery)
+      || (topicNoteIndex.get(topic.id) || []).some((note) => note.searchText.includes(normalizedQuery)))
   ));
-  const linkedNoteCount = new Set(coreTopics.flatMap((topic) => topic.notionNotes.map((note) => note.url))).size;
+  const selectedTopicNotes = useMemo(() => {
+    if (!selectedTopic) return EMPTY_ARRAY;
+    return [...new Map([
+      ...(topicNoteIndex.get(selectedTopic.id) || []),
+      ...selectedTopic.notionNotes.map((note) => ({
+        ...note,
+        id: note.url,
+        source: 'Question link',
+        cancerTypes: [selectedTopic.cancer],
+        genes: [],
+        tags: [],
+        flashcardCreated: false,
+      })),
+    ].map((note) => [note.url, note])).values()];
+  }, [selectedTopic, topicNoteIndex]);
+  const linkedNoteCount = new Set([
+    ...libraryItems.map((note) => note.url),
+    ...coreTopics.flatMap((topic) => topic.notionNotes.map((note) => note.url)),
+  ]).size;
   const linkedQuestionCount = new Set(coreTopics.flatMap((topic) => topic.questionRows.map(({ question }) => question.id))).size;
   const linkedCardCount = new Set(coreTopics.flatMap((topic) => topic.cards.map((card) => card.id))).size;
+  const libraryCancerOptions = [...new Set(libraryItems.flatMap((note) => note.cancerTypes))].sort();
+  const libraryGeneOptions = [...new Set(libraryItems.flatMap((note) => note.genes))].sort();
+  const filteredLibraryItems = filterNotionLibrary(libraryItems, {
+    query: libraryQuery,
+    cancer: libraryCancer,
+    gene: libraryGene,
+    flashcard: libraryFlashcard,
+  });
+
+  const syncLibrary = useCallback(async () => {
+    if (!user) {
+      setLibraryState((prev) => ({ ...prev, status: 'error', error: '請先登入 Cloud Sync，再同步 Fellow training。' }));
+      return;
+    }
+    setLibraryState((prev) => ({ ...prev, status: 'loading', error: '' }));
+    try {
+      const payload = await fetchNotionLibrary();
+      saveNotionLibraryCache(payload);
+      setLibraryState({
+        items: payload.items,
+        status: 'ready',
+        error: '',
+        fetchedAt: payload.fetchedAt,
+        truncated: Boolean(payload.truncated),
+        source: 'live',
+      });
+    } catch (error) {
+      setLibraryState((prev) => ({
+        ...prev,
+        status: 'error',
+        error: error.message || 'Fellow training 同步失敗，已保留 cached library。',
+      }));
+    }
+  }, [user]);
+
+  const openNotePreview = useCallback(async (note) => {
+    const pageId = getNotionPreviewPageId(note);
+    if (!pageId) return;
+    const cached = loadNotionPreviewCache(pageId);
+    if (cached?.plainText) {
+      setNotePreview({ id: pageId, title: note.title, status: 'ready', item: cached, error: '' });
+      return;
+    }
+    setNotePreview({ id: pageId, title: note.title, status: 'loading', item: null, error: '' });
+    try {
+      const preview = await fetchNotionPagePreview(pageId);
+      saveNotionPreviewCache(preview);
+      setNotePreview({ id: pageId, title: preview.title, status: 'ready', item: preview, error: '' });
+      setLibraryState((prev) => ({
+        ...prev,
+        items: prev.items.map((item) => item.id === preview.id ? { ...item, ...preview } : item),
+      }));
+    } catch (error) {
+      setNotePreview({ id: pageId, title: note.title, status: 'error', item: null, error: error.message || '筆記預覽載入失敗。' });
+    }
+  }, []);
 
   useEffect(() => {
     if (selectedTopicId && !coreTopics.some((topic) => topic.id === selectedTopicId)) {
       setSelectedTopicId('');
     }
   }, [coreTopics, selectedTopicId]);
+
+  useEffect(() => {
+    if (!user?.uid || autoSyncedUserRef.current === user.uid) return;
+    autoSyncedUserRef.current = user.uid;
+    syncLibrary();
+  }, [syncLibrary, user?.uid]);
 
   if (selectedTopic) {
     return (
@@ -6589,28 +6792,22 @@ function KnowledgeHubPanel({
           <div className="section-head">
             <div>
               <h3>Linked Fellow training notes</h3>
-              <p className="muted">Phase 1 僅使用題庫既有的 Notion URL，不會讀取或修改 Notion。</p>
+              <p className="muted">依 Cancer type、Gene tag、trial 與 topic 自動建立唯讀關聯；原始筆記仍以 Notion 為準。</p>
             </div>
-            <span className="pill soft">{selectedTopic.notionNotes.length}</span>
+            <span className="pill soft">{selectedTopicNotes.length}</span>
           </div>
-          {selectedTopic.notionNotes.length ? (
+          {selectedTopicNotes.length ? (
             <div className="linked-note-grid">
-              {selectedTopic.notionNotes.map((note) => (
-                <a href={note.url} target="_blank" rel="noreferrer" key={note.url}>
-                  <span>Fellow training</span>
-                  <strong>{note.title}</strong>
-                  <small>Linked from {note.questionId}</small>
-                  <ExternalLink size={16} />
-                </a>
-              ))}
+              {selectedTopicNotes.map((note) => <NotionLibraryCard note={note} onPreview={openNotePreview} compact key={note.url} />)}
             </div>
           ) : (
             <div className="empty-state small">
               <h3>尚未連結 Fellow training note</h3>
-              <p>Phase 2 的唯讀 connector 會補上資料庫索引；目前不會猜測或新增連結。</p>
+              <p>目前資料庫中沒有足夠明確的 Cancer／Gene／Trial metadata 可安全連到此 topic。</p>
             </div>
           )}
         </section>
+        <NotionPreviewPanel preview={notePreview} onClose={() => setNotePreview({ id: '', title: '', status: 'idle', item: null, error: '' })} />
       </main>
     );
   }
@@ -6621,13 +6818,13 @@ function KnowledgeHubPanel({
         <div>
           <div className="knowledge-kicker">Oncology Knowledge Hub</div>
           <h2>先進入主題，再看到所有學習資源</h2>
-          <p>以 100-Day Plan 的穩定 topic 為骨架，唯讀聚合 Questions、Trials、Flashcards、Critical Errors、Plan progress 與既有 Notion links。</p>
+          <p>以 100-Day Plan 為骨架，唯讀聚合 Questions、Trials、Flashcards、Critical Errors 與 Fellow training；Notion 始終是原始筆記來源。</p>
         </div>
         <div className="knowledge-hub-summary">
           <strong>{coreTopics.length}</strong><span>clinical topics</span>
           <strong>{linkedQuestionCount}</strong><span>questions linked</span>
           <strong>{linkedCardCount}</strong><span>cards linked</span>
-          <strong>{linkedNoteCount}</strong><span>Notion links</span>
+          <strong>{linkedNoteCount}</strong><span>Fellow notes</span>
         </div>
       </section>
 
@@ -6686,7 +6883,7 @@ function KnowledgeHubPanel({
                   <span><b>{topic.dueCount}</b> due</span>
                 </div>
                 <footer>
-                  <span>{topic.coverage}% coverage · {topic.accuracy}% accuracy</span>
+                  <span>{topic.coverage}% coverage · {topic.accuracy}% accuracy · {(topicNoteIndex.get(topic.id) || []).length} notes</span>
                   <b>Open topic →</b>
                 </footer>
               </button>
@@ -6699,6 +6896,77 @@ function KnowledgeHubPanel({
           </div>
         )}
       </section>
+
+      <section className="notion-library-section">
+        <div className="section-head">
+          <div>
+            <div className="knowledge-kicker">Fellow Training Database Connector</div>
+            <h3>Notion Library</h3>
+            <p className="muted">單向讀取 Page、Cancer type、Gene tag、Flashcard、最後更新時間與筆記內容預覽。</p>
+          </div>
+          <div className="notion-library-sync">
+            <span className={`notion-sync-status ${libraryState.status}`}>{libraryState.source === 'live' ? 'Live index' : 'Cached index'}</span>
+            <small>Last sync {formatLibrarySyncTime(libraryState.fetchedAt)}</small>
+            <button type="button" className="secondary" disabled={libraryState.status === 'loading'} onClick={syncLibrary}>
+              <RefreshCw size={15} className={libraryState.status === 'loading' ? 'spin' : ''} />
+              {libraryState.status === 'loading' ? 'Syncing…' : 'Sync now'}
+            </button>
+          </div>
+        </div>
+
+        {libraryState.error && <p className="notion-library-message error">{libraryState.error}</p>}
+        {libraryState.truncated && <p className="notion-library-message">Notion 回傳頁數超過安全上限；目前顯示最近更新的 {libraryItems.length} 篇。</p>}
+
+        <div className="notion-library-filters">
+          <label>
+            Search notes
+            <input type="search" value={libraryQuery} onChange={(event) => setLibraryQuery(event.target.value)} placeholder="Title、trial、drug、keyword…" />
+          </label>
+          <label>
+            Cancer type
+            <select value={libraryCancer} onChange={(event) => setLibraryCancer(event.target.value)}>
+              <option value="All">All</option>
+              {libraryCancerOptions.map((value) => <option value={value} key={value}>{value}</option>)}
+            </select>
+          </label>
+          <label>
+            Gene tag
+            <select value={libraryGene} onChange={(event) => setLibraryGene(event.target.value)}>
+              <option value="All">All</option>
+              {libraryGeneOptions.map((value) => <option value={value} key={value}>{value}</option>)}
+            </select>
+          </label>
+          <label>
+            Flashcard
+            <select value={libraryFlashcard} onChange={(event) => setLibraryFlashcard(event.target.value)}>
+              <option value="All">All</option>
+              <option value="Ready">Ready</option>
+              <option value="Missing">Not yet carded</option>
+            </select>
+          </label>
+        </div>
+
+        <div className="notion-library-count">
+          <FileText size={16} />
+          <strong>{filteredLibraryItems.length}</strong> of {libraryItems.length} notes
+          <span>·</span>
+          <strong>{libraryItems.filter((note) => note.flashcardCreated).length}</strong> marked Flashcard ready
+        </div>
+
+        {filteredLibraryItems.length ? (
+          <div className="notion-library-grid">
+            {filteredLibraryItems.slice(0, 36).map((note) => (
+              <NotionLibraryCard note={note} onPreview={openNotePreview} key={note.id} />
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state small">
+            <h3>找不到符合條件的 Fellow training note</h3>
+            <p>請清除搜尋字詞或調整 Cancer type、Gene tag、Flashcard 篩選。</p>
+          </div>
+        )}
+      </section>
+      <NotionPreviewPanel preview={notePreview} onClose={() => setNotePreview({ id: '', title: '', status: 'idle', item: null, error: '' })} />
     </main>
   );
 }
@@ -9712,6 +9980,8 @@ export default function App() {
       {tab === 'knowledge' && (
         <KnowledgeHubPanel
           topics={knowledgeTopics}
+          fallbackNotes={notionNewsItems}
+          user={user}
           onOpenQuestion={(question) => {
             setBankYear('All');
             setBankCancer(question.cancer || 'All');
