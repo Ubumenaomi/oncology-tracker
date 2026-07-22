@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import { AlertTriangle, BarChart3, ChevronDown, ClipboardList, Clock3, ExternalLink, Home, Newspaper, Pause, Play, RotateCcw, Settings2 } from 'lucide-react';
+import { AlertTriangle, BarChart3, BookOpen, ChevronDown, ClipboardList, Clock3, ExternalLink, Home, Newspaper, Pause, Play, RotateCcw, Settings2 } from 'lucide-react';
 import './App.css';
 import { QUESTION_BANK_TOTAL, QUESTION_YEARS, cancerCategories } from './data/questionBankMeta.js';
 import { buildFlashcardTags } from './data/taxonomy.js';
@@ -59,6 +59,17 @@ const STORAGE_SLICE_KEYS = {
 const CLOUD_STORAGE_VERSION = 3;
 const CLOUD_SLICE_CHUNK_SIZE = 250000;
 const CLOUD_SLICE_NAMES = Object.freeze(Object.keys(STORAGE_SLICE_KEYS));
+const KNOWLEDGE_CANCER_DOMAINS = new Set([
+  'Lung',
+  'Breast',
+  'GI',
+  'GU',
+  'GYN',
+  'Head & Neck',
+  'Heme',
+  'Other',
+  'Supportive/Stats',
+]);
 
 const NAV_GROUPS = [
   {
@@ -2615,6 +2626,115 @@ function questionMatchesTask(question, task, minScore = 120) {
   const hasEnoughPromptEvidence = hasCancerSignal || trialHits > 0 || focusHits >= 2 || keywordHits >= 4;
   if (!hasTaskSpecificHit || !hasEnoughPromptEvidence) return false;
   return hasTaskSpecificHit && scoreQuestionForTask(question, task) >= minScore;
+}
+
+function getKnowledgeCardText(card = {}) {
+  return [
+    card.id,
+    card.cancer,
+    card.topic,
+    card.type,
+    card.front,
+    card.back,
+    card.cloze,
+    ...normalizeTextList(card.trial || card.trials),
+    ...normalizeTextList(card.tags),
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+
+function knowledgeCardMatchesTask(card, task) {
+  if (!card || !task) return false;
+  const text = getKnowledgeCardText(card);
+  const trialHits = [...(task.goldenTrials || []), ...(task.relatedTrials || [])]
+    .filter((trial) => text.includes(String(trial).toLowerCase())).length;
+  const focusHits = (task.focusTags || []).filter((tag) => text.includes(String(tag).toLowerCase())).length;
+  const keywordHits = getTaskKeywords(task).filter((keyword) => text.includes(keyword)).length;
+  const sameCancer = card.cancer === task.cancer || card.tags?.cancerDomain === task.cancer;
+  return sameCancer && (trialHits > 0 || focusHits > 0 || keywordHits >= 2);
+}
+
+function getKnowledgeTopicStatus({ coverage, accuracy, criticalCount, dueCount }) {
+  if (criticalCount > 0 || accuracy < 70 || coverage < 40) return 'Needs attention';
+  if (dueCount > 0 || accuracy < 80 || coverage < 75) return 'In progress';
+  return 'On track';
+}
+
+function buildKnowledgeTopics(questionState, flashcardState, planProgress = {}) {
+  const questions = getQuestionPool(questionState)
+    .map((question) => getQuestionWithOverride(question.id, questionState))
+    .filter(Boolean);
+  const cards = getFlashcardList(flashcardState);
+
+  return studyPlan100.map((task) => {
+    const questionRows = questions
+      .filter((question) => questionMatchesTask(question, task))
+      .map((question) => ({ question, stat: getStat(questionState, question.id) }));
+    const topicCards = cards.filter((card) => knowledgeCardMatchesTask(card, task));
+    const attempts = questionRows.reduce((sum, { stat }) => sum + (stat.attempts || 0), 0);
+    const correct = questionRows.reduce((sum, { stat }) => sum + (stat.correct || 0), 0);
+    const attemptedQuestions = questionRows.filter(({ stat }) => (stat.attempts || 0) > 0).length;
+    const dueQuestions = questionRows.filter(({ stat }) => stat.nextReviewDate && stat.nextReviewDate <= TODAY);
+    const dueCards = topicCards.filter((card) => {
+      const stat = flashcardState.flashcardStats?.[card.id] || {};
+      return stat.nextReviewDate && stat.nextReviewDate <= TODAY;
+    });
+    const criticalQuestions = questionRows.filter(({ stat }) => (
+      (stat.highConfidenceWrong || 0) > 0
+      || (stat.repeatedWrong || 0) >= 2
+      || (stat.wrong || 0) >= 2
+    ));
+    const notionNotes = [...new Map(questionRows
+      .filter(({ question }) => question.notionUrl)
+      .map(({ question }) => [question.notionUrl, {
+        url: question.notionUrl,
+        title: question.trials?.[0] || question.topic || question.id,
+        questionId: question.id,
+      }])).values()];
+    const trials = [...new Set([
+      ...(task.goldenTrials || []),
+      ...(task.relatedTrials || []),
+      ...questionRows.flatMap(({ question }) => question.trials || []),
+      ...topicCards.flatMap((card) => normalizeTextList(card.trial || card.trials)),
+    ].filter(Boolean))];
+    const coverage = questionRows.length ? Math.round((attemptedQuestions / questionRows.length) * 100) : 0;
+    const accuracy = attempts ? Math.round((correct / attempts) * 100) : 0;
+    const dueCount = dueQuestions.length + dueCards.length;
+    const searchText = [
+      task.cancer,
+      task.module,
+      task.topic,
+      task.details,
+      ...(task.focusTags || []),
+      ...trials,
+      ...questionRows.flatMap(({ question }) => [question.id, question.stem]),
+      ...topicCards.flatMap((card) => [card.front, card.back]),
+    ].filter(Boolean).join(' ').toLowerCase();
+
+    return {
+      id: task.key,
+      task,
+      cancer: task.cancer,
+      title: task.topic,
+      details: task.details,
+      focusTags: task.focusTags || [],
+      priority: task.priority || 'Standard',
+      highYieldWeight: task.highYieldWeight || 0,
+      completed: getPlanProgressValue(planProgress, task),
+      questionRows,
+      cards: topicCards,
+      trials,
+      notionNotes,
+      criticalQuestions,
+      attempts,
+      accuracy,
+      coverage,
+      dueQuestions,
+      dueCards,
+      dueCount,
+      status: getKnowledgeTopicStatus({ coverage, accuracy, criticalCount: criticalQuestions.length, dueCount }),
+      searchText,
+    };
+  });
 }
 
 function generateDailyQuestionIds(state, task = getTodayPlanTask(state), excludedIds = [], rankedHighYieldTopics = null) {
@@ -6308,6 +6428,281 @@ function QuestPanel({
   );
 }
 
+function KnowledgeHubPanel({
+  topics,
+  onOpenQuestion,
+  onOpenCards,
+  onOpenPlan,
+  onOpenReview,
+}) {
+  const [cancerFilter, setCancerFilter] = useState('All');
+  const [query, setQuery] = useState('');
+  const [selectedTopicId, setSelectedTopicId] = useState('');
+  const normalizedQuery = query.trim().toLowerCase();
+  const coreTopics = useMemo(
+    () => topics.filter((topic) => KNOWLEDGE_CANCER_DOMAINS.has(topic.cancer)),
+    [topics],
+  );
+  const programTopicCount = topics.length - coreTopics.length;
+  const cancers = [...new Set(coreTopics.map((topic) => topic.cancer))];
+  const selectedTopic = coreTopics.find((topic) => topic.id === selectedTopicId) || null;
+  const filteredTopics = coreTopics.filter((topic) => (
+    (cancerFilter === 'All' || topic.cancer === cancerFilter)
+    && (!normalizedQuery || topic.searchText.includes(normalizedQuery))
+  ));
+  const linkedNoteCount = new Set(coreTopics.flatMap((topic) => topic.notionNotes.map((note) => note.url))).size;
+  const linkedQuestionCount = new Set(coreTopics.flatMap((topic) => topic.questionRows.map(({ question }) => question.id))).size;
+  const linkedCardCount = new Set(coreTopics.flatMap((topic) => topic.cards.map((card) => card.id))).size;
+
+  useEffect(() => {
+    if (selectedTopicId && !coreTopics.some((topic) => topic.id === selectedTopicId)) {
+      setSelectedTopicId('');
+    }
+  }, [coreTopics, selectedTopicId]);
+
+  if (selectedTopic) {
+    return (
+      <main className="panel knowledge-hub-panel">
+        <button className="knowledge-back" type="button" onClick={() => setSelectedTopicId('')}>← 回到 Knowledge Hub</button>
+
+        <section className="knowledge-detail-hero">
+          <div>
+            <div className="knowledge-kicker">{selectedTopic.cancer} · {selectedTopic.task.day}</div>
+            <h2>{selectedTopic.title}</h2>
+            <p>{selectedTopic.details}</p>
+            <div className="knowledge-chip-row">
+              <span className={`knowledge-status ${selectedTopic.status.toLowerCase().replaceAll(' ', '-')}`}>{selectedTopic.status}</span>
+              <span className="pill soft">Plan {selectedTopic.completed ? 'completed' : 'in progress'}</span>
+              <span className="pill soft">Weight {selectedTopic.highYieldWeight}</span>
+            </div>
+          </div>
+          <div className="knowledge-detail-actions">
+            <button className="primary" type="button" onClick={onOpenPlan}>Open 100-Day Plan</button>
+            {selectedTopic.dueCount > 0 && <button className="secondary" type="button" onClick={onOpenReview}>Review due items</button>}
+          </div>
+        </section>
+
+        <section className="knowledge-metrics">
+          <MetricCard label="Related questions" value={selectedTopic.questionRows.length} sub={`${selectedTopic.coverage}% coverage`} />
+          <MetricCard label="Accuracy" value={`${selectedTopic.accuracy}%`} sub={`${selectedTopic.attempts} attempts`} />
+          <MetricCard label="Flashcards" value={selectedTopic.cards.length} sub={`${selectedTopic.dueCards.length} due`} />
+          <MetricCard label="Critical errors" value={selectedTopic.criticalQuestions.length} sub={`${selectedTopic.dueQuestions.length} questions due`} />
+        </section>
+
+        <div className="knowledge-detail-grid">
+          <section className="subsection knowledge-section">
+            <div className="section-head">
+              <div>
+                <h3>Decision focus</h3>
+                <p className="muted">這個 topic 在 100-Day Plan 的穩定學習範圍。</p>
+              </div>
+            </div>
+            <div className="knowledge-chip-row">
+              {selectedTopic.focusTags.map((tag) => <span className="knowledge-tag" key={tag}>#{tag}</span>)}
+            </div>
+          </section>
+
+          <section className="subsection knowledge-section">
+            <div className="section-head">
+              <div>
+                <h3>Trials</h3>
+                <p className="muted">Plan、題目與卡片中出現的相關 trial。</p>
+              </div>
+              <span className="pill soft">{selectedTopic.trials.length}</span>
+            </div>
+            {selectedTopic.trials.length ? (
+              <div className="knowledge-chip-row">
+                {selectedTopic.trials.map((trial) => <span className="knowledge-trial" key={trial}>{trial}</span>)}
+              </div>
+            ) : <p className="muted">目前沒有已連結的 trial。</p>}
+          </section>
+        </div>
+
+        <section className="subsection knowledge-section">
+          <div className="section-head">
+            <div>
+              <h3>Related questions</h3>
+              <p className="muted">由 cancer、topic、trial 與 focus tags 自動聚合；不會改動題庫內容。</p>
+            </div>
+            <span className="pill soft">{selectedTopic.questionRows.length}</span>
+          </div>
+          {selectedTopic.questionRows.length ? (
+            <div className="knowledge-resource-list">
+              {selectedTopic.questionRows.slice(0, 24).map(({ question, stat }) => (
+                <button className="knowledge-resource-row" type="button" key={question.id} onClick={() => onOpenQuestion(question)}>
+                  <span>
+                    <strong>{question.id}</strong>
+                    <small>{question.cancer} · {question.topic}</small>
+                  </span>
+                  <span className="knowledge-resource-copy">{question.stem}</span>
+                  <span className="knowledge-resource-stat">{stat.attempts || 0} attempts · {wrongRate(stat)}% wrong</span>
+                </button>
+              ))}
+            </div>
+          ) : <p className="muted">目前題庫中沒有足夠明確的相關題目。</p>}
+        </section>
+
+        <div className="knowledge-detail-grid">
+          <section className="subsection knowledge-section">
+            <div className="section-head">
+              <div>
+                <h3>Flashcards</h3>
+                <p className="muted">與此 topic 關聯的現有卡片。</p>
+              </div>
+              <button className="secondary tiny" type="button" onClick={onOpenCards}>Open Card Manager</button>
+            </div>
+            {selectedTopic.cards.length ? (
+              <div className="knowledge-card-list">
+                {selectedTopic.cards.slice(0, 10).map((card) => (
+                  <article key={card.id}>
+                    <span className="pill soft">{card.type}</span>
+                    <strong>{getFlashcardFrontText(card)}</strong>
+                  </article>
+                ))}
+              </div>
+            ) : <p className="muted">目前沒有已連結的卡片。</p>}
+          </section>
+
+          <section className="subsection knowledge-section">
+            <div className="section-head">
+              <div>
+                <h3>Critical errors</h3>
+                <p className="muted">高信心錯題、連續錯題或累積錯誤。</p>
+              </div>
+              {selectedTopic.criticalQuestions.length > 0 && <button className="secondary tiny" type="button" onClick={onOpenReview}>Open Review</button>}
+            </div>
+            {selectedTopic.criticalQuestions.length ? (
+              <div className="knowledge-error-list">
+                {selectedTopic.criticalQuestions.slice(0, 8).map(({ question, stat }) => (
+                  <button type="button" key={question.id} onClick={() => onOpenQuestion(question)}>
+                    <strong>{question.id}</strong>
+                    <span>{stat.lastErrorType || 'Unclassified error'}</span>
+                    <em>{stat.highConfidenceWrong || 0} high-confidence · {stat.repeatedWrong || 0} repeated</em>
+                  </button>
+                ))}
+              </div>
+            ) : <p className="muted">此 topic 目前沒有 critical error。</p>}
+          </section>
+        </div>
+
+        <section className="subsection knowledge-section linked-note-section">
+          <div className="section-head">
+            <div>
+              <h3>Linked Fellow training notes</h3>
+              <p className="muted">Phase 1 僅使用題庫既有的 Notion URL，不會讀取或修改 Notion。</p>
+            </div>
+            <span className="pill soft">{selectedTopic.notionNotes.length}</span>
+          </div>
+          {selectedTopic.notionNotes.length ? (
+            <div className="linked-note-grid">
+              {selectedTopic.notionNotes.map((note) => (
+                <a href={note.url} target="_blank" rel="noreferrer" key={note.url}>
+                  <span>Fellow training</span>
+                  <strong>{note.title}</strong>
+                  <small>Linked from {note.questionId}</small>
+                  <ExternalLink size={16} />
+                </a>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state small">
+              <h3>尚未連結 Fellow training note</h3>
+              <p>Phase 2 的唯讀 connector 會補上資料庫索引；目前不會猜測或新增連結。</p>
+            </div>
+          )}
+        </section>
+      </main>
+    );
+  }
+
+  return (
+    <main className="panel knowledge-hub-panel">
+      <section className="knowledge-hub-hero">
+        <div>
+          <div className="knowledge-kicker">Oncology Knowledge Hub</div>
+          <h2>先進入主題，再看到所有學習資源</h2>
+          <p>以 100-Day Plan 的穩定 topic 為骨架，唯讀聚合 Questions、Trials、Flashcards、Critical Errors、Plan progress 與既有 Notion links。</p>
+        </div>
+        <div className="knowledge-hub-summary">
+          <strong>{coreTopics.length}</strong><span>clinical topics</span>
+          <strong>{linkedQuestionCount}</strong><span>questions linked</span>
+          <strong>{linkedCardCount}</strong><span>cards linked</span>
+          <strong>{linkedNoteCount}</strong><span>Notion links</span>
+        </div>
+      </section>
+
+      <section className="knowledge-toolbar">
+        <label>
+          Search Knowledge
+          <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Trial、biomarker、topic、question ID..." />
+        </label>
+        <label>
+          Cancer
+          <select value={cancerFilter} onChange={(event) => setCancerFilter(event.target.value)}>
+            <option value="All">All cancers</option>
+            {cancers.map((cancer) => <option value={cancer} key={cancer}>{cancer}</option>)}
+          </select>
+        </label>
+      </section>
+
+      <section className="knowledge-cancer-overview">
+        {cancers.map((cancer) => {
+          const cancerTopics = coreTopics.filter((topic) => topic.cancer === cancer);
+          const active = cancerFilter === cancer;
+          return (
+            <button type="button" className={active ? 'active' : ''} key={cancer} onClick={() => setCancerFilter(active ? 'All' : cancer)}>
+              <span>{cancer}</span>
+              <strong>{cancerTopics.filter((topic) => topic.completed).length}/{cancerTopics.length}</strong>
+              <small>plan topics complete</small>
+            </button>
+          );
+        })}
+      </section>
+
+      <section className="knowledge-topic-section">
+        <div className="section-head">
+          <div>
+            <h3>{cancerFilter === 'All' ? 'All topics' : cancerFilter}</h3>
+            <p className="muted">顯示 {filteredTopics.length} 個 topic；點擊後進入聚合頁面。</p>
+          </div>
+          {programTopicCount > 0 && (
+            <p className="knowledge-program-note">Mock、Weakness Repair 與 Final Review 等 {programTopicCount} 個訓練日仍保留在 100-Day Plan，不列為臨床知識主題。</p>
+          )}
+        </div>
+        {filteredTopics.length ? (
+          <div className="knowledge-topic-grid">
+            {filteredTopics.map((topic) => (
+              <button className="knowledge-topic-card" type="button" key={topic.id} onClick={() => setSelectedTopicId(topic.id)}>
+                <div>
+                  <span className="pill">{topic.cancer}</span>
+                  <span className={`knowledge-status ${topic.status.toLowerCase().replaceAll(' ', '-')}`}>{topic.status}</span>
+                </div>
+                <strong>{topic.title}</strong>
+                <p>{topic.details}</p>
+                <div className="knowledge-topic-stats">
+                  <span><b>{topic.questionRows.length}</b> questions</span>
+                  <span><b>{topic.cards.length}</b> cards</span>
+                  <span><b>{topic.trials.length}</b> trials</span>
+                  <span><b>{topic.dueCount}</b> due</span>
+                </div>
+                <footer>
+                  <span>{topic.coverage}% coverage · {topic.accuracy}% accuracy</span>
+                  <b>Open topic →</b>
+                </footer>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state">
+            <h3>找不到符合條件的 topic</h3>
+            <p>請清除搜尋字詞或切換 Cancer 篩選。</p>
+          </div>
+        )}
+      </section>
+    </main>
+  );
+}
+
 function FlashcardsPanel({
   state,
   allFlashcards,
@@ -7287,7 +7682,7 @@ export default function App() {
       return bankYear === 'All' ? QUESTION_YEARS : normalizeQuestionYearList([bankYear]);
     }
     if (tab === 'today' || tab === 'quest') return todaySessionQuestionYears;
-    if (['review', 'analytics', 'readiness', 'critical', 'plan', 'flashcards'].includes(tab)) return preferredQuestionYears;
+    if (['review', 'analytics', 'readiness', 'critical', 'plan', 'flashcards', 'knowledge'].includes(tab)) return preferredQuestionYears;
     return EMPTY_ARRAY;
   }, [bankYear, preferredQuestionYears, tab, todaySessionQuestionYears]);
   const requestedQuestionYearKey = requestedQuestionYears.join(',');
@@ -8671,7 +9066,7 @@ export default function App() {
   const needsCancerSummary = ['readiness', 'analytics'].includes(tab);
   const needsTaxonomyAnalytics = tab === 'analytics';
   const needsBankQuestions = tab === 'questions';
-  const needsFlashcardLists = ['stats', 'flashcards', 'flashcard-review', 'plan'].includes(tab);
+  const needsFlashcardLists = ['stats', 'flashcards', 'flashcard-review', 'plan', 'knowledge'].includes(tab);
   const readinessDataState = useMemo(() => ({
     ...questionDataState,
     mockExams: state.mockExams,
@@ -8783,6 +9178,9 @@ export default function App() {
     () => allFlashcards.filter((card) => card.sourceType === 'trial' || card.type === 'Trial Card').length,
     [allFlashcards]
   );
+  const knowledgeTopics = useMemo(() => tab === 'knowledge'
+    ? buildKnowledgeTopics(questionDataState, flashcardListState, state.planProgress || {})
+    : EMPTY_ARRAY, [tab, questionDataState, flashcardListState, state.planProgress]);
 
   const updateActiveMockExam = useCallback((draft) => {
     updateState((prev) => ({ ...prev, activeMockExam: draft }), ['activity']);
@@ -9233,6 +9631,10 @@ export default function App() {
           <Home size={17} strokeWidth={2.4} />
           <span>Quest</span>
         </button>
+        <button className={`nav-knowledge ${tab === 'knowledge' ? 'active' : ''}`} type="button" onClick={() => setTab('knowledge')}>
+          <BookOpen size={17} strokeWidth={2.4} />
+          <span>Knowledge</span>
+        </button>
         <button className={`nav-news ${tab === 'news' ? 'active' : ''}`} type="button" onClick={() => setTab('news')}>
           <Newspaper size={17} strokeWidth={2.4} />
           <span>NEWS</span>
@@ -9304,6 +9706,22 @@ export default function App() {
             }
             setTab('today');
           }}
+        />
+      )}
+
+      {tab === 'knowledge' && (
+        <KnowledgeHubPanel
+          topics={knowledgeTopics}
+          onOpenQuestion={(question) => {
+            setBankYear('All');
+            setBankCancer(question.cancer || 'All');
+            setSearch(question.id);
+            setEditingQuestionId(question.id);
+            setTab('questions');
+          }}
+          onOpenCards={() => setTab('flashcards')}
+          onOpenPlan={() => setTab('plan')}
+          onOpenReview={() => setTab('review')}
         />
       )}
 
