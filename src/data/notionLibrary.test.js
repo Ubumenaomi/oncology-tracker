@@ -5,6 +5,7 @@ import {
   filterNotionLibrary,
   getLinkedNotionNotes,
   inferNotionNoteType,
+  normalizeNotionExternalUrl,
   normalizeNotionLibraryItem,
 } from './notionLibrary.js';
 
@@ -53,4 +54,28 @@ test('infers a conservative display-only note type without changing Notion', () 
   assert.equal(inferNotionNoteType({ title: 'KEYNOTE-522 phase 3 trial' }), 'Trial Note');
   assert.equal(inferNotionNoteType({ title: 'ICI myocarditis toxicity' }), 'Toxicity');
   assert.equal(inferNotionNoteType({ title: 'NSCLC overview' }), 'Master Note');
+});
+
+test('repairs legacy app.notion.com page links while preserving current Notion URLs', () => {
+  assert.equal(
+    normalizeNotionExternalUrl('https://app.notion.com/38db04dafce881e8a345c39dbdc12272'),
+    'https://www.notion.so/38db04dafce881e8a345c39dbdc12272',
+  );
+  assert.equal(
+    normalizeNotionExternalUrl('https://app.notion.com/38db04da-fce8-81e8-a345-c39dbdc12272?pvs=4'),
+    'https://www.notion.so/38db04dafce881e8a345c39dbdc12272?pvs=4',
+  );
+  assert.equal(
+    normalizeNotionExternalUrl('https://www.notion.so/NSCLC-38db04dafce881e8a345c39dbdc12272'),
+    'https://www.notion.so/NSCLC-38db04dafce881e8a345c39dbdc12272',
+  );
+});
+
+test('normalizes legacy links when reading library items and cached snapshots', () => {
+  const note = normalizeNotionLibraryItem({
+    id: 'legacy',
+    title: 'Legacy snapshot note',
+    url: 'https://app.notion.com/38db04dafce881e8a345c39dbdc12272',
+  });
+  assert.equal(note.url, 'https://www.notion.so/38db04dafce881e8a345c39dbdc12272');
 });

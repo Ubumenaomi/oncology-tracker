@@ -1,4 +1,5 @@
-import { mapNotionCancerToTrackerDomain, normalizeNotionLibraryItem } from './notionLibrary.js';
+import { normalizeNotionLibraryItem } from './notionLibrary.js';
+import { buildNotionLearningTags, mapNotionCancerToTrackerDomain } from './notionTaxonomy.js';
 import { trialRegistryCandidates } from './trialRegistry.js';
 
 export const NOTION_LEARNING_ARTIFACTS = Object.freeze([
@@ -26,15 +27,6 @@ function unique(items = []) {
 function normalizeList(value = []) {
   if (Array.isArray(value)) return unique(value);
   return unique(String(value || '').split(',').map((item) => item.trim()));
-}
-
-function slugify(value = '') {
-  return String(value)
-    .trim()
-    .toLowerCase()
-    .replace(/\+/g, '-positive')
-    .replace(/[^a-z0-9\u4e00-\u9fff]+/g, '-')
-    .replace(/^-+|-+$/g, '');
 }
 
 function noteSearchText(note = {}) {
@@ -65,7 +57,9 @@ function titleTerms(title = '') {
 
 function inferKnownTrials(note = {}, relatedQuestions = []) {
   const text = noteSearchText(note);
-  const fromQuestions = (relatedQuestions || []).flatMap((question) => question.trials || []);
+  const fromQuestions = (relatedQuestions || [])
+    .flatMap((question) => question.trials || [])
+    .filter((name) => textIncludesKnownName(text, name));
   const fromRegistry = trialRegistryCandidates
     .filter((trial) => [trial.canonicalName, ...(trial.aliases || [])]
       .some((name) => textIncludesKnownName(text, name)))
@@ -79,16 +73,7 @@ export function deriveNotionLearningContext(note = {}, relatedQuestions = []) {
     || relatedQuestions.find((question) => question.cancer)?.cancer
     || 'Other';
   const trials = inferKnownTrials(normalized, relatedQuestions);
-  const autoTags = unique([
-    `source/notion`,
-    ...normalized.cancerTypes.map((value) => `disease/${slugify(value)}`),
-    ...normalized.subtypes.map((value) => `subtype/${slugify(value)}`),
-    ...normalized.genes.map((value) => `biomarker/${slugify(value)}`),
-    ...normalized.treatments.map((value) => `setting/${slugify(value)}`),
-    ...normalized.drugs.map((value) => `drug/${slugify(value)}`),
-    ...trials.map((value) => `trial/${slugify(value)}`),
-    ...normalized.tags.map((value) => `topic/${slugify(value)}`),
-  ].filter((tag) => !tag.endsWith('/')));
+  const autoTags = buildNotionLearningTags(normalized, trials);
 
   return {
     cancer,

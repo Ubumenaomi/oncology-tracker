@@ -1,18 +1,11 @@
+import {
+  getNotionCancerTypesForTrackerDomain,
+  mapNotionCancerToTrackerDomain,
+} from './notionTaxonomy.js';
+
 const LIBRARY_CACHE_KEY = 'oncology-tracker.notion-library.v1';
 const PREVIEW_CACHE_KEY = 'oncology-tracker.notion-preview.v1';
 const MAX_PREVIEW_CACHE_ITEMS = 20;
-
-const CANCER_ALIASES = {
-  Lung: ['lung cancer', 'methothelioma', 'mesothelioma'],
-  Breast: ['breast cancer', 'breast'],
-  GI: ['gastric cancer', 'esophageal cancer', 'colon cancer', 'hcc', 'pancreatic cancer', 'cholangiocarcinoma', 'biliary tract', 'small bowel'],
-  GU: ['gu', 'prostatic cancer'],
-  GYN: ['gyn', 'endometrial adenocarcinoma'],
-  'Head & Neck': ['head and neck', 'npc'],
-  Heme: ['aml', 'hodgkin lymphoma'],
-  Other: ['rare cancer', 'soft tissue', 'gist', 'thymoma', 'melanoma', 'adenoid cystic carcinoma', 'adrenal gland carcinoma', 'cns'],
-  'Supportive/Stats': ['drug toxicity'],
-};
 
 function unique(items = []) {
   const values = new Map();
@@ -28,13 +21,32 @@ function normalizeList(value = []) {
   return unique(String(value || '').split(',').map((item) => item.trim()));
 }
 
+export function normalizeNotionExternalUrl(value = '') {
+  const url = String(value || '').trim();
+  if (!url) return '';
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.toLowerCase() !== 'app.notion.com') return url;
+
+    const compactId = parsed.pathname.match(/([0-9a-f]{32})(?:\/)?$/i)?.[1];
+    const uuid = parsed.pathname.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/)?$/i)?.[1];
+    const pageId = compactId || uuid?.replaceAll('-', '');
+    if (!pageId) return url;
+
+    return `https://www.notion.so/${pageId}${parsed.search}${parsed.hash}`;
+  } catch {
+    return url;
+  }
+}
+
 export function normalizeNotionLibraryItem(item = {}) {
   const normalized = {
     id: item.id,
     sourceType: 'notion',
     source: item.source || 'Notion · Fellow training',
     title: item.title || 'Untitled',
-    url: item.url || '',
+    url: normalizeNotionExternalUrl(item.url),
     createdTime: item.createdTime || item.publishedAt || null,
     lastEditedTime: item.lastEditedTime || item.publishedAt || item.createdTime || null,
     cancerTypes: normalizeList(item.cancerTypes),
@@ -123,12 +135,7 @@ function includesAny(values = [], aliases = []) {
   return aliases.some((alias) => normalizedValues.includes(String(alias).toLowerCase()));
 }
 
-export function mapNotionCancerToTrackerDomain(cancerTypes = []) {
-  const values = normalizeList(cancerTypes);
-  const match = Object.entries(CANCER_ALIASES)
-    .find(([, aliases]) => includesAny(values, aliases));
-  return match?.[0] || '';
-}
+export { mapNotionCancerToTrackerDomain };
 
 function meaningfulTerms(values = []) {
   return unique(values)
@@ -139,7 +146,7 @@ function meaningfulTerms(values = []) {
 export function scoreNotionNoteForTopic(note, topic) {
   if (!note || !topic) return 0;
   const noteText = note.searchText || normalizeNotionLibraryItem(note).searchText;
-  const cancerAliases = CANCER_ALIASES[topic.cancer] || [String(topic.cancer || '').toLowerCase()];
+  const cancerAliases = getNotionCancerTypesForTrackerDomain(topic.cancer);
   const sameCancer = includesAny(note.cancerTypes || [], cancerAliases);
   const trials = meaningfulTerms(topic.trials || topic.task?.goldenTrials || []);
   const focusTerms = meaningfulTerms([
