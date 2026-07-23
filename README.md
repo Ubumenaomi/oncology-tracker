@@ -30,6 +30,14 @@ The conversion workflow is intentionally gated:
 
 Generated items retain the Notion page ID, URL, title, and source evidence. The Tracker never changes the source page or its `Flashcard` checkbox; instead it separately displays the number of locally linked cards.
 
+## NEWS and Phase 3 integration
+
+NEWS and Knowledge now share the same authenticated `/api/notion-library` index, local cache, sync status, and on-demand note preview. NEWS ranks that shared index against the selected 100-Day Plan task in the browser; it no longer has a separate Notion API route.
+
+Cancer domains, Notion cancer values, treatment settings, drug terms, and note tags are defined once in `src/data/notionTaxonomy.js`. The same definitions drive NEWS matching, Knowledge topic links, and Phase 3 namespaced auto-tags. Current plan labels such as `Other` and legacy module labels such as `Rare/Skin/Sarcoma/CUP/Other` resolve through the same mapping.
+
+From a NEWS story, `Preview & create` opens the same read-only preview and Learning Draft Studio used by Knowledge. A bundled metadata snapshot remains only as a first-run/offline display fallback; all live Notion reads go through the authenticated Library endpoint.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:

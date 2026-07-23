@@ -47,6 +47,18 @@ test('derives safe tracker mapping, auto-tags, and known trials from a Notion no
   assert.ok(context.autoTags.includes('source/notion'));
 });
 
+test('does not leak trial names from related questions into note auto-mapping', () => {
+  const context = deriveNotionLearningContext({
+    id: 'her2-note',
+    title: 'HER2-positive early breast cancer',
+    plainText: 'Neoadjuvant treatment and residual disease decisions.',
+    cancerTypes: ['breast cancer'],
+    genes: ['HER2'],
+  }, [{ cancer: 'Breast', trials: ['OlympiA'] }]);
+  assert.deepEqual(context.trials, []);
+  assert.equal(context.autoTags.some((tag) => tag === 'trial/olympia'), false);
+});
+
 test('links only strongly related existing questions', () => {
   assert.deepEqual(
     getRelatedQuestionsForNotionNote(note, questions).map(({ question }) => question.id),

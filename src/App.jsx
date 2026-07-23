@@ -5,21 +5,16 @@ import { QUESTION_BANK_TOTAL, QUESTION_YEARS, cancerCategories } from './data/qu
 import { buildFlashcardTags } from './data/taxonomy.js';
 import { notionNewsItems } from './data/notionNews.js';
 import {
-  buildNotionNewsQuery,
   getNotionNewsCriteriaForTask,
+  hasCriteriaMatches,
   rankNotionNewsItems,
 } from './data/notionNewsMatching.js';
 import {
   filterNotionLibrary,
   getLinkedNotionNotes,
   inferNotionNoteType,
-  loadNotionLibraryCache,
-  loadNotionPreviewCache,
-  normalizeNotionLibraryItems,
-  saveNotionLibraryCache,
-  saveNotionPreviewCache,
+  normalizeNotionExternalUrl,
 } from './data/notionLibrary.js';
-import { fetchNotionLibrary, fetchNotionPagePreview } from './data/notionLibraryClient.js';
 import {
   NOTION_LEARNING_ARTIFACTS,
   buildNotionLearningPrompt,
@@ -29,6 +24,7 @@ import {
   markLearningDraftDuplicates,
   parseNotionLearningDrafts,
 } from './data/notionLearningDrafts.js';
+import { getNotionPageId, useNotionLibrary } from './hooks/useNotionLibrary.js';
 import {
   HIGH_YIELD_TOPICS,
   dailyCompletionCriteria,
@@ -2704,9 +2700,13 @@ function buildKnowledgeTopics(questionState, flashcardState, planProgress = {}) 
       || (stat.wrong || 0) >= 2
     ));
     const notionNotes = [...new Map(questionRows
-      .filter(({ question }) => question.notionUrl)
-      .map(({ question }) => [question.notionUrl, {
-        url: question.notionUrl,
+      .map(({ question }) => ({
+        question,
+        url: normalizeNotionExternalUrl(question.notionUrl),
+      }))
+      .filter(({ url }) => url)
+      .map(({ question, url }) => [url, {
+        url,
         title: question.trials?.[0] || question.topic || question.id,
         questionId: question.id,
       }])).values()];
@@ -4096,15 +4096,32 @@ function formatNewsDate(value) {
   }).format(new Date(value));
 }
 
-function NewsPanel({ fallbackItems, planTasks, defaultTaskId }) {
+function NewsPanel({
+  libraryState,
+  notePreview,
+  planTasks,
+  defaultTaskId,
+  questions,
+  flashcards,
+  onOpenQuestion,
+  onImportLearningDrafts,
+  onSyncLibrary,
+  onOpenNotePreview,
+  onCloseNotePreview,
+}) {
   const [selectedTaskId, setSelectedTaskId] = useState(defaultTaskId || 1);
-  const [liveNews, setLiveNews] = useState({ items: [], status: 'idle', error: '', fetchedAt: null, source: 'cached' });
   const selectedTask = getStudyPlanTaskById(selectedTaskId) || planTasks[0];
   const criteria = useMemo(() => getNotionNewsCriteriaForTask(selectedTask), [selectedTask]);
-  const cachedItems = useMemo(() => rankNotionNewsItems(fallbackItems, criteria), [fallbackItems, criteria]);
-  const sortedItems = liveNews.status === 'ready' ? liveNews.items : cachedItems;
-  const latestDate = sortedItems[0]?.publishedAt;
-  const usingCached = liveNews.status !== 'ready';
+  const rankedItems = useMemo(
+    () => rankNotionNewsItems(libraryState.items, criteria),
+    [criteria, libraryState.items],
+  );
+  const matchedItems = rankedItems.filter(hasCriteriaMatches);
+  const sortedItems = matchedItems.length ? matchedItems : rankedItems;
+  const latestDate = sortedItems[0]?.lastEditedTime || sortedItems[0]?.createdTime;
+  const sourceLabel = libraryState.source === 'live' && libraryState.status !== 'error'
+    ? 'live'
+    : libraryState.source === 'snapshot' ? 'snapshot' : 'cached';
   const topicCounts = sortedItems.reduce((acc, item) => {
     (item.cancerTypes || []).forEach((label) => {
       acc[label] = (acc[label] || 0) + 1;
@@ -4130,49 +4147,12 @@ function NewsPanel({ fallbackItems, planTasks, defaultTaskId }) {
     if (defaultTaskId) setSelectedTaskId(defaultTaskId);
   }, [defaultTaskId]);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLiveNews((prev) => ({ ...prev, status: 'loading', error: '' }));
-    fetch(buildNotionNewsQuery(selectedTask, criteria))
-      .then(async (response) => {
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(payload.message || payload.error || 'Notion NEWS 載入失敗');
-        return payload;
-      })
-      .then((payload) => {
-        if (cancelled) return;
-        if (!Array.isArray(payload.items) || payload.items.length === 0) {
-          throw new Error('Notion NEWS 目前沒有回傳筆記，已顯示 cached snapshot。');
-        }
-        setLiveNews({
-          items: rankNotionNewsItems(payload.items || [], criteria),
-          status: 'ready',
-          error: '',
-          fetchedAt: payload.fetchedAt || null,
-          source: payload.source || 'live',
-        });
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        setLiveNews({
-          items: [],
-          status: 'error',
-          error: error.message || 'Notion NEWS 載入失敗，已顯示 cached snapshot。',
-          fetchedAt: null,
-          source: 'cached',
-        });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedTask, criteria]);
-
   return (
     <main className="panel news-panel">
       <div className="news-masthead">
         <div className="news-kicker">
           <span>腫專考古每日整理速報</span>
-          <span>{sortedItems.length} notes · {usingCached ? 'cached' : 'live'} · {latestDate ? formatNewsDate(latestDate) : '-'}</span>
+          <span>{sortedItems.length} matched notes · {sourceLabel} · {latestDate ? formatNewsDate(latestDate) : '-'}</span>
         </div>
         <h2>Oncology Review Times</h2>
         <p>每天從 Fellow training 抓 Notion 筆記，依 Day task 屬性集合排序成新聞首頁。</p>
@@ -4190,6 +4170,13 @@ function NewsPanel({ fallbackItems, planTasks, defaultTaskId }) {
         <div className="news-selected-task">
           <strong>{selectedTask?.day} · {selectedTask?.topic}</strong>
           <span>{selectedTask?.details}</span>
+          <div className="news-library-actions">
+            <small>Shared Library · {libraryState.items.length} notes · synced {formatLibrarySyncTime(libraryState.fetchedAt)}</small>
+            <button type="button" className="secondary tiny" disabled={libraryState.status === 'loading'} onClick={onSyncLibrary}>
+              <RefreshCw size={14} className={libraryState.status === 'loading' ? 'spin' : ''} />
+              {libraryState.status === 'loading' ? 'Syncing…' : 'Sync Library'}
+            </button>
+          </div>
         </div>
       </section>
 
@@ -4217,11 +4204,11 @@ function NewsPanel({ fallbackItems, planTasks, defaultTaskId }) {
         ))}
       </section>
 
-      {usingCached && (
+      {(sourceLabel !== 'live' || libraryState.status === 'loading' || libraryState.error) && (
         <div className="news-status-line">
-          {liveNews.status === 'loading'
-            ? '正在讀取 Notion，即時資料載入前先顯示 cached snapshot。'
-            : liveNews.error || '目前顯示 cached snapshot。'}
+          {libraryState.status === 'loading'
+            ? '正在更新共用 Notion Library；完成前先顯示目前索引。'
+            : libraryState.error || `目前顯示 ${sourceLabel} Library；登入 Cloud Sync 後可取得最新索引。`}
         </div>
       )}
 
@@ -4254,7 +4241,12 @@ function NewsPanel({ fallbackItems, planTasks, defaultTaskId }) {
                   ))}
                 </div>
               )}
-              <a className="news-read-link" href={leadItem.url} target="_blank" rel="noreferrer">開啟 Notion 筆記</a>
+              <div className="news-story-actions">
+                {getNotionPageId(leadItem) && (
+                  <button type="button" className="primary" onClick={() => onOpenNotePreview(leadItem)}>Preview & create</button>
+                )}
+                <a className="news-read-link" href={leadItem.url} target="_blank" rel="noreferrer">開啟 Notion 筆記</a>
+              </div>
             </article>
           )}
 
@@ -4264,13 +4256,19 @@ function NewsPanel({ fallbackItems, planTasks, defaultTaskId }) {
               const meta = [...(item.cancerTypes || []), ...(item.tags || []), ...(item.treatments || [])].slice(0, 4);
               const keyTerms = [...(item.genes || []), ...(item.drugs || [])].slice(0, 4);
               return (
-                <a className="news-card news-card-link" href={item.url} target="_blank" rel="noreferrer" key={item.id}>
+                <article className="news-card" key={item.id}>
                   <div className="news-meta-line">
                     {meta.map((label) => <em key={`${item.id}-card-${label}`}>{label}</em>)}
                   </div>
                   <h3>{item.title}</h3>
                   {keyTerms.length > 0 && <p>{keyTerms.join(' / ')}</p>}
-                </a>
+                  <div className="news-card-actions">
+                    {getNotionPageId(item) && (
+                      <button type="button" onClick={() => onOpenNotePreview(item)}>Preview & create</button>
+                    )}
+                    <a href={item.url} target="_blank" rel="noreferrer">Notion <ExternalLink size={13} /></a>
+                  </div>
+                </article>
               );
             })}
           </section>
@@ -4280,16 +4278,25 @@ function NewsPanel({ fallbackItems, planTasks, defaultTaskId }) {
           <aside className="news-rail" aria-label="自動滾動速報">
             <div className="news-rail-stack">
               {briefItems.map((item, index) => (
-                <a className="news-brief news-brief-link" href={item.url} target="_blank" rel="noreferrer" key={`${item.id}-brief-${index}`}>
-                  <div className="news-brief-date">{formatNewsDate(item.publishedAt)}</div>
+                <button className="news-brief news-brief-link" type="button" onClick={() => onOpenNotePreview(item)} key={`${item.id}-brief-${index}`}>
+                  <div className="news-brief-date">{formatNewsDate(item.lastEditedTime || item.createdTime)}</div>
                   <h3>{item.title}</h3>
                   <p>{[...(item.cancerTypes || []), ...(item.tags || []), ...(item.treatments || []), ...(item.drugs || [])].slice(0, 5).join(' / ')}</p>
-                </a>
+                  <small>Preview & create →</small>
+                </button>
               ))}
             </div>
           </aside>
         )}
       </section>
+      <NotionPreviewPanel
+        preview={notePreview}
+        questions={questions}
+        flashcards={flashcards}
+        onOpenQuestion={onOpenQuestion}
+        onImportLearningDrafts={onImportLearningDrafts}
+        onClose={onCloseNotePreview}
+      />
     </main>
   );
 }
@@ -4974,7 +4981,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
           <button className="link-button" onClick={() => setOpen(!open)}>{open ? '收合' : '展開'}</button>
           <span className="qid">{question.id}</span>
           {question.notionUrl && (
-            <a className="notion-link" href={question.notionUrl} target="_blank" rel="noreferrer" title="Open Notion explanation">🔗</a>
+            <a className="notion-link" href={normalizeNotionExternalUrl(question.notionUrl)} target="_blank" rel="noreferrer" title="Open Notion explanation">🔗</a>
           )}
           <span className="pill">{question.cancer}</span>
           <span className="pill soft">{question.topic}</span>
@@ -4984,7 +4991,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
         <div className="question-actions">
             {onEdit && <button className="secondary" onClick={() => onEdit(question.id)}>編輯題目</button>}
             {question.notionUrl && (
-              <button className="secondary" onClick={() => window.open(question.notionUrl, '_blank')}>Notion 詳解</button>
+              <button className="secondary" onClick={() => window.open(normalizeNotionExternalUrl(question.notionUrl), '_blank')}>Notion 詳解</button>
             )}
             <button className={stat.bookmarked ? 'bookmark active' : 'bookmark'} onClick={toggleBookmark}>
               {stat.bookmarked ? '★ 已標記' : '☆ 標記'}
@@ -6459,13 +6466,6 @@ function formatLibrarySyncTime(value) {
   }).format(new Date(value));
 }
 
-function getNotionPreviewPageId(note = {}) {
-  const id = String(note.id || '');
-  if (/^[0-9a-f-]{32,36}$/i.test(id)) return id;
-  const urlId = String(note.url || '').match(/([0-9a-f]{32})(?:[?/#]|$)/i)?.[1];
-  return urlId || '';
-}
-
 function NotionLibraryCard({ note, onPreview, localCardCount = 0, compact = false }) {
   const labels = [
     ...(note.cancerTypes || []),
@@ -6488,7 +6488,7 @@ function NotionLibraryCard({ note, onPreview, localCardCount = 0, compact = fals
       )}
       <small>Updated {formatLibrarySyncTime(note.lastEditedTime || note.createdTime)}</small>
       <div className="notion-library-card-actions">
-        {getNotionPreviewPageId(note) && <button type="button" className="secondary tiny" onClick={() => onPreview(note)}>Preview</button>}
+        {getNotionPageId(note) && <button type="button" className="secondary tiny" onClick={() => onPreview(note)}>Preview</button>}
         <a href={note.url} target="_blank" rel="noreferrer">Open in Notion <ExternalLink size={14} /></a>
       </div>
     </article>
@@ -6731,12 +6731,15 @@ function NotionPreviewPanel({ preview, questions, flashcards, onOpenQuestion, on
 
 function KnowledgeHubPanel({
   topics,
-  fallbackNotes,
   questions,
   flashcards,
-  user,
+  libraryState,
+  notePreview,
   onOpenQuestion,
   onImportLearningDrafts,
+  onSyncLibrary,
+  onOpenNotePreview,
+  onCloseNotePreview,
   onOpenCards,
   onOpenPlan,
   onOpenReview,
@@ -6748,22 +6751,6 @@ function KnowledgeHubPanel({
   const [libraryCancer, setLibraryCancer] = useState('All');
   const [libraryGene, setLibraryGene] = useState('All');
   const [libraryFlashcard, setLibraryFlashcard] = useState('All');
-  const [notePreview, setNotePreview] = useState({ id: '', title: '', status: 'idle', item: null, error: '' });
-  const autoSyncedUserRef = useRef('');
-  const [libraryState, setLibraryState] = useState(() => {
-    const cached = loadNotionLibraryCache();
-    if (cached?.items?.length) {
-      return { items: cached.items, status: 'cached', error: '', fetchedAt: cached.fetchedAt, truncated: cached.truncated, source: 'cache' };
-    }
-    return {
-      items: normalizeNotionLibraryItems(fallbackNotes),
-      status: 'idle',
-      error: '',
-      fetchedAt: null,
-      truncated: false,
-      source: 'snapshot',
-    };
-  });
   const normalizedQuery = query.trim().toLowerCase();
   const coreTopics = useMemo(
     () => topics.filter((topic) => KNOWLEDGE_CANCER_DOMAINS.has(topic.cancer)),
@@ -6821,65 +6808,11 @@ function KnowledgeHubPanel({
     return counts;
   }, [flashcards]);
 
-  const syncLibrary = useCallback(async () => {
-    if (!user) {
-      setLibraryState((prev) => ({ ...prev, status: 'error', error: '請先登入 Cloud Sync，再同步 Fellow training。' }));
-      return;
-    }
-    setLibraryState((prev) => ({ ...prev, status: 'loading', error: '' }));
-    try {
-      const payload = await fetchNotionLibrary();
-      saveNotionLibraryCache(payload);
-      setLibraryState({
-        items: payload.items,
-        status: 'ready',
-        error: '',
-        fetchedAt: payload.fetchedAt,
-        truncated: Boolean(payload.truncated),
-        source: 'live',
-      });
-    } catch (error) {
-      setLibraryState((prev) => ({
-        ...prev,
-        status: 'error',
-        error: error.message || 'Fellow training 同步失敗，已保留 cached library。',
-      }));
-    }
-  }, [user]);
-
-  const openNotePreview = useCallback(async (note) => {
-    const pageId = getNotionPreviewPageId(note);
-    if (!pageId) return;
-    const cached = loadNotionPreviewCache(pageId);
-    if (cached?.plainText) {
-      setNotePreview({ id: pageId, title: note.title, status: 'ready', item: cached, error: '' });
-      return;
-    }
-    setNotePreview({ id: pageId, title: note.title, status: 'loading', item: null, error: '' });
-    try {
-      const preview = await fetchNotionPagePreview(pageId);
-      saveNotionPreviewCache(preview);
-      setNotePreview({ id: pageId, title: preview.title, status: 'ready', item: preview, error: '' });
-      setLibraryState((prev) => ({
-        ...prev,
-        items: prev.items.map((item) => item.id === preview.id ? { ...item, ...preview } : item),
-      }));
-    } catch (error) {
-      setNotePreview({ id: pageId, title: note.title, status: 'error', item: null, error: error.message || '筆記預覽載入失敗。' });
-    }
-  }, []);
-
   useEffect(() => {
     if (selectedTopicId && !coreTopics.some((topic) => topic.id === selectedTopicId)) {
       setSelectedTopicId('');
     }
   }, [coreTopics, selectedTopicId]);
-
-  useEffect(() => {
-    if (!user?.uid || autoSyncedUserRef.current === user.uid) return;
-    autoSyncedUserRef.current = user.uid;
-    syncLibrary();
-  }, [syncLibrary, user?.uid]);
 
   if (selectedTopic) {
     return (
@@ -7019,7 +6952,7 @@ function KnowledgeHubPanel({
               {selectedTopicNotes.map((note) => (
                 <NotionLibraryCard
                   note={note}
-                  onPreview={openNotePreview}
+                  onPreview={onOpenNotePreview}
                   localCardCount={notionCardCounts.get(note.id) || 0}
                   compact
                   key={note.url}
@@ -7039,7 +6972,7 @@ function KnowledgeHubPanel({
           flashcards={flashcards}
           onOpenQuestion={onOpenQuestion}
           onImportLearningDrafts={onImportLearningDrafts}
-          onClose={() => setNotePreview({ id: '', title: '', status: 'idle', item: null, error: '' })}
+          onClose={onCloseNotePreview}
         />
       </main>
     );
@@ -7140,7 +7073,7 @@ function KnowledgeHubPanel({
           <div className="notion-library-sync">
             <span className={`notion-sync-status ${libraryState.status}`}>{libraryState.source === 'live' ? 'Live index' : 'Cached index'}</span>
             <small>Last sync {formatLibrarySyncTime(libraryState.fetchedAt)}</small>
-            <button type="button" className="secondary" disabled={libraryState.status === 'loading'} onClick={syncLibrary}>
+            <button type="button" className="secondary" disabled={libraryState.status === 'loading'} onClick={onSyncLibrary}>
               <RefreshCw size={15} className={libraryState.status === 'loading' ? 'spin' : ''} />
               {libraryState.status === 'loading' ? 'Syncing…' : 'Sync now'}
             </button>
@@ -7191,7 +7124,7 @@ function KnowledgeHubPanel({
             {filteredLibraryItems.slice(0, 36).map((note) => (
               <NotionLibraryCard
                 note={note}
-                onPreview={openNotePreview}
+                onPreview={onOpenNotePreview}
                 localCardCount={notionCardCounts.get(note.id) || 0}
                 key={note.id}
               />
@@ -7210,7 +7143,7 @@ function KnowledgeHubPanel({
         flashcards={flashcards}
         onOpenQuestion={onOpenQuestion}
         onImportLearningDrafts={onImportLearningDrafts}
-        onClose={() => setNotePreview({ id: '', title: '', status: 'idle', item: null, error: '' })}
+        onClose={onCloseNotePreview}
       />
     </main>
   );
@@ -8167,6 +8100,11 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState('尚未登入，資料目前只存在這台裝置。');
   const [syncError, setSyncError] = useState('');
   const [isApplyingCloudState, setIsApplyingCloudState] = useState(false);
+  const notionLibrary = useNotionLibrary({
+    user,
+    fallbackItems: notionNewsItems,
+    enabled: tab === 'knowledge' || tab === 'news',
+  });
   const isApplyingCloudStateRef = useRef(false);
   const lastSyncedSignatureRef = useRef(getCloudSyncSignature(loadState()));
   const [isCreatingPractice, setIsCreatingPractice] = useState(false);
@@ -8195,7 +8133,7 @@ export default function App() {
       return bankYear === 'All' ? QUESTION_YEARS : normalizeQuestionYearList([bankYear]);
     }
     if (tab === 'today' || tab === 'quest') return todaySessionQuestionYears;
-    if (['review', 'analytics', 'readiness', 'critical', 'plan', 'flashcards', 'knowledge'].includes(tab)) return preferredQuestionYears;
+    if (['review', 'analytics', 'readiness', 'critical', 'plan', 'flashcards', 'knowledge', 'news'].includes(tab)) return preferredQuestionYears;
     return EMPTY_ARRAY;
   }, [bankYear, preferredQuestionYears, tab, todaySessionQuestionYears]);
   const requestedQuestionYearKey = requestedQuestionYears.join(',');
@@ -9649,7 +9587,7 @@ export default function App() {
   const needsCancerSummary = ['readiness', 'analytics'].includes(tab);
   const needsTaxonomyAnalytics = tab === 'analytics';
   const needsBankQuestions = tab === 'questions';
-  const needsFlashcardLists = ['stats', 'flashcards', 'flashcard-review', 'plan', 'knowledge'].includes(tab);
+  const needsFlashcardLists = ['stats', 'flashcards', 'flashcard-review', 'plan', 'knowledge', 'news'].includes(tab);
   const readinessDataState = useMemo(() => ({
     ...questionDataState,
     mockExams: state.mockExams,
@@ -9764,7 +9702,7 @@ export default function App() {
   const knowledgeTopics = useMemo(() => tab === 'knowledge'
     ? buildKnowledgeTopics(questionDataState, flashcardListState, state.planProgress || {})
     : EMPTY_ARRAY, [tab, questionDataState, flashcardListState, state.planProgress]);
-  const knowledgeQuestions = useMemo(() => tab === 'knowledge'
+  const knowledgeQuestions = useMemo(() => ['knowledge', 'news'].includes(tab)
     ? getQuestionPool(questionDataState)
       .map((question) => getQuestionWithOverride(question.id, questionDataState))
       .filter(Boolean)
@@ -10300,10 +10238,10 @@ export default function App() {
       {tab === 'knowledge' && (
         <KnowledgeHubPanel
           topics={knowledgeTopics}
-          fallbackNotes={notionNewsItems}
           questions={knowledgeQuestions}
           flashcards={allFlashcards}
-          user={user}
+          libraryState={notionLibrary.libraryState}
+          notePreview={notionLibrary.notePreview}
           onOpenQuestion={(question) => {
             setBankYear('All');
             setBankCancer(question.cancer || 'All');
@@ -10312,6 +10250,9 @@ export default function App() {
             setTab('questions');
           }}
           onImportLearningDrafts={importNotionLearningDrafts}
+          onSyncLibrary={notionLibrary.syncLibrary}
+          onOpenNotePreview={notionLibrary.openNotePreview}
+          onCloseNotePreview={notionLibrary.closeNotePreview}
           onOpenCards={() => setTab('flashcards')}
           onOpenPlan={() => setTab('plan')}
           onOpenReview={() => setTab('review')}
@@ -10339,7 +10280,25 @@ export default function App() {
       )}
 
       {tab === 'news' && (
-        <NewsPanel fallbackItems={notionNewsItems} planTasks={studyPlan100} defaultTaskId={getPlanTaskStorageId(questTask)} />
+        <NewsPanel
+          libraryState={notionLibrary.libraryState}
+          notePreview={notionLibrary.notePreview}
+          planTasks={studyPlan100}
+          defaultTaskId={getPlanTaskStorageId(questTask)}
+          questions={knowledgeQuestions}
+          flashcards={allFlashcards}
+          onOpenQuestion={(question) => {
+            setBankYear('All');
+            setBankCancer(question.cancer || 'All');
+            setSearch(question.id);
+            setEditingQuestionId(question.id);
+            setTab('questions');
+          }}
+          onImportLearningDrafts={importNotionLearningDrafts}
+          onSyncLibrary={notionLibrary.syncLibrary}
+          onOpenNotePreview={notionLibrary.openNotePreview}
+          onCloseNotePreview={notionLibrary.closeNotePreview}
+        />
       )}
 
       {tab === 'readiness' && (
