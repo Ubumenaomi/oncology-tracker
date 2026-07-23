@@ -9956,7 +9956,14 @@ export default function App() {
   };
 
   const setPracticeMode = (practiceMode) => {
+    if (todaySessionMatchesQuest && dailyBatchSubmitted && !todaySession?.statsCommittedAt) {
+      setTab('today');
+      setPracticePageMessage('請先完成目前這批的錯因訂正並寫入統計，再開始下一批 Daily Practice。');
+      return;
+    }
     const modeConfig = getPracticeModeConfig(practiceMode);
+    setPracticePage(0);
+    setPracticePageMessage('');
     updateState((prev) => {
       const existing = prev.sessions?.[TODAY];
       const existingMatchesQuest = getStudyPlanTaskById(existing?.planTaskId) === questTask
@@ -9968,19 +9975,20 @@ export default function App() {
       const completedCount = completedQuestionIds.length
         ? (Number(existing?.previousPracticeTotal) || 0) + completedQuestionIds.length
         : existingModeConfig.total;
-      const startsExtraBatch = existingMatchesQuest
+      const startsNewBatch = existingMatchesQuest
         && Boolean(existing?.submittedAt && existing?.statsCommittedAt)
-        && modeConfig.total > completedCount;
-      const extraCount = startsExtraBatch ? modeConfig.total - completedCount : 0;
-      const previousQuestionIds = startsExtraBatch
+      const newBatchCount = startsNewBatch
+        ? (modeConfig.total > completedCount ? modeConfig.total - completedCount : modeConfig.total)
+        : 0;
+      const previousQuestionIds = startsNewBatch
         ? [...new Set([...(existing?.excludedQuestionIds || []), ...completedQuestionIds])]
         : [];
-      const pendingQuestionIds = startsExtraBatch
-        ? (existing.questionIds || []).filter((id) => !previousQuestionIds.includes(id)).slice(0, extraCount)
+      const pendingQuestionIds = startsNewBatch
+        ? (existing.questionIds || []).filter((id) => !previousQuestionIds.includes(id)).slice(0, newBatchCount)
         : [];
-      const rankedHighYieldTopics = startsExtraBatch ? getRankedHighYieldTopics(prev, questTask) : [];
-      const extraQuestionIds = startsExtraBatch
-        ? fillDailyQuestionIds(prev, questTask, pendingQuestionIds, extraCount, rankedHighYieldTopics, previousQuestionIds)
+      const rankedHighYieldTopics = startsNewBatch ? getRankedHighYieldTopics(prev, questTask) : [];
+      const newBatchQuestionIds = startsNewBatch
+        ? fillDailyQuestionIds(prev, questTask, pendingQuestionIds, newBatchCount, rankedHighYieldTopics, previousQuestionIds)
         : [];
       const now = new Date().toISOString();
       return {
@@ -9993,22 +10001,22 @@ export default function App() {
         sessions: {
           ...(prev.sessions || {}),
           ...(existingMatchesQuest ? {
-            [TODAY]: startsExtraBatch ? {
+            [TODAY]: startsNewBatch ? {
               date: TODAY,
               ...makePlanTaskSnapshot(questTask),
               practiceMode,
-              practiceModeLabel: `加練 ${extraCount} 題`,
-              practiceTargetCount: extraCount,
+              practiceModeLabel: `加練 ${newBatchCount} 題`,
+              practiceTargetCount: newBatchCount,
               practiceRecipe: {
-                total: extraCount,
-                newCount: Math.min(modeConfig.newCount, extraCount),
+                total: newBatchCount,
+                newCount: Math.min(modeConfig.newCount, newBatchCount),
                 topicCount: modeConfig.topicCount,
                 dueCount: modeConfig.dueCount,
                 weaknessCount: modeConfig.weaknessCount,
                 highYieldCount: modeConfig.highYieldCount || 0,
               },
               highYieldInserts: rankedHighYieldTopics.slice(0, 5).map(({ id, label, type, priorityScore }) => ({ id, label, type, priorityScore })),
-              questionIds: extraQuestionIds,
+              questionIds: newBatchQuestionIds,
               excludedQuestionIds: previousQuestionIds,
               previousPracticeTotal: completedCount,
               createdAt: now,
