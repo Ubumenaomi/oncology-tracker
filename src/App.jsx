@@ -21,6 +21,15 @@ import {
 } from './data/notionLibrary.js';
 import { fetchNotionLibrary, fetchNotionPagePreview } from './data/notionLibraryClient.js';
 import {
+  NOTION_LEARNING_ARTIFACTS,
+  buildNotionLearningPrompt,
+  canonicalLearningText,
+  deriveNotionLearningContext,
+  getRelatedQuestionsForNotionNote,
+  markLearningDraftDuplicates,
+  parseNotionLearningDrafts,
+} from './data/notionLearningDrafts.js';
+import {
   HIGH_YIELD_TOPICS,
   dailyCompletionCriteria,
   getStudyPlanTaskById,
@@ -6457,7 +6466,7 @@ function getNotionPreviewPageId(note = {}) {
   return urlId || '';
 }
 
-function NotionLibraryCard({ note, onPreview, compact = false }) {
+function NotionLibraryCard({ note, onPreview, localCardCount = 0, compact = false }) {
   const labels = [
     ...(note.cancerTypes || []),
     ...(note.genes || []),
@@ -6467,7 +6476,9 @@ function NotionLibraryCard({ note, onPreview, compact = false }) {
     <article className={`notion-library-card ${compact ? 'compact' : ''}`}>
       <div className="notion-library-card-top">
         <span>{inferNotionNoteType(note)}</span>
-        <em className={note.flashcardCreated ? 'ready' : 'missing'}>{note.flashcardCreated ? 'Flashcard ready' : 'Not yet carded'}</em>
+        <em className={note.flashcardCreated || localCardCount > 0 ? 'ready' : 'missing'}>
+          {note.flashcardCreated ? 'Notion: ready' : localCardCount > 0 ? `Tracker: ${localCardCount} cards` : 'Not yet carded'}
+        </em>
       </div>
       <strong>{note.title}</strong>
       {labels.length > 0 && (
@@ -6484,7 +6495,194 @@ function NotionLibraryCard({ note, onPreview, compact = false }) {
   );
 }
 
-function NotionPreviewPanel({ preview, onClose }) {
+function NotionLearningStudio({ note, questions, flashcards, onOpenQuestion, onImportLearningDrafts }) {
+  const [artifactType, setArtifactType] = useState('flashcards');
+  const [prompt, setPrompt] = useState('');
+  const [promptMessage, setPromptMessage] = useState('');
+  const [rawJson, setRawJson] = useState('');
+  const [draftState, setDraftState] = useState({ items: [], errors: [], total: 0 });
+  const [selectedDrafts, setSelectedDrafts] = useState({});
+  const [importMessage, setImportMessage] = useState('');
+  const relatedRows = useMemo(
+    () => getRelatedQuestionsForNotionNote(note, questions),
+    [note, questions],
+  );
+  const relatedQuestions = useMemo(
+    () => relatedRows.map(({ question }) => question),
+    [relatedRows],
+  );
+  const learningContext = useMemo(
+    () => deriveNotionLearningContext(note, relatedQuestions),
+    [note, relatedQuestions],
+  );
+  const generatedPrompt = useMemo(
+    () => buildNotionLearningPrompt({ artifactType, note, relatedQuestions }),
+    [artifactType, note, relatedQuestions],
+  );
+  const linkedCardCount = flashcards.filter((card) => card.notionPageId === note.id).length;
+  const linkedGeneratedQuestionCount = questions.filter((question) => question.notionPageId === note.id).length;
+
+  useEffect(() => {
+    setPrompt(generatedPrompt);
+    setPromptMessage('');
+    setRawJson('');
+    setDraftState({ items: [], errors: [], total: 0 });
+    setSelectedDrafts({});
+    setImportMessage('');
+  }, [artifactType, generatedPrompt, note.id]);
+
+  const copyPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setPromptMessage('已複製 source-grounded prompt，可以貼到 ChatGPT。');
+    } catch {
+      setPromptMessage('瀏覽器無法自動複製，請手動選取 prompt。');
+    }
+  };
+
+  const validateDrafts = () => {
+    try {
+      const parsed = parseNotionLearningDrafts(rawJson, artifactType, note, relatedQuestions);
+      const marked = markLearningDraftDuplicates(parsed.items, flashcards, questions);
+      setDraftState({ ...parsed, items: marked });
+      setSelectedDrafts(Object.fromEntries(marked.map((item) => [item.draftId, !item.duplicate])));
+      setImportMessage(marked.length
+        ? `已驗證 ${marked.length} 項；${marked.filter((item) => item.duplicate).length} 項重複，預設不匯入。`
+        : '沒有可匯入的有效草稿。');
+    } catch (error) {
+      setDraftState({ items: [], errors: [error.message || 'JSON 格式錯誤。'], total: 0 });
+      setSelectedDrafts({});
+      setImportMessage('驗證失敗，尚未更動 Tracker。');
+    }
+  };
+
+  const selectedItems = draftState.items.filter((item) => selectedDrafts[item.draftId] && !item.duplicate);
+  const approveDrafts = () => {
+    if (!selectedItems.length) return;
+    const result = onImportLearningDrafts({ artifactType, note, items: selectedItems });
+    setImportMessage(result.message);
+    if (result.ok) {
+      setRawJson('');
+      setDraftState({ items: [], errors: [], total: 0 });
+      setSelectedDrafts({});
+    }
+  };
+
+  return (
+    <section className="notion-learning-studio" aria-label="Notion learning draft studio">
+      <div className="section-head">
+        <div>
+          <div className="knowledge-kicker">Phase 3 · Learning Draft Studio</div>
+          <h3>把筆記轉成可審核的學習單位</h3>
+          <p className="muted">先產生 prompt，再驗證與去重；只有按下核准後才加入 Tracker。全程不回寫 Notion。</p>
+        </div>
+        <div className="knowledge-chip-row">
+          <span className="pill soft">{relatedRows.length} related questions</span>
+          <span className="pill soft">{linkedCardCount} linked cards</span>
+          <span className="pill soft">{linkedGeneratedQuestionCount} generated quizzes</span>
+        </div>
+      </div>
+
+      <div className="notion-learning-context">
+        <div>
+          <strong>Auto mapping</strong>
+          <span>{learningContext.cancer} · {learningContext.trials.join(', ') || 'No trial detected'}</span>
+        </div>
+        <div className="knowledge-chip-row">
+          {learningContext.autoTags.slice(0, 12).map((tag) => <span className="knowledge-tag" key={tag}>#{tag}</span>)}
+        </div>
+      </div>
+
+      {relatedRows.length > 0 && (
+        <div className="notion-related-questions">
+          <strong>Related existing questions</strong>
+          <div>
+            {relatedRows.slice(0, 8).map(({ question, score }) => (
+              <button type="button" key={question.id} onClick={() => onOpenQuestion(question)}>
+                <b>{question.id}</b>
+                <span>{question.topic}</span>
+                <em>match {score}</em>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="notion-artifact-tabs" role="group" aria-label="Learning artifact type">
+        {NOTION_LEARNING_ARTIFACTS.map((artifact) => (
+          <button
+            type="button"
+            className={artifactType === artifact.id ? 'active' : 'secondary'}
+            onClick={() => setArtifactType(artifact.id)}
+            key={artifact.id}
+          >
+            {artifact.label}
+            <small>→ {artifact.target}</small>
+          </button>
+        ))}
+      </div>
+
+      <div className="notion-learning-workflow">
+        <section>
+          <div className="notion-learning-step"><span>1</span><strong>Generate prompt</strong></div>
+          <textarea className="prompt-box" value={prompt} onChange={(event) => setPrompt(event.target.value)} />
+          <div className="inline-actions">
+            <button type="button" className="primary" onClick={copyPrompt}>複製 Prompt</button>
+            <button type="button" className="secondary" onClick={() => setPrompt(generatedPrompt)}>重設 Prompt</button>
+          </div>
+          {promptMessage && <p className="save-message">{promptMessage}</p>}
+        </section>
+
+        <section>
+          <div className="notion-learning-step"><span>2</span><strong>Paste and validate JSON</strong></div>
+          <textarea
+            value={rawJson}
+            onChange={(event) => setRawJson(event.target.value)}
+            placeholder="貼上 ChatGPT 回傳的 JSON array。尚未核准前不會寫入任何學習紀錄。"
+          />
+          <button type="button" className="secondary" onClick={validateDrafts} disabled={!rawJson.trim()}>驗證草稿</button>
+        </section>
+      </div>
+
+      {(draftState.items.length > 0 || draftState.errors.length > 0) && (
+        <section className="notion-draft-review">
+          <div className="notion-learning-step"><span>3</span><strong>Review and approve</strong></div>
+          {draftState.errors.length > 0 && (
+            <ul className="notion-draft-errors">
+              {draftState.errors.map((error) => <li key={error}>{error}</li>)}
+            </ul>
+          )}
+          <div className="notion-draft-list">
+            {draftState.items.map((item) => (
+              <label className={item.duplicate ? 'notion-draft-card duplicate' : 'notion-draft-card'} key={item.draftId}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(selectedDrafts[item.draftId])}
+                  disabled={item.duplicate}
+                  onChange={(event) => setSelectedDrafts((prev) => ({ ...prev, [item.draftId]: event.target.checked }))}
+                />
+                <span>
+                  <small>{item.kind === 'question' ? 'Quiz question' : item.type}{item.duplicate ? ' · Duplicate' : ''}</small>
+                  <strong>{item.kind === 'question' ? item.stem : item.front}</strong>
+                  <em>Evidence: {item.sourceEvidence}</em>
+                </span>
+              </label>
+            ))}
+          </div>
+          <div className="inline-actions">
+            <button type="button" className="primary" disabled={!selectedItems.length} onClick={approveDrafts}>
+              核准並加入 {selectedItems.length} 項
+            </button>
+            <span className="muted">重複項目永遠不會匯入。</span>
+          </div>
+        </section>
+      )}
+      {importMessage && <p className="notion-library-message">{importMessage}</p>}
+    </section>
+  );
+}
+
+function NotionPreviewPanel({ preview, questions, flashcards, onOpenQuestion, onImportLearningDrafts, onClose }) {
   if (!preview?.id) return null;
   const note = preview.item;
   return (
@@ -6500,23 +6698,32 @@ function NotionPreviewPanel({ preview, onClose }) {
       {preview.status === 'loading' && <p className="notion-preview-status">正在載入筆記內容…</p>}
       {preview.status === 'error' && <p className="notion-preview-status error">{preview.error}</p>}
       {preview.status === 'ready' && note && (
-        <div className="notion-preview-layout">
-          <aside>
-            <strong>Table of contents</strong>
-            {note.headings?.length ? (
-              <ol>
-                {note.headings.slice(0, 24).map((heading) => (
-                  <li className={`level-${heading.level}`} key={heading.id}>{heading.text}</li>
-                ))}
-              </ol>
-            ) : <p className="muted">這篇筆記沒有 heading。</p>}
-            <a href={note.url} target="_blank" rel="noreferrer">Open full note <ExternalLink size={14} /></a>
-          </aside>
-          <div className="notion-preview-copy">
-            {note.plainText ? note.plainText.slice(0, 16000) : '這篇筆記目前沒有可顯示的純文字內容。'}
-            {note.plainText?.length > 16000 && '\n\nPreview truncated. Open in Notion to read the full note.'}
+        <>
+          <div className="notion-preview-layout">
+            <aside>
+              <strong>Table of contents</strong>
+              {note.headings?.length ? (
+                <ol>
+                  {note.headings.slice(0, 24).map((heading) => (
+                    <li className={`level-${heading.level}`} key={heading.id}>{heading.text}</li>
+                  ))}
+                </ol>
+              ) : <p className="muted">這篇筆記沒有 heading。</p>}
+              <a href={note.url} target="_blank" rel="noreferrer">Open full note <ExternalLink size={14} /></a>
+            </aside>
+            <div className="notion-preview-copy">
+              {note.plainText ? note.plainText.slice(0, 16000) : '這篇筆記目前沒有可顯示的純文字內容。'}
+              {note.plainText?.length > 16000 && '\n\nPreview truncated. Open in Notion to read the full note.'}
+            </div>
           </div>
-        </div>
+          <NotionLearningStudio
+            note={note}
+            questions={questions}
+            flashcards={flashcards}
+            onOpenQuestion={onOpenQuestion}
+            onImportLearningDrafts={onImportLearningDrafts}
+          />
+        </>
       )}
     </section>
   );
@@ -6525,8 +6732,11 @@ function NotionPreviewPanel({ preview, onClose }) {
 function KnowledgeHubPanel({
   topics,
   fallbackNotes,
+  questions,
+  flashcards,
   user,
   onOpenQuestion,
+  onImportLearningDrafts,
   onOpenCards,
   onOpenPlan,
   onOpenReview,
@@ -6602,6 +6812,14 @@ function KnowledgeHubPanel({
     gene: libraryGene,
     flashcard: libraryFlashcard,
   });
+  const notionCardCounts = useMemo(() => {
+    const counts = new Map();
+    flashcards.forEach((card) => {
+      if (!card.notionPageId) return;
+      counts.set(card.notionPageId, (counts.get(card.notionPageId) || 0) + 1);
+    });
+    return counts;
+  }, [flashcards]);
 
   const syncLibrary = useCallback(async () => {
     if (!user) {
@@ -6798,7 +7016,15 @@ function KnowledgeHubPanel({
           </div>
           {selectedTopicNotes.length ? (
             <div className="linked-note-grid">
-              {selectedTopicNotes.map((note) => <NotionLibraryCard note={note} onPreview={openNotePreview} compact key={note.url} />)}
+              {selectedTopicNotes.map((note) => (
+                <NotionLibraryCard
+                  note={note}
+                  onPreview={openNotePreview}
+                  localCardCount={notionCardCounts.get(note.id) || 0}
+                  compact
+                  key={note.url}
+                />
+              ))}
             </div>
           ) : (
             <div className="empty-state small">
@@ -6807,7 +7033,14 @@ function KnowledgeHubPanel({
             </div>
           )}
         </section>
-        <NotionPreviewPanel preview={notePreview} onClose={() => setNotePreview({ id: '', title: '', status: 'idle', item: null, error: '' })} />
+        <NotionPreviewPanel
+          preview={notePreview}
+          questions={questions}
+          flashcards={flashcards}
+          onOpenQuestion={onOpenQuestion}
+          onImportLearningDrafts={onImportLearningDrafts}
+          onClose={() => setNotePreview({ id: '', title: '', status: 'idle', item: null, error: '' })}
+        />
       </main>
     );
   }
@@ -6956,7 +7189,12 @@ function KnowledgeHubPanel({
         {filteredLibraryItems.length ? (
           <div className="notion-library-grid">
             {filteredLibraryItems.slice(0, 36).map((note) => (
-              <NotionLibraryCard note={note} onPreview={openNotePreview} key={note.id} />
+              <NotionLibraryCard
+                note={note}
+                onPreview={openNotePreview}
+                localCardCount={notionCardCounts.get(note.id) || 0}
+                key={note.id}
+              />
             ))}
           </div>
         ) : (
@@ -6966,7 +7204,14 @@ function KnowledgeHubPanel({
           </div>
         )}
       </section>
-      <NotionPreviewPanel preview={notePreview} onClose={() => setNotePreview({ id: '', title: '', status: 'idle', item: null, error: '' })} />
+      <NotionPreviewPanel
+        preview={notePreview}
+        questions={questions}
+        flashcards={flashcards}
+        onOpenQuestion={onOpenQuestion}
+        onImportLearningDrafts={onImportLearningDrafts}
+        onClose={() => setNotePreview({ id: '', title: '', status: 'idle', item: null, error: '' })}
+      />
     </main>
   );
 }
@@ -8553,6 +8798,10 @@ export default function App() {
           tags: normalizeTextList(item.tags),
           examValue: normalizeExamValue(item.examValue),
           errorType: normalizeFlashcardErrorType(item.errorType),
+          notionPageId: item.notionPageId || null,
+          notionUrl: item.notionUrl || '',
+          sourceTitle: item.sourceTitle || '',
+          sourceEvidence: item.sourceEvidence || '',
           intervalDays: 1,
           nextReviewDate: TODAY,
           mastery: 0,
@@ -8575,6 +8824,72 @@ export default function App() {
     } catch (error) {
       return { ok: false, message: error.message || 'JSON 格式錯誤，沒有匯入任何卡片。' };
     }
+  };
+
+  const importNotionLearningDrafts = ({ artifactType, note, items }) => {
+    if (!Array.isArray(items) || !items.length) {
+      return { ok: false, message: '沒有已核准的 learning draft。' };
+    }
+
+    if (artifactType !== 'quiz') {
+      const existingKeys = new Set(Object.values(normalizeFlashcards(latestStateRef.current.flashcards))
+        .map((card) => canonicalLearningText(card.front)));
+      const batchKeys = new Set();
+      const newItems = items.filter((item) => {
+        const key = canonicalLearningText(item.front);
+        if (!key || existingKeys.has(key) || batchKeys.has(key)) return false;
+        batchKeys.add(key);
+        return true;
+      });
+      if (!newItems.length) return { ok: false, message: '所有草稿都已存在，沒有匯入。' };
+      const result = importFlashcards(JSON.stringify(newItems));
+      const skipped = items.length - newItems.length;
+      return {
+        ...result,
+        message: result.ok
+          ? `已加入 ${newItems.length} 張卡到 Card Manager${skipped ? `；略過 ${skipped} 個重複項目` : ''}。`
+          : result.message,
+      };
+    }
+
+    const existingQuestionKeys = new Set(getQuestionPool(latestStateRef.current)
+      .map((question) => canonicalLearningText(question.stem)));
+    const batchKeys = new Set();
+    const newItems = items.filter((item) => {
+      const key = canonicalLearningText(item.stem);
+      if (!key || existingQuestionKeys.has(key) || batchKeys.has(key)) return false;
+      batchKeys.add(key);
+      return true;
+    });
+    if (!newItems.length) return { ok: false, message: '所有草稿題目都已存在，沒有匯入。' };
+
+    const now = new Date().toISOString();
+    const safePageId = String(note?.id || 'note').replace(/[^a-zA-Z0-9]/g, '').slice(-16) || 'note';
+    const questionsToAdd = newItems.map((item, index) => normalizeQuestion({
+      ...item,
+      id: `custom-notion-${safePageId}-${Date.now()}-${index}`,
+      year: 'Generated',
+      number: null,
+      sourceType: 'custom',
+      provenance: 'notion-generated',
+      updatedAt: now,
+    }));
+    updateState((prev) => ({
+      ...prev,
+      customQuestions: {
+        ...(prev.customQuestions || {}),
+        ...Object.fromEntries(questionsToAdd.map((question) => [question.id, question])),
+      },
+      deletedQuestionIds: {
+        ...(prev.deletedQuestionIds || {}),
+        ...Object.fromEntries(questionsToAdd.map((question) => [question.id, false])),
+      },
+    }), ['questionEdits']);
+    const skipped = items.length - newItems.length;
+    return {
+      ok: true,
+      message: `已加入 ${questionsToAdd.length} 題到 Question Manager${skipped ? `；略過 ${skipped} 個重複項目` : ''}。`,
+    };
   };
 
   const saveQuestionOverride = (id, override) => {
@@ -9449,6 +9764,11 @@ export default function App() {
   const knowledgeTopics = useMemo(() => tab === 'knowledge'
     ? buildKnowledgeTopics(questionDataState, flashcardListState, state.planProgress || {})
     : EMPTY_ARRAY, [tab, questionDataState, flashcardListState, state.planProgress]);
+  const knowledgeQuestions = useMemo(() => tab === 'knowledge'
+    ? getQuestionPool(questionDataState)
+      .map((question) => getQuestionWithOverride(question.id, questionDataState))
+      .filter(Boolean)
+    : EMPTY_ARRAY, [tab, questionDataState]);
 
   const updateActiveMockExam = useCallback((draft) => {
     updateState((prev) => ({ ...prev, activeMockExam: draft }), ['activity']);
@@ -9981,6 +10301,8 @@ export default function App() {
         <KnowledgeHubPanel
           topics={knowledgeTopics}
           fallbackNotes={notionNewsItems}
+          questions={knowledgeQuestions}
+          flashcards={allFlashcards}
           user={user}
           onOpenQuestion={(question) => {
             setBankYear('All');
@@ -9989,6 +10311,7 @@ export default function App() {
             setEditingQuestionId(question.id);
             setTab('questions');
           }}
+          onImportLearningDrafts={importNotionLearningDrafts}
           onOpenCards={() => setTab('flashcards')}
           onOpenPlan={() => setTab('plan')}
           onOpenReview={() => setTab('review')}
