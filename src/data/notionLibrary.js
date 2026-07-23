@@ -123,6 +123,13 @@ function includesAny(values = [], aliases = []) {
   return aliases.some((alias) => normalizedValues.includes(String(alias).toLowerCase()));
 }
 
+export function mapNotionCancerToTrackerDomain(cancerTypes = []) {
+  const values = normalizeList(cancerTypes);
+  const match = Object.entries(CANCER_ALIASES)
+    .find(([, aliases]) => includesAny(values, aliases));
+  return match?.[0] || '';
+}
+
 function meaningfulTerms(values = []) {
   return unique(values)
     .map((value) => value.toLowerCase().replace(/^#/, '').trim())
