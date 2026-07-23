@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "test:knowledge": "node --test src/data/knowledgeCardMatching.test.js",
     "test:notion-library": "node --test src/data/notionTaxonomy.test.js src/data/notionNewsMatching.test.js src/data/notionLibrary.test.js src/data/notionLearningDrafts.test.js api/notion-library.test.js",
     "test:trials": "node --test src/data/trialRegistry.test.js",
     "trials:review": "node scripts/generate-trial-registry-review.js",

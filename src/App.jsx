@@ -3,6 +3,12 @@ import { AlertTriangle, BarChart3, BookOpen, ChevronDown, ClipboardList, Clock3,
 import './App.css';
 import { QUESTION_BANK_TOTAL, QUESTION_YEARS, cancerCategories } from './data/questionBankMeta.js';
 import { buildFlashcardTags } from './data/taxonomy.js';
+import {
+  getKnowledgeCardCancerDomain,
+  getTaskKeywords,
+  getTaskSearchText,
+  knowledgeCardMatchesTask,
+} from './data/knowledgeCardMatching.js';
 import { notionNewsItems } from './data/notionNews.js';
 import {
   getNotionNewsCriteriaForTask,
@@ -2498,26 +2504,6 @@ function shuffleStable(items) {
   return [...items].sort(() => Math.random() - 0.5);
 }
 
-function getTaskSearchText(task) {
-  if (!task) return '';
-  return [
-    task.cancer,
-    task.module,
-    task.topic,
-    task.details,
-    ...(task.goldenTrials || []),
-    ...(task.focusTags || []),
-  ].filter(Boolean).join(' ').toLowerCase();
-}
-
-function getTaskKeywords(task) {
-  const text = getTaskSearchText(task);
-  return [...new Set(text
-    .split(/[^a-z0-9+/-]+/i)
-    .map((word) => word.trim().toLowerCase())
-    .filter((word) => word.length >= 3 && !['and', 'the', 'with', 'for', 'from', 'what', 'each', 'this', 'that'].includes(word)))];
-}
-
 function getQuestionContentText(question) {
   return [
     question?.id,
@@ -2642,31 +2628,6 @@ function questionMatchesTask(question, task, minScore = 120) {
   const hasEnoughPromptEvidence = hasCancerSignal || trialHits > 0 || focusHits >= 2 || keywordHits >= 4;
   if (!hasTaskSpecificHit || !hasEnoughPromptEvidence) return false;
   return hasTaskSpecificHit && scoreQuestionForTask(question, task) >= minScore;
-}
-
-function getKnowledgeCardText(card = {}) {
-  return [
-    card.id,
-    card.cancer,
-    card.topic,
-    card.type,
-    card.front,
-    card.back,
-    card.cloze,
-    ...normalizeTextList(card.trial || card.trials),
-    ...normalizeTextList(card.tags),
-  ].filter(Boolean).join(' ').toLowerCase();
-}
-
-function knowledgeCardMatchesTask(card, task) {
-  if (!card || !task) return false;
-  const text = getKnowledgeCardText(card);
-  const trialHits = [...(task.goldenTrials || []), ...(task.relatedTrials || [])]
-    .filter((trial) => text.includes(String(trial).toLowerCase())).length;
-  const focusHits = (task.focusTags || []).filter((tag) => text.includes(String(tag).toLowerCase())).length;
-  const keywordHits = getTaskKeywords(task).filter((keyword) => text.includes(keyword)).length;
-  const sameCancer = card.cancer === task.cancer || card.tags?.cancerDomain === task.cancer;
-  return sameCancer && (trialHits > 0 || focusHits > 0 || keywordHits >= 2);
 }
 
 function getKnowledgeTopicStatus({ coverage, accuracy, criticalCount, dueCount }) {
@@ -6790,7 +6751,28 @@ function KnowledgeHubPanel({
     ...coreTopics.flatMap((topic) => topic.notionNotes.map((note) => note.url)),
   ]).size;
   const linkedQuestionCount = new Set(coreTopics.flatMap((topic) => topic.questionRows.map(({ question }) => question.id))).size;
-  const linkedCardCount = new Set(coreTopics.flatMap((topic) => topic.cards.map((card) => card.id))).size;
+  const cardLinkSummary = useMemo(() => {
+    const cardsById = new Map(flashcards.map((card) => [card.id, card]));
+    const linkedIds = new Set(coreTopics.flatMap((topic) => topic.cards.map((card) => card.id)));
+    let unclassified = 0;
+    let outsidePlan = 0;
+
+    cardsById.forEach((card, cardId) => {
+      if (linkedIds.has(cardId)) return;
+      if (KNOWLEDGE_CANCER_DOMAINS.has(getKnowledgeCardCancerDomain(card))) {
+        outsidePlan += 1;
+      } else {
+        unclassified += 1;
+      }
+    });
+
+    return {
+      total: cardsById.size,
+      linked: linkedIds.size,
+      unclassified,
+      outsidePlan,
+    };
+  }, [coreTopics, flashcards]);
   const libraryCancerOptions = [...new Set(libraryItems.flatMap((note) => note.cancerTypes))].sort();
   const libraryGeneOptions = [...new Set(libraryItems.flatMap((note) => note.genes))].sort();
   const filteredLibraryItems = filterNotionLibrary(libraryItems, {
@@ -6989,7 +6971,10 @@ function KnowledgeHubPanel({
         <div className="knowledge-hub-summary">
           <strong>{coreTopics.length}</strong><span>clinical topics</span>
           <strong>{linkedQuestionCount}</strong><span>questions linked</span>
-          <strong>{linkedCardCount}</strong><span>cards linked</span>
+          <strong>{cardLinkSummary.total}</strong><span>cards total</span>
+          <strong>{cardLinkSummary.linked}</strong><span>cards linked</span>
+          <strong>{cardLinkSummary.unclassified}</strong><span>cards unclassified</span>
+          <strong>{cardLinkSummary.outsidePlan}</strong><span>outside-plan cards</span>
           <strong>{linkedNoteCount}</strong><span>Fellow notes</span>
         </div>
       </section>
