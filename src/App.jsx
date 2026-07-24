@@ -9956,9 +9956,9 @@ export default function App() {
   };
 
   const setPracticeMode = (practiceMode) => {
-    if (todaySessionMatchesQuest && dailyBatchSubmitted && !todaySession?.statsCommittedAt) {
+    if (todaySessionMatchesQuest && dailyBatchSubmitted && !dailyBatchClassificationComplete) {
       setTab('today');
-      setPracticePageMessage('請先完成目前這批的錯因訂正並寫入統計，再開始下一批 Daily Practice。');
+      setPracticePageMessage('請先完成目前這批所有錯題的錯因分類，再開始下一批 Daily Practice。');
       return;
     }
     const modeConfig = getPracticeModeConfig(practiceMode);
@@ -9975,8 +9975,19 @@ export default function App() {
       const completedCount = completedQuestionIds.length
         ? (Number(existing?.previousPracticeTotal) || 0) + completedQuestionIds.length
         : existingModeConfig.total;
+      const completedResults = (existing?.gradingResults || []).map((result) => ({
+        ...result,
+        errorType: result.isCorrect === false
+          ? (result.errorType || existing?.practiceDrafts?.[result.questionId]?.errorType || '')
+          : '',
+      }));
+      const batchReady = Boolean(existing?.submittedAt)
+        && completedResults.length > 0
+        && completedResults.every((result) => (
+          result.isCorrect === true || (result.isCorrect === false && result.errorType)
+        ));
       const startsNewBatch = existingMatchesQuest
-        && Boolean(existing?.submittedAt && existing?.statsCommittedAt)
+        && batchReady;
       const newBatchCount = startsNewBatch
         ? (modeConfig.total > completedCount ? modeConfig.total - completedCount : modeConfig.total)
         : 0;
@@ -9991,8 +10002,18 @@ export default function App() {
         ? fillDailyQuestionIds(prev, questTask, pendingQuestionIds, newBatchCount, rankedHighYieldTopics, previousQuestionIds)
         : [];
       const now = new Date().toISOString();
+      const attemptsRecorded = startsNewBatch && completedResults.every((result) => (
+        (prev.stats?.[result.questionId]?.answerHistory || []).some((event) => event?.attemptId === existing?.attemptId)
+      ));
+      const attemptStats = startsNewBatch && !attemptsRecorded
+        ? applyBatchQuestionResults(prev.stats, completedResults, 'daily', existing?.attemptId)
+        : prev.stats;
+      const nextStats = startsNewBatch
+        ? applyBatchRemediationsToStats(attemptStats, completedResults, existing?.attemptId)
+        : prev.stats;
       return {
         ...prev,
+        stats: nextStats,
         settings: {
           ...prev.settings,
           practiceMode,
