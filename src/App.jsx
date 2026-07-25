@@ -10061,7 +10061,16 @@ export default function App() {
           } : {}),
         },
       };
-    }, ['app', 'sessions']);
+    }, ['app', 'sessions', 'stats']);
+  };
+
+  const startDailyPractice = () => {
+    if (dailyBatchSubmitted) {
+      setPracticeMode(selectedPracticeMode);
+      setTab('today');
+      return;
+    }
+    createTodaySession();
   };
 
   const exportBackup = () => {
@@ -10104,8 +10113,8 @@ export default function App() {
           <button className={checkedInToday ? 'good' : 'primary'} disabled={checkedInToday} onClick={markDailyCheckIn}>
             {checkedInToday ? '今日已打卡' : '每日打卡'}
           </button>
-          <button className="primary" disabled={isCreatingPractice} onClick={() => createTodaySession()}>
-            {isCreatingPractice ? '產生中...' : '產生今日 Daily Practice'}
+          <button className="primary" disabled={isCreatingPractice} onClick={startDailyPractice}>
+            {isCreatingPractice ? '產生中...' : dailyBatchSubmitted ? '開始下一份 Daily Practice' : '產生今日 Daily Practice'}
           </button>
         </div>
       </header>
@@ -10404,6 +10413,7 @@ export default function App() {
                   ? `${todayPracticeConfig.shortLabel}：${formatPracticeRecipe(todayPracticeConfig)}`
                   : `${selectedPracticeConfig.shortLabel}：${formatPracticeRecipe(selectedPracticeConfig)}`}
               </p>
+              <PracticeModeSelector value={selectedPracticeMode} onChange={setPracticeMode} compact />
             </div>
             <div className="inline-actions">
               <button className="secondary" disabled={isCreatingPractice || dailyBatchSubmitted} onClick={regenerateTodaySession}>重新抽題</button>
@@ -10484,9 +10494,12 @@ export default function App() {
                 {!dailyBatchSubmitted ? (
                   <button className="good" onClick={submitDailyPractice}>整份交卷並顯示答案</button>
                 ) : (
-                  <button className="good" disabled={Boolean(todaySession?.statsCommittedAt && dailyBatchAttemptsRecorded)} onClick={finalizeDailyPractice}>
-                    {todaySession?.statsCommittedAt && dailyBatchAttemptsRecorded ? '訂正與統計已完成' : '完成錯因訂正並寫入統計'}
-                  </button>
+                  <>
+                    <button className="good" disabled={Boolean(todaySession?.statsCommittedAt && dailyBatchAttemptsRecorded)} onClick={finalizeDailyPractice}>
+                      {todaySession?.statsCommittedAt && dailyBatchAttemptsRecorded ? '訂正與統計已完成' : '完成錯因訂正並寫入統計'}
+                    </button>
+                    <button className="primary" onClick={startDailyPractice}>開始下一份 Daily Practice</button>
+                  </>
                 )}
               </div>
               {practicePageMessage && <p className="save-message">{practicePageMessage}</p>}
