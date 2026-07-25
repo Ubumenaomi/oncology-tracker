@@ -10,14 +10,14 @@ async function getAuthHeaders() {
 
 async function readLibraryResponse(url) {
   const headers = await getAuthHeaders();
-  const response = await fetch(url, { headers });
+  const response = await fetch(url, { headers, cache: 'no-store' });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.message || payload.error || 'Fellow training 同步失敗。');
   return payload;
 }
 
 export async function fetchNotionLibrary() {
-  const payload = await readLibraryResponse('/api/notion-library');
+  const payload = await readLibraryResponse(`/api/notion-library?sync=${Date.now()}`);
   if (!Array.isArray(payload.items) || payload.items.length === 0) {
     throw new Error('Fellow training 沒有回傳有效索引，已保留 cached library。');
   }
