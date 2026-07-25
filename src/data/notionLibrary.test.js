@@ -2,11 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  buildNotionNoteSections,
   filterNotionLibrary,
   getLinkedNotionNotes,
   inferNotionNoteType,
   normalizeNotionExternalUrl,
   normalizeNotionLibraryItem,
+  sortNotionLibrary,
 } from './notionLibrary.js';
 
 const topic = {
@@ -54,6 +56,48 @@ test('infers a conservative display-only note type without changing Notion', () 
   assert.equal(inferNotionNoteType({ title: 'KEYNOTE-522 phase 3 trial' }), 'Trial Note');
   assert.equal(inferNotionNoteType({ title: 'ICI myocarditis toxicity' }), 'Toxicity');
   assert.equal(inferNotionNoteType({ title: 'NSCLC overview' }), 'Master Note');
+});
+
+test('filters note type and sorts without mutating the source library', () => {
+  const trial = normalizeNotionLibraryItem({
+    id: 'trial',
+    title: 'KEYNOTE-522 phase 3 trial',
+    url: 'https://notion.so/trial',
+    lastEditedTime: '2026-07-24T00:00:00.000Z',
+  });
+  const source = [...notes, trial];
+  assert.deepEqual(filterNotionLibrary(source, { type: 'Trial Note', flashcard: 'All' }).map((note) => note.id), ['trial']);
+  assert.deepEqual(sortNotionLibrary(source, 'title').map((note) => note.id), ['egfr', 'breast', 'trial']);
+  assert.equal(source[0].id, 'egfr');
+});
+
+test('builds readable sections from sequential Notion headings', () => {
+  assert.deepEqual(buildNotionNoteSections({
+    title: 'NSCLC',
+    plainText: 'Short introduction\nBiomarkers\nEGFR and ALK\nTreatment\nUse stage and driver.',
+    headings: [
+      { id: 'bio', level: 2, text: 'Biomarkers' },
+      { id: 'tx', level: 2, text: 'Treatment' },
+    ],
+  }), [
+    { id: 'note-introduction', level: 1, title: 'NSCLC', body: 'Short introduction' },
+    { id: 'bio', level: 2, title: 'Biomarkers', body: 'EGFR and ALK' },
+    { id: 'tx', level: 2, title: 'Treatment', body: 'Use stage and driver.' },
+  ]);
+});
+
+test('preserves structured Notion blocks and schema version during normalization', () => {
+  const note = normalizeNotionLibraryItem({
+    id: 'rich-note',
+    title: 'Rich note',
+    url: 'https://notion.so/rich-note',
+    contentSchemaVersion: 2,
+    blocks: [{ id: 'h1', type: 'heading_1', richText: [{ text: 'Title' }] }],
+    assets: [{ id: 'image', type: 'image', url: 'https://example.com/image.png' }],
+  });
+  assert.equal(note.contentSchemaVersion, 2);
+  assert.equal(note.blocks[0].type, 'heading_1');
+  assert.equal(note.assets[0].type, 'image');
 });
 
 test('repairs legacy app.notion.com page links while preserving current Notion URLs', () => {

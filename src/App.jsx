@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import { AlertTriangle, BarChart3, BookOpen, ChevronDown, ClipboardList, Clock3, ExternalLink, FileText, Home, Newspaper, Pause, Play, RefreshCw, RotateCcw, Settings2 } from 'lucide-react';
+import { AlertTriangle, BarChart3, BookOpen, ChevronDown, ClipboardList, Clock3, ExternalLink, FileText, Home, LayoutGrid, List, Pause, Play, RefreshCw, RotateCcw, Settings2 } from 'lucide-react';
 import './App.css';
+import { NotionBlocks } from './components/NotionBlockRenderer.jsx';
 import { QUESTION_BANK_TOTAL, QUESTION_YEARS, cancerCategories } from './data/questionBankMeta.js';
 import { buildFlashcardTags } from './data/taxonomy.js';
 import {
@@ -16,10 +17,12 @@ import {
   rankNotionNewsItems,
 } from './data/notionNewsMatching.js';
 import {
+  buildNotionNoteSections,
   filterNotionLibrary,
   getLinkedNotionNotes,
   inferNotionNoteType,
   normalizeNotionExternalUrl,
+  sortNotionLibrary,
 } from './data/notionLibrary.js';
 import {
   NOTION_LEARNING_ARTIFACTS,
@@ -4057,7 +4060,7 @@ function formatNewsDate(value) {
   }).format(new Date(value));
 }
 
-function NewsPanel({
+export function NewsPanel({
   libraryState,
   notePreview,
   planTasks,
@@ -6428,6 +6431,7 @@ function formatLibrarySyncTime(value) {
 }
 
 function NotionLibraryCard({ note, onPreview, localCardCount = 0, compact = false }) {
+  const noteType = inferNotionNoteType(note);
   const labels = [
     ...(note.cancerTypes || []),
     ...(note.genes || []),
@@ -6436,7 +6440,7 @@ function NotionLibraryCard({ note, onPreview, localCardCount = 0, compact = fals
   return (
     <article className={`notion-library-card ${compact ? 'compact' : ''}`}>
       <div className="notion-library-card-top">
-        <span>{inferNotionNoteType(note)}</span>
+        <span>{noteType}</span>
         <em className={note.flashcardCreated || localCardCount > 0 ? 'ready' : 'missing'}>
           {note.flashcardCreated ? 'Notion: ready' : localCardCount > 0 ? `Tracker: ${localCardCount} cards` : 'Not yet carded'}
         </em>
@@ -6447,16 +6451,16 @@ function NotionLibraryCard({ note, onPreview, localCardCount = 0, compact = fals
           {labels.map((label) => <span className="knowledge-tag" key={`${note.id}-${label}`}>{label}</span>)}
         </div>
       )}
-      <small>Updated {formatLibrarySyncTime(note.lastEditedTime || note.createdTime)}</small>
+      <small>{note.cancerTypes?.[0] || 'Unclassified'} · Updated {formatLibrarySyncTime(note.lastEditedTime || note.createdTime)}</small>
       <div className="notion-library-card-actions">
-        {getNotionPageId(note) && <button type="button" className="secondary tiny" onClick={() => onPreview(note)}>Preview</button>}
-        <a href={note.url} target="_blank" rel="noreferrer">Open in Notion <ExternalLink size={14} /></a>
+        {getNotionPageId(note) && <button type="button" className="primary tiny" onClick={() => onPreview(note)}>閱讀筆記</button>}
+        <a href={note.url} target="_blank" rel="noreferrer">前往 Notion 編輯 <ExternalLink size={14} /></a>
       </div>
     </article>
   );
 }
 
-function NotionLearningStudio({ note, questions, flashcards, onOpenQuestion, onImportLearningDrafts }) {
+export function NotionLearningStudio({ note, questions, flashcards, onOpenQuestion, onImportLearningDrafts }) {
   const [artifactType, setArtifactType] = useState('flashcards');
   const [prompt, setPrompt] = useState('');
   const [promptMessage, setPromptMessage] = useState('');
@@ -6643,47 +6647,73 @@ function NotionLearningStudio({ note, questions, flashcards, onOpenQuestion, onI
   );
 }
 
-function NotionPreviewPanel({ preview, questions, flashcards, onOpenQuestion, onImportLearningDrafts, onClose }) {
+function NotionPreviewPanel({ preview, onClose, onOpenInternalPage }) {
+  const sections = preview?.item ? buildNotionNoteSections(preview.item) : EMPTY_ARRAY;
   if (!preview?.id) return null;
   const note = preview.item;
+  const jumpToSection = (event, index) => {
+    const panel = event.currentTarget.closest('.notion-preview-panel');
+    panel?.querySelector(`[data-note-section="${index}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
   return (
     <section className="notion-preview-panel" aria-label="Fellow training note preview">
-      <div className="section-head">
+      <div className="notion-reader-head">
         <div>
-          <div className="knowledge-kicker">Read-only Notion preview</div>
+          <div className="knowledge-kicker">Fellow training · Read-only</div>
           <h3>{note?.title || preview.title || 'Loading note...'}</h3>
-          <p className="muted">內容只從 Fellow training 讀取；Tracker 不會修改原筆記。</p>
+          <div className="knowledge-chip-row">
+            {note && <span className="pill soft">{inferNotionNoteType(note)}</span>}
+            {(note?.cancerTypes || []).slice(0, 2).map((value) => <span className="knowledge-tag" key={value}>{value}</span>)}
+            {(note?.genes || []).slice(0, 3).map((value) => <span className="knowledge-tag" key={value}>{value}</span>)}
+          </div>
         </div>
-        <button type="button" className="secondary tiny" onClick={onClose}>Close preview</button>
+        <div className="notion-reader-actions">
+          {note?.url && <a className="notion-edit-link" href={note.url} target="_blank" rel="noreferrer">前往 Notion 編輯 <ExternalLink size={14} /></a>}
+          <button type="button" className="secondary tiny" onClick={onClose}>關閉閱讀</button>
+        </div>
       </div>
       {preview.status === 'loading' && <p className="notion-preview-status">正在載入筆記內容…</p>}
       {preview.status === 'error' && <p className="notion-preview-status error">{preview.error}</p>}
+      {preview.status === 'ready' && preview.error && <p className="notion-preview-status">{preview.error}</p>}
       {preview.status === 'ready' && note && (
         <>
           <div className="notion-preview-layout">
-            <aside>
-              <strong>Table of contents</strong>
-              {note.headings?.length ? (
-                <ol>
-                  {note.headings.slice(0, 24).map((heading) => (
-                    <li className={`level-${heading.level}`} key={heading.id}>{heading.text}</li>
+            <aside className="notion-reader-toc">
+              <strong>章節目錄</strong>
+              {sections.length > 1 ? (
+                <nav aria-label="筆記章節">
+                  {sections.slice(0, 30).map((section, index) => (
+                    <button
+                      type="button"
+                      className={`level-${section.level}`}
+                      onClick={(event) => jumpToSection(event, index)}
+                      key={`${section.id}-${index}`}
+                    >
+                      {section.title}
+                    </button>
                   ))}
-                </ol>
+                </nav>
               ) : <p className="muted">這篇筆記沒有 heading。</p>}
-              <a href={note.url} target="_blank" rel="noreferrer">Open full note <ExternalLink size={14} /></a>
+              <small>Updated {formatLibrarySyncTime(note.lastEditedTime || note.createdTime)}</small>
             </aside>
-            <div className="notion-preview-copy">
-              {note.plainText ? note.plainText.slice(0, 16000) : '這篇筆記目前沒有可顯示的純文字內容。'}
-              {note.plainText?.length > 16000 && '\n\nPreview truncated. Open in Notion to read the full note.'}
-            </div>
+            <article className="notion-preview-copy">
+              {note.blocks?.length ? (
+                <NotionBlocks blocks={note.blocks} onOpenNotionPage={onOpenInternalPage} />
+              ) : sections.length ? sections.map((section, index) => (
+                <section
+                  className={`notion-note-section level-${section.level}`}
+                  data-note-section={index}
+                  key={`${section.id}-${index}`}
+                >
+                  {index === 0 && section.title === note.title
+                    ? <h1>{section.title}</h1>
+                    : section.level <= 2 ? <h2>{section.title}</h2> : <h3>{section.title}</h3>}
+                  {section.body && <div>{section.body}</div>}
+                </section>
+              )) : <p>這篇筆記目前沒有可顯示的內容。</p>}
+              {note.truncated && <p className="notion-preview-truncated">筆記超過安全讀取上限；請前往 Notion 查看其餘內容。</p>}
+            </article>
           </div>
-          <NotionLearningStudio
-            note={note}
-            questions={questions}
-            flashcards={flashcards}
-            onOpenQuestion={onOpenQuestion}
-            onImportLearningDrafts={onImportLearningDrafts}
-          />
         </>
       )}
     </section>
@@ -6694,6 +6724,8 @@ function KnowledgeHubPanel({
   topics,
   questions,
   flashcards,
+  planTasks,
+  defaultTaskId,
   libraryState,
   notePreview,
   onOpenQuestion,
@@ -6708,10 +6740,15 @@ function KnowledgeHubPanel({
   const [cancerFilter, setCancerFilter] = useState('All');
   const [query, setQuery] = useState('');
   const [selectedTopicId, setSelectedTopicId] = useState('');
+  const [hubView, setHubView] = useState('today');
+  const [selectedTaskId, setSelectedTaskId] = useState(defaultTaskId || 1);
   const [libraryQuery, setLibraryQuery] = useState('');
   const [libraryCancer, setLibraryCancer] = useState('All');
   const [libraryGene, setLibraryGene] = useState('All');
   const [libraryFlashcard, setLibraryFlashcard] = useState('All');
+  const [libraryType, setLibraryType] = useState('All');
+  const [librarySort, setLibrarySort] = useState('updated');
+  const [libraryView, setLibraryView] = useState('grid');
   const normalizedQuery = query.trim().toLowerCase();
   const coreTopics = useMemo(
     () => topics.filter((topic) => KNOWLEDGE_CANCER_DOMAINS.has(topic.cancer)),
@@ -6721,6 +6758,14 @@ function KnowledgeHubPanel({
   const cancers = [...new Set(coreTopics.map((topic) => topic.cancer))];
   const selectedTopic = coreTopics.find((topic) => topic.id === selectedTopicId) || null;
   const libraryItems = libraryState.items;
+  const selectedTask = getStudyPlanTaskById(selectedTaskId) || planTasks[0];
+  const todayCriteria = useMemo(() => getNotionNewsCriteriaForTask(selectedTask), [selectedTask]);
+  const todayRankedItems = useMemo(
+    () => rankNotionNewsItems(libraryItems, todayCriteria),
+    [libraryItems, todayCriteria],
+  );
+  const todayMatchedItems = todayRankedItems.filter(hasCriteriaMatches);
+  const todayItems = (todayMatchedItems.length ? todayMatchedItems : todayRankedItems).slice(0, 12);
   const topicNoteIndex = useMemo(() => new Map(coreTopics.map((topic) => [
     topic.id,
     getLinkedNotionNotes(libraryItems, topic),
@@ -6775,12 +6820,34 @@ function KnowledgeHubPanel({
   }, [coreTopics, flashcards]);
   const libraryCancerOptions = [...new Set(libraryItems.flatMap((note) => note.cancerTypes))].sort();
   const libraryGeneOptions = [...new Set(libraryItems.flatMap((note) => note.genes))].sort();
-  const filteredLibraryItems = filterNotionLibrary(libraryItems, {
+  const filteredLibraryItems = sortNotionLibrary(filterNotionLibrary(libraryItems, {
     query: libraryQuery,
     cancer: libraryCancer,
     gene: libraryGene,
     flashcard: libraryFlashcard,
-  });
+    type: libraryType,
+  }), librarySort);
+  const libraryTypes = [...new Set(libraryItems.map(inferNotionNoteType))].sort();
+  const hasLibraryFilters = Boolean(libraryQuery.trim()
+    || libraryCancer !== 'All'
+    || libraryGene !== 'All'
+    || libraryFlashcard !== 'All'
+    || libraryType !== 'All');
+  const clearLibraryFilters = () => {
+    setLibraryQuery('');
+    setLibraryCancer('All');
+    setLibraryGene('All');
+    setLibraryFlashcard('All');
+    setLibraryType('All');
+  };
+  const openInternalNotionPage = (pageId) => {
+    const normalizedId = String(pageId || '').replaceAll('-', '').toLowerCase();
+    const item = libraryItems.find((note) => String(note.id || '').replaceAll('-', '').toLowerCase() === normalizedId);
+    if (item) onOpenNotePreview(item);
+  };
+  useEffect(() => {
+    if (defaultTaskId) setSelectedTaskId(defaultTaskId);
+  }, [defaultTaskId]);
   const notionCardCounts = useMemo(() => {
     const counts = new Map();
     flashcards.forEach((card) => {
@@ -6965,8 +7032,10 @@ function KnowledgeHubPanel({
       <section className="knowledge-hub-hero">
         <div>
           <div className="knowledge-kicker">Oncology Knowledge Hub</div>
-          <h2>先進入主題，再看到所有學習資源</h2>
-          <p>以 100-Day Plan 為骨架，唯讀聚合 Questions、Trials、Flashcards、Critical Errors 與 Fellow training；Notion 始終是原始筆記來源。</p>
+          <h2>{hubView === 'topics' ? '從主題進入所有學習資源' : 'Notion 筆記，集中閱讀'}</h2>
+          <p>{hubView !== 'topics'
+            ? '在 Tracker 搜尋與閱讀 Fellow training；需要修改時直接回到 Notion，維持唯一筆記來源。'
+            : '以 100-Day Plan 為骨架，唯讀聚合 Questions、Trials、Flashcards、Critical Errors 與 Fellow training。'}</p>
         </div>
         <div className="knowledge-hub-summary">
           <strong>{coreTopics.length}</strong><span>clinical topics</span>
@@ -6979,7 +7048,58 @@ function KnowledgeHubPanel({
         </div>
       </section>
 
-      <section className="knowledge-toolbar">
+      <nav className="knowledge-view-tabs" aria-label="Knowledge 顯示模式">
+        <button type="button" className={hubView === 'today' ? 'active' : ''} onClick={() => setHubView('today')}>
+          <BookOpen size={17} />
+          今日推薦
+        </button>
+        <button type="button" className={hubView === 'notes' ? 'active' : ''} onClick={() => setHubView('notes')}>
+          <FileText size={17} />
+          筆記庫
+        </button>
+        <button type="button" className={hubView === 'topics' ? 'active' : ''} onClick={() => setHubView('topics')}>
+          <LayoutGrid size={17} />
+          主題地圖
+        </button>
+      </nav>
+
+      {hubView === 'today' && (
+        <section className="notion-library-section notion-today-section">
+          <div className="section-head">
+            <div>
+              <div className="knowledge-kicker">Today · 100-Day Plan</div>
+              <h3>{selectedTask?.day} · {selectedTask?.topic}</h3>
+              <p className="muted">{selectedTask?.details}</p>
+            </div>
+            <label className="notion-day-picker">
+              <span>選擇讀書日</span>
+              <select value={selectedTask ? getPlanTaskStorageId(selectedTask) : ''} onChange={(event) => setSelectedTaskId(event.target.value)}>
+                {planTasks.map((task) => (
+                  <option key={getPlanTaskStorageId(task)} value={getPlanTaskStorageId(task)}>{task.day} · {task.topic}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="notion-library-count">
+            <strong>{todayItems.length}</strong>
+            <span>篇依今日主題、癌別、治療與藥物排序的筆記</span>
+          </div>
+          {todayItems.length ? (
+            <div className="notion-library-grid">
+              {todayItems.map((note) => (
+                <NotionLibraryCard
+                  note={note}
+                  onPreview={onOpenNotePreview}
+                  localCardCount={notionCardCounts.get(note.id) || 0}
+                  key={note.id}
+                />
+              ))}
+            </div>
+          ) : <div className="empty-state small"><h3>今天尚無匹配筆記</h3><p>同步 Notion Library 後再試一次。</p></div>}
+        </section>
+      )}
+
+      {hubView === 'topics' && <><section className="knowledge-toolbar">
         <label>
           Search Knowledge
           <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Trial、biomarker、topic、question ID..." />
@@ -7047,13 +7167,14 @@ function KnowledgeHubPanel({
           </div>
         )}
       </section>
+      </>}
 
-      <section className="notion-library-section">
+      {hubView === 'notes' && <section className="notion-library-section">
         <div className="section-head">
           <div>
-            <div className="knowledge-kicker">Fellow Training Database Connector</div>
-            <h3>Notion Library</h3>
-            <p className="muted">單向讀取 Page、Cancer type、Gene tag、Flashcard、最後更新時間與筆記內容預覽。</p>
+            <div className="knowledge-kicker">Fellow Training Notes</div>
+            <h3>所有筆記</h3>
+            <p className="muted">搜尋、篩選並閱讀腫瘤筆記；Notion 保持為原始資料來源，Tracker 僅做唯讀整理。</p>
           </div>
           <div className="notion-library-sync">
             <span className={`notion-sync-status ${libraryState.status}`}>{libraryState.source === 'live' ? 'Live index' : 'Cached index'}</span>
@@ -7068,33 +7189,41 @@ function KnowledgeHubPanel({
         {libraryState.error && <p className="notion-library-message error">{libraryState.error}</p>}
         {libraryState.truncated && <p className="notion-library-message">Notion 回傳頁數超過安全上限；目前顯示最近更新的 {libraryItems.length} 篇。</p>}
 
-        <div className="notion-library-filters">
-          <label>
-            Search notes
+        <div className="notion-library-toolbox">
+          <label className="notion-library-search">
+            <span>搜尋筆記</span>
             <input type="search" value={libraryQuery} onChange={(event) => setLibraryQuery(event.target.value)} placeholder="Title、trial、drug、keyword…" />
           </label>
-          <label>
-            Cancer type
-            <select value={libraryCancer} onChange={(event) => setLibraryCancer(event.target.value)}>
-              <option value="All">All</option>
-              {libraryCancerOptions.map((value) => <option value={value} key={value}>{value}</option>)}
-            </select>
-          </label>
-          <label>
-            Gene tag
-            <select value={libraryGene} onChange={(event) => setLibraryGene(event.target.value)}>
-              <option value="All">All</option>
-              {libraryGeneOptions.map((value) => <option value={value} key={value}>{value}</option>)}
-            </select>
-          </label>
-          <label>
-            Flashcard
-            <select value={libraryFlashcard} onChange={(event) => setLibraryFlashcard(event.target.value)}>
-              <option value="All">All</option>
-              <option value="Ready">Ready</option>
-              <option value="Missing">Not yet carded</option>
-            </select>
-          </label>
+          <div className="notion-library-view" role="group" aria-label="筆記顯示方式">
+            <button type="button" className={libraryView === 'grid' ? 'active' : ''} onClick={() => setLibraryView('grid')} aria-label="卡片檢視"><LayoutGrid size={17} /></button>
+            <button type="button" className={libraryView === 'list' ? 'active' : ''} onClick={() => setLibraryView('list')} aria-label="清單檢視"><List size={18} /></button>
+          </div>
+        </div>
+
+        <div className="notion-library-filters">
+          <select aria-label="Cancer type" value={libraryCancer} onChange={(event) => setLibraryCancer(event.target.value)}>
+            <option value="All">所有 Cancer types</option>
+            {libraryCancerOptions.map((value) => <option value={value} key={value}>{value}</option>)}
+          </select>
+          <select aria-label="Note type" value={libraryType} onChange={(event) => setLibraryType(event.target.value)}>
+            <option value="All">所有筆記類型</option>
+            {libraryTypes.map((value) => <option value={value} key={value}>{value}</option>)}
+          </select>
+          <select aria-label="Gene tag" value={libraryGene} onChange={(event) => setLibraryGene(event.target.value)}>
+            <option value="All">所有 Gene tags</option>
+            {libraryGeneOptions.map((value) => <option value={value} key={value}>{value}</option>)}
+          </select>
+          <select aria-label="Flashcard status" value={libraryFlashcard} onChange={(event) => setLibraryFlashcard(event.target.value)}>
+            <option value="All">所有卡片狀態</option>
+            <option value="Ready">已有 Flashcards</option>
+            <option value="Missing">尚未製卡</option>
+          </select>
+          <select aria-label="Sort notes" value={librarySort} onChange={(event) => setLibrarySort(event.target.value)}>
+            <option value="updated">最近更新</option>
+            <option value="title">標題 A–Z</option>
+            <option value="needs-cards">優先顯示未製卡</option>
+          </select>
+          {hasLibraryFilters && <button type="button" className="secondary tiny" onClick={clearLibraryFilters}>清除篩選</button>}
         </div>
 
         <div className="notion-library-count">
@@ -7105,8 +7234,8 @@ function KnowledgeHubPanel({
         </div>
 
         {filteredLibraryItems.length ? (
-          <div className="notion-library-grid">
-            {filteredLibraryItems.slice(0, 36).map((note) => (
+          <div className={`notion-library-grid ${libraryView}`}>
+            {filteredLibraryItems.slice(0, 60).map((note) => (
               <NotionLibraryCard
                 note={note}
                 onPreview={onOpenNotePreview}
@@ -7118,18 +7247,21 @@ function KnowledgeHubPanel({
         ) : (
           <div className="empty-state small">
             <h3>找不到符合條件的 Fellow training note</h3>
-            <p>請清除搜尋字詞或調整 Cancer type、Gene tag、Flashcard 篩選。</p>
+            <p>請清除搜尋字詞，或調整 Cancer type、筆記類型、Gene tag 與 Flashcard 篩選。</p>
+            {hasLibraryFilters && <button type="button" className="secondary" onClick={clearLibraryFilters}>清除所有篩選</button>}
           </div>
         )}
       </section>
-      <NotionPreviewPanel
+      }
+      {hubView !== 'topics' && <NotionPreviewPanel
         preview={notePreview}
         questions={questions}
         flashcards={flashcards}
         onOpenQuestion={onOpenQuestion}
         onImportLearningDrafts={onImportLearningDrafts}
         onClose={onCloseNotePreview}
-      />
+        onOpenInternalPage={openInternalNotionPage}
+      />}
     </main>
   );
 }
@@ -8077,6 +8209,9 @@ export default function App() {
   const latestStateRef = useRef(state);
   const dirtyStorageSlicesRef = useRef(null);
   const [tab, setTab] = useState('quest');
+  useEffect(() => {
+    if (tab === 'news') setTab('knowledge');
+  }, [tab]);
   const [search, setSearch] = useState('');
   const [bankCancer, setBankCancer] = useState('All');
   const [bankYear, setBankYear] = useState(DEFAULT_QUESTION_MANAGER_YEAR);
@@ -10184,10 +10319,6 @@ export default function App() {
           <BookOpen size={17} strokeWidth={2.4} />
           <span>Knowledge</span>
         </button>
-        <button className={`nav-news ${tab === 'news' ? 'active' : ''}`} type="button" onClick={() => setTab('news')}>
-          <Newspaper size={17} strokeWidth={2.4} />
-          <span>NEWS</span>
-        </button>
         <button className={`nav-pomodoro ${tab === 'pomodoro' ? 'active' : ''}`} type="button" onClick={() => setTab('pomodoro')}>
           <Clock3 size={17} strokeWidth={2.4} />
           <span>Pomodoro</span>
@@ -10263,6 +10394,8 @@ export default function App() {
           topics={knowledgeTopics}
           questions={knowledgeQuestions}
           flashcards={allFlashcards}
+          planTasks={studyPlan100}
+          defaultTaskId={getPlanTaskStorageId(questTask)}
           libraryState={notionLibrary.libraryState}
           notePreview={notionLibrary.notePreview}
           onOpenQuestion={(question) => {
@@ -10299,28 +10432,6 @@ export default function App() {
           onResume={resumePomodoroSession}
           onCancel={cancelFocusSession}
           onFinishLegacy={finishFocusSession}
-        />
-      )}
-
-      {tab === 'news' && (
-        <NewsPanel
-          libraryState={notionLibrary.libraryState}
-          notePreview={notionLibrary.notePreview}
-          planTasks={studyPlan100}
-          defaultTaskId={getPlanTaskStorageId(questTask)}
-          questions={knowledgeQuestions}
-          flashcards={allFlashcards}
-          onOpenQuestion={(question) => {
-            setBankYear('All');
-            setBankCancer(question.cancer || 'All');
-            setSearch(question.id);
-            setEditingQuestionId(question.id);
-            setTab('questions');
-          }}
-          onImportLearningDrafts={importNotionLearningDrafts}
-          onSyncLibrary={notionLibrary.syncLibrary}
-          onOpenNotePreview={notionLibrary.openNotePreview}
-          onCloseNotePreview={notionLibrary.closeNotePreview}
         />
       )}
 

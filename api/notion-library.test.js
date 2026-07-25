@@ -82,3 +82,90 @@ test('authenticates Firebase and returns normalized read-only library metadata',
     else process.env.NOTION_TOKEN = originalToken;
   }
 });
+
+test('returns structured rich blocks for a read-only page preview', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalPolicy = process.env.NOTION_ALLOWED_UIDS;
+  const originalToken = process.env.NOTION_TOKEN;
+  process.env.NOTION_ALLOWED_UIDS = 'allowed-user';
+  process.env.NOTION_TOKEN = 'server-only-test-token';
+  const pageId = '12345678-1234-1234-1234-123456789abc';
+  globalThis.fetch = async (url) => {
+    const value = String(url);
+    if (value.includes('accounts:lookup')) {
+      return jsonResponse({ users: [{ localId: 'allowed-user' }] });
+    }
+    if (value.endsWith(`/pages/${pageId}`)) {
+      return jsonResponse({
+        id: pageId,
+        url: `https://notion.so/${pageId.replaceAll('-', '')}`,
+        parent: { data_source_id: '105bb19a-c0c2-8160-aaab-000b49de9e79' },
+        properties: { Page: { title: [{ plain_text: 'Rich note' }] } },
+      });
+    }
+    if (value.includes(`/blocks/${pageId}/children`)) {
+      return jsonResponse({
+        has_more: false,
+        results: [
+          {
+            id: 'heading',
+            type: 'heading_2',
+            has_children: false,
+            heading_2: { rich_text: [{ plain_text: 'Treatment', annotations: { bold: true } }] },
+          },
+          {
+            id: 'toggle',
+            type: 'toggle',
+            has_children: true,
+            toggle: { rich_text: [{ plain_text: 'Details' }] },
+          },
+          {
+            id: 'image',
+            type: 'image',
+            has_children: false,
+            image: { file: { url: 'https://files.notion.so/image.png' }, caption: [{ plain_text: 'Figure 1' }] },
+          },
+        ],
+      });
+    }
+    if (value.includes('/blocks/toggle/children')) {
+      return jsonResponse({
+        has_more: false,
+        results: [{
+          id: 'todo',
+          type: 'to_do',
+          has_children: false,
+          to_do: { checked: true, rich_text: [{ plain_text: 'Review evidence' }] },
+        }],
+      });
+    }
+    throw new Error(`Unexpected request: ${value}`);
+  };
+
+  try {
+    const res = createResponse();
+    await handler({
+      method: 'GET',
+      headers: { authorization: 'Bearer firebase-id-token' },
+      url: `/api/notion-library?pageId=${pageId}`,
+    }, res);
+    const payload = JSON.parse(res.body);
+    assert.equal(res.statusCode, 200);
+    assert.equal(payload.item.contentSchemaVersion, 2);
+    assert.equal(payload.item.blocks[0].type, 'heading_2');
+    assert.equal(payload.item.blocks[0].richText[0].annotations.bold, true);
+    assert.equal(payload.item.blocks[1].children[0].type, 'to_do');
+    assert.equal(payload.item.blocks[1].children[0].checked, true);
+    assert.deepEqual(payload.item.assets, [{
+      id: 'image',
+      type: 'image',
+      url: 'https://files.notion.so/image.png',
+    }]);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalPolicy === undefined) delete process.env.NOTION_ALLOWED_UIDS;
+    else process.env.NOTION_ALLOWED_UIDS = originalPolicy;
+    if (originalToken === undefined) delete process.env.NOTION_TOKEN;
+    else process.env.NOTION_TOKEN = originalToken;
+  }
+});

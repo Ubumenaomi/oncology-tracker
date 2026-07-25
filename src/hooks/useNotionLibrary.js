@@ -74,7 +74,11 @@ export function useNotionLibrary({ user, fallbackItems = [], enabled = false } =
     const pageId = getNotionPageId(note);
     if (!pageId) return { ok: false };
     const cached = loadNotionPreviewCache(pageId);
-    if (cached?.plainText) {
+    const cacheAge = cached?.fetchedAt ? Date.now() - new Date(cached.fetchedAt).getTime() : Infinity;
+    const hasFreshStructuredCache = cached?.contentSchemaVersion >= 2
+      && cached.blocks?.length > 0
+      && cacheAge < 5 * 60 * 1000;
+    if (hasFreshStructuredCache) {
       setNotePreview({ id: pageId, title: note.title, status: 'ready', item: cached, error: '' });
       return { ok: true, source: 'cache' };
     }
@@ -89,6 +93,16 @@ export function useNotionLibrary({ user, fallbackItems = [], enabled = false } =
       }));
       return { ok: true, source: 'live' };
     } catch (error) {
+      if (cached?.plainText || cached?.blocks?.length) {
+        setNotePreview({
+          id: pageId,
+          title: cached.title || note.title,
+          status: 'ready',
+          item: cached,
+          error: error.message || '即時內容載入失敗，目前顯示快取。',
+        });
+        return { ok: true, source: 'stale-cache' };
+      }
       setNotePreview({ id: pageId, title: note.title, status: 'error', item: null, error: error.message || '筆記預覽載入失敗。' });
       return { ok: false };
     }

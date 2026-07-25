@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:full": "vercel dev",
     "build": "vite build",
     "lint": "eslint .",
     "test:knowledge": "node --test src/data/knowledgeCardMatching.test.js",

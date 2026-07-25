@@ -4,7 +4,8 @@ import {
 } from './notionTaxonomy.js';
 
 const LIBRARY_CACHE_KEY = 'oncology-tracker.notion-library.v1';
-const PREVIEW_CACHE_KEY = 'oncology-tracker.notion-preview.v1';
+const PREVIEW_CACHE_KEY = 'oncology-tracker.notion-preview.v2';
+const LEGACY_PREVIEW_CACHE_KEY = 'oncology-tracker.notion-preview.v1';
 const MAX_PREVIEW_CACHE_ITEMS = 20;
 
 function unique(items = []) {
@@ -49,6 +50,7 @@ export function normalizeNotionLibraryItem(item = {}) {
     url: normalizeNotionExternalUrl(item.url),
     createdTime: item.createdTime || item.publishedAt || null,
     lastEditedTime: item.lastEditedTime || item.publishedAt || item.createdTime || null,
+    fetchedAt: item.fetchedAt || null,
     cancerTypes: normalizeList(item.cancerTypes),
     subtypes: normalizeList(item.subtypes),
     tags: normalizeList(item.tags),
@@ -60,6 +62,10 @@ export function normalizeNotionLibraryItem(item = {}) {
     flashcardCreated: Boolean(item.flashcardCreated),
     plainText: item.plainText || '',
     headings: Array.isArray(item.headings) ? item.headings : [],
+    blocks: Array.isArray(item.blocks) ? item.blocks : [],
+    assets: Array.isArray(item.assets) ? item.assets : [],
+    contentSchemaVersion: Number(item.contentSchemaVersion) || 1,
+    truncated: Boolean(item.truncated),
   };
   normalized.searchText = [
     normalized.title,
@@ -117,7 +123,9 @@ export function saveNotionLibraryCache(payload) {
 export function loadNotionPreviewCache(pageId) {
   if (typeof window === 'undefined') return null;
   const cache = readStorage(window.sessionStorage, PREVIEW_CACHE_KEY) || {};
-  return cache[pageId] ? normalizeNotionLibraryItem(cache[pageId]) : null;
+  if (cache[pageId]) return normalizeNotionLibraryItem(cache[pageId]);
+  const legacyCache = readStorage(window.sessionStorage, LEGACY_PREVIEW_CACHE_KEY) || {};
+  return legacyCache[pageId] ? normalizeNotionLibraryItem(legacyCache[pageId]) : null;
 }
 
 export function saveNotionPreviewCache(item) {
@@ -184,10 +192,71 @@ export function filterNotionLibrary(notes = [], filters = {}) {
     (!query || note.searchText.includes(query))
     && (!filters.cancer || filters.cancer === 'All' || note.cancerTypes.includes(filters.cancer))
     && (!filters.gene || filters.gene === 'All' || note.genes.includes(filters.gene))
+    && (!filters.type || filters.type === 'All' || inferNotionNoteType(note) === filters.type)
     && (filters.flashcard === 'All'
       || (filters.flashcard === 'Ready' && note.flashcardCreated)
       || (filters.flashcard === 'Missing' && !note.flashcardCreated))
   ));
+}
+
+export function sortNotionLibrary(notes = [], sort = 'updated') {
+  const items = [...(notes || [])];
+  if (sort === 'title') {
+    return items.sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'zh-Hant'));
+  }
+  if (sort === 'needs-cards') {
+    return items.sort((a, b) => Number(a.flashcardCreated) - Number(b.flashcardCreated)
+      || new Date(b.lastEditedTime || b.createdTime || 0) - new Date(a.lastEditedTime || a.createdTime || 0));
+  }
+  return items.sort((a, b) => new Date(b.lastEditedTime || b.createdTime || 0)
+    - new Date(a.lastEditedTime || a.createdTime || 0));
+}
+
+export function buildNotionNoteSections(note = {}) {
+  const plainText = String(note.plainText || '').trim();
+  const headings = (note.headings || [])
+    .filter((heading) => heading?.text)
+    .map((heading, index) => ({
+      id: heading.id || `heading-${index + 1}`,
+      level: Number(heading.level) || 2,
+      title: String(heading.text).trim(),
+    }));
+  if (!plainText || !headings.length) {
+    return plainText ? [{ id: 'note-start', level: 1, title: note.title || '筆記內容', body: plainText }] : [];
+  }
+
+  const lowerText = plainText.toLowerCase();
+  let cursor = 0;
+  const located = headings.map((heading) => {
+    let start = plainText.indexOf(heading.title, cursor);
+    if (start < 0) start = lowerText.indexOf(heading.title.toLowerCase(), cursor);
+    if (start < 0) return null;
+    cursor = start + heading.title.length;
+    return { ...heading, start, contentStart: cursor };
+  }).filter(Boolean);
+
+  if (!located.length) {
+    return [{ id: 'note-start', level: 1, title: note.title || '筆記內容', body: plainText }];
+  }
+
+  const sections = [];
+  if (located[0].start > 0) {
+    sections.push({
+      id: 'note-introduction',
+      level: 1,
+      title: note.title || '摘要',
+      body: plainText.slice(0, located[0].start).trim(),
+    });
+  }
+  located.forEach((heading, index) => {
+    sections.push({
+      id: heading.id,
+      level: heading.level,
+      title: heading.title,
+      body: plainText.slice(heading.contentStart, located[index + 1]?.start ?? plainText.length).trim(),
+    });
+  });
+  return sections.filter((section) => section.title || section.body);
 }
 
 export function inferNotionNoteType(note = {}) {
