@@ -6647,7 +6647,7 @@ export function NotionLearningStudio({ note, questions, flashcards, onOpenQuesti
   );
 }
 
-function NotionPreviewPanel({ preview, onClose, onOpenInternalPage }) {
+function NotionPreviewPanel({ preview, onClose, onOpenInternalPage, readerRef }) {
   const sections = preview?.item ? buildNotionNoteSections(preview.item) : EMPTY_ARRAY;
   if (!preview?.id) return null;
   const note = preview.item;
@@ -6656,7 +6656,7 @@ function NotionPreviewPanel({ preview, onClose, onOpenInternalPage }) {
     panel?.querySelector(`[data-note-section="${index}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
   return (
-    <section className="notion-preview-panel" aria-label="Fellow training note preview">
+    <section ref={readerRef} className="notion-preview-panel" aria-label="Fellow training note preview">
       <div className="notion-reader-head">
         <div>
           <div className="knowledge-kicker">Fellow training · Read-only</div>
@@ -6722,14 +6722,12 @@ function NotionPreviewPanel({ preview, onClose, onOpenInternalPage }) {
 
 function KnowledgeHubPanel({
   topics,
-  questions,
   flashcards,
   planTasks,
   defaultTaskId,
   libraryState,
   notePreview,
   onOpenQuestion,
-  onImportLearningDrafts,
   onSyncLibrary,
   onOpenNotePreview,
   onCloseNotePreview,
@@ -6749,6 +6747,8 @@ function KnowledgeHubPanel({
   const [libraryType, setLibraryType] = useState('All');
   const [librarySort, setLibrarySort] = useState('updated');
   const [libraryView, setLibraryView] = useState('grid');
+  const readerRef = useRef(null);
+  const isReading = Boolean(notePreview?.id);
   const normalizedQuery = query.trim().toLowerCase();
   const coreTopics = useMemo(
     () => topics.filter((topic) => KNOWLEDGE_CANCER_DOMAINS.has(topic.cancer)),
@@ -6840,10 +6840,15 @@ function KnowledgeHubPanel({
     setLibraryFlashcard('All');
     setLibraryType('All');
   };
+  const openNoteReader = (note) => onOpenNotePreview(note);
+  const changeHubView = (view) => {
+    if (isReading) onCloseNotePreview();
+    setHubView(view);
+  };
   const openInternalNotionPage = (pageId) => {
     const normalizedId = String(pageId || '').replaceAll('-', '').toLowerCase();
     const item = libraryItems.find((note) => String(note.id || '').replaceAll('-', '').toLowerCase() === normalizedId);
-    if (item) onOpenNotePreview(item);
+    if (item) openNoteReader(item);
   };
   useEffect(() => {
     if (defaultTaskId) setSelectedTaskId(defaultTaskId);
@@ -6863,7 +6868,27 @@ function KnowledgeHubPanel({
     }
   }, [coreTopics, selectedTopicId]);
 
+  useEffect(() => {
+    if (!isReading) return;
+    const frame = window.requestAnimationFrame(() => {
+      readerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [isReading, notePreview?.id]);
+
   if (selectedTopic) {
+    if (isReading) {
+      return (
+        <main className="panel knowledge-hub-panel">
+          <NotionPreviewPanel
+            preview={notePreview}
+            onClose={onCloseNotePreview}
+            onOpenInternalPage={openInternalNotionPage}
+            readerRef={readerRef}
+          />
+        </main>
+      );
+    }
     return (
       <main className="panel knowledge-hub-panel">
         <button className="knowledge-back" type="button" onClick={() => setSelectedTopicId('')}>← 回到 Knowledge Hub</button>
@@ -7001,7 +7026,7 @@ function KnowledgeHubPanel({
               {selectedTopicNotes.map((note) => (
                 <NotionLibraryCard
                   note={note}
-                  onPreview={onOpenNotePreview}
+                  onPreview={openNoteReader}
                   localCardCount={notionCardCounts.get(note.id) || 0}
                   compact
                   key={note.url}
@@ -7015,14 +7040,6 @@ function KnowledgeHubPanel({
             </div>
           )}
         </section>
-        <NotionPreviewPanel
-          preview={notePreview}
-          questions={questions}
-          flashcards={flashcards}
-          onOpenQuestion={onOpenQuestion}
-          onImportLearningDrafts={onImportLearningDrafts}
-          onClose={onCloseNotePreview}
-        />
       </main>
     );
   }
@@ -7049,21 +7066,28 @@ function KnowledgeHubPanel({
       </section>
 
       <nav className="knowledge-view-tabs" aria-label="Knowledge 顯示模式">
-        <button type="button" className={hubView === 'today' ? 'active' : ''} onClick={() => setHubView('today')}>
+        <button type="button" className={hubView === 'today' ? 'active' : ''} onClick={() => changeHubView('today')}>
           <BookOpen size={17} />
           今日推薦
         </button>
-        <button type="button" className={hubView === 'notes' ? 'active' : ''} onClick={() => setHubView('notes')}>
+        <button type="button" className={hubView === 'notes' ? 'active' : ''} onClick={() => changeHubView('notes')}>
           <FileText size={17} />
           筆記庫
         </button>
-        <button type="button" className={hubView === 'topics' ? 'active' : ''} onClick={() => setHubView('topics')}>
+        <button type="button" className={hubView === 'topics' ? 'active' : ''} onClick={() => changeHubView('topics')}>
           <LayoutGrid size={17} />
           主題地圖
         </button>
       </nav>
 
-      {hubView === 'today' && (
+      {isReading && <NotionPreviewPanel
+        preview={notePreview}
+        onClose={onCloseNotePreview}
+        onOpenInternalPage={openInternalNotionPage}
+        readerRef={readerRef}
+      />}
+
+      {hubView === 'today' && !isReading && (
         <section className="notion-library-section notion-today-section">
           <div className="section-head">
             <div>
@@ -7089,7 +7113,7 @@ function KnowledgeHubPanel({
               {todayItems.map((note) => (
                 <NotionLibraryCard
                   note={note}
-                  onPreview={onOpenNotePreview}
+                  onPreview={openNoteReader}
                   localCardCount={notionCardCounts.get(note.id) || 0}
                   key={note.id}
                 />
@@ -7099,7 +7123,7 @@ function KnowledgeHubPanel({
         </section>
       )}
 
-      {hubView === 'topics' && <><section className="knowledge-toolbar">
+      {hubView === 'topics' && !isReading && <><section className="knowledge-toolbar">
         <label>
           Search Knowledge
           <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Trial、biomarker、topic、question ID..." />
@@ -7169,7 +7193,7 @@ function KnowledgeHubPanel({
       </section>
       </>}
 
-      {hubView === 'notes' && <section className="notion-library-section">
+      {hubView === 'notes' && !isReading && <section className="notion-library-section">
         <div className="section-head">
           <div>
             <div className="knowledge-kicker">Fellow Training Notes</div>
@@ -7238,7 +7262,7 @@ function KnowledgeHubPanel({
             {filteredLibraryItems.slice(0, 60).map((note) => (
               <NotionLibraryCard
                 note={note}
-                onPreview={onOpenNotePreview}
+                onPreview={openNoteReader}
                 localCardCount={notionCardCounts.get(note.id) || 0}
                 key={note.id}
               />
@@ -7253,15 +7277,6 @@ function KnowledgeHubPanel({
         )}
       </section>
       }
-      {hubView !== 'topics' && <NotionPreviewPanel
-        preview={notePreview}
-        questions={questions}
-        flashcards={flashcards}
-        onOpenQuestion={onOpenQuestion}
-        onImportLearningDrafts={onImportLearningDrafts}
-        onClose={onCloseNotePreview}
-        onOpenInternalPage={openInternalNotionPage}
-      />}
     </main>
   );
 }
