@@ -172,14 +172,21 @@ function normalizeId(value = '') {
   return String(value).replace(/-/g, '').toLowerCase();
 }
 
-function assertLibraryPage(page, dataSourceId) {
-  const parentId = page?.parent?.data_source_id || page?.parent?.database_id || '';
-  if (!parentId || normalizeId(parentId) !== normalizeId(dataSourceId)) {
-    const error = new Error('The requested page is not part of Fellow training.');
-    error.status = 404;
-    error.code = 'notion_page_outside_library';
-    throw error;
+async function assertLibraryPage(page, dataSourceId) {
+  const pageDataSourceId = page?.parent?.data_source_id || '';
+  if (pageDataSourceId && normalizeId(pageDataSourceId) === normalizeId(dataSourceId)) return;
+
+  const pageDatabaseId = page?.parent?.database_id || '';
+  if (pageDatabaseId) {
+    const dataSource = await notionFetch(`/data_sources/${dataSourceId}`);
+    const parentDatabaseId = dataSource?.parent?.database_id || '';
+    if (parentDatabaseId && normalizeId(parentDatabaseId) === normalizeId(pageDatabaseId)) return;
   }
+
+  const error = new Error('The requested page is not part of Fellow training.');
+  error.status = 404;
+  error.code = 'notion_page_outside_library';
+  throw error;
 }
 
 function blockPlainText(block) {
@@ -295,7 +302,7 @@ async function getLibraryPagePreview(pageId) {
   }
   const dataSourceId = process.env.NOTION_DATA_SOURCE_ID || DEFAULT_DATA_SOURCE_ID;
   const page = await notionFetch(`/pages/${pageId}`);
-  assertLibraryPage(page, dataSourceId);
+  await assertLibraryPage(page, dataSourceId);
   const normalized = normalizeNotionPage(page);
   const state = { lines: [], headings: [], blocks: [], blockCount: 0 };
   await collectBlockContent(page.id, state);

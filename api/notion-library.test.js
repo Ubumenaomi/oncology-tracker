@@ -99,8 +99,14 @@ test('returns structured rich blocks for a read-only page preview', async () => 
       return jsonResponse({
         id: pageId,
         url: `https://notion.so/${pageId.replaceAll('-', '')}`,
-        parent: { data_source_id: '105bb19a-c0c2-8160-aaab-000b49de9e79' },
+        parent: { database_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' },
         properties: { Page: { title: [{ plain_text: 'Rich note' }] } },
+      });
+    }
+    if (value.endsWith('/data_sources/105bb19a-c0c2-8160-aaab-000b49de9e79')) {
+      return jsonResponse({
+        id: '105bb19a-c0c2-8160-aaab-000b49de9e79',
+        parent: { database_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' },
       });
     }
     if (value.includes(`/blocks/${pageId}/children`)) {
