@@ -4,6 +4,7 @@ const DEFAULT_FIREBASE_API_KEY = 'AIzaSyAIHA_tbHQbK7-7mQrPA-Y2RMN7c-FZrIk';
 const MAX_QUERY_PAGES = 10;
 const MAX_CONTENT_BLOCKS = 500;
 const MAX_CONTENT_DEPTH = 4;
+const CONTENT_SCHEMA_VERSION = 2;
 
 function sendJson(res, status, payload) {
   res.statusCode = status;
@@ -192,7 +193,69 @@ function blockPlainText(block) {
   return '';
 }
 
-async function collectBlockContent(blockId, state, depth = 0) {
+function normalizeRichText(parts = []) {
+  return (parts || []).map((part) => ({
+    type: part.type || 'text',
+    text: part.plain_text || part.text?.content || part.equation?.expression || '',
+    href: safeExternalUrl(part.href || part.text?.link?.url) || null,
+    annotations: {
+      bold: Boolean(part.annotations?.bold),
+      italic: Boolean(part.annotations?.italic),
+      underline: Boolean(part.annotations?.underline),
+      strikethrough: Boolean(part.annotations?.strikethrough),
+      code: Boolean(part.annotations?.code),
+      color: part.annotations?.color || 'default',
+    },
+  })).filter((part) => part.text);
+}
+
+function safeExternalUrl(value = '') {
+  try {
+    const url = new URL(String(value || ''));
+    return ['https:', 'http:'].includes(url.protocol) ? url.toString() : '';
+  } catch {
+    return '';
+  }
+}
+
+function normalizeBlock(block) {
+  const value = block?.[block?.type] || {};
+  const normalized = {
+    id: block.id,
+    type: block.type,
+    hasChildren: Boolean(block.has_children),
+    children: [],
+  };
+  if (Array.isArray(value.rich_text)) normalized.richText = normalizeRichText(value.rich_text);
+  if (value.color) normalized.color = value.color;
+  if (block.type === 'to_do') normalized.checked = Boolean(value.checked);
+  if (block.type === 'code') {
+    normalized.language = value.language || 'plain text';
+    normalized.caption = normalizeRichText(value.caption);
+  }
+  if (block.type === 'equation') normalized.expression = value.expression || '';
+  if (block.type === 'image') {
+    normalized.url = safeExternalUrl(value.file?.url || value.external?.url);
+    normalized.caption = normalizeRichText(value.caption);
+  }
+  if (['bookmark', 'embed', 'video', 'file', 'pdf', 'audio'].includes(block.type)) {
+    normalized.url = safeExternalUrl(value.url || value.file?.url || value.external?.url);
+    normalized.caption = normalizeRichText(value.caption);
+  }
+  if (block.type === 'callout') normalized.icon = value.icon?.emoji || '';
+  if (block.type === 'child_page' || block.type === 'child_database') normalized.title = value.title || '';
+  if (block.type === 'table') {
+    normalized.tableWidth = Number(value.table_width) || 0;
+    normalized.hasColumnHeader = Boolean(value.has_column_header);
+    normalized.hasRowHeader = Boolean(value.has_row_header);
+  }
+  if (block.type === 'table_row') {
+    normalized.cells = (value.cells || []).map(normalizeRichText);
+  }
+  return normalized;
+}
+
+async function collectBlockContent(blockId, state, depth = 0, target = state.blocks) {
   if (state.blockCount >= MAX_CONTENT_BLOCKS || depth > MAX_CONTENT_DEPTH) return;
   let cursor = null;
   do {
@@ -202,6 +265,7 @@ async function collectBlockContent(blockId, state, depth = 0) {
     for (const block of payload.results || []) {
       if (state.blockCount >= MAX_CONTENT_BLOCKS) break;
       state.blockCount += 1;
+      const normalizedBlock = normalizeBlock(block);
       const text = blockPlainText(block).trim();
       if (text) {
         state.lines.push(text);
@@ -214,8 +278,9 @@ async function collectBlockContent(blockId, state, depth = 0) {
         }
       }
       if (block.has_children && depth < MAX_CONTENT_DEPTH) {
-        await collectBlockContent(block.id, state, depth + 1);
+        await collectBlockContent(block.id, state, depth + 1, normalizedBlock.children);
       }
+      target.push(normalizedBlock);
     }
     cursor = payload.has_more && state.blockCount < MAX_CONTENT_BLOCKS ? payload.next_cursor : null;
   } while (cursor);
@@ -232,12 +297,18 @@ async function getLibraryPagePreview(pageId) {
   const page = await notionFetch(`/pages/${pageId}`);
   assertLibraryPage(page, dataSourceId);
   const normalized = normalizeNotionPage(page);
-  const state = { lines: [], headings: [], blockCount: 0 };
+  const state = { lines: [], headings: [], blocks: [], blockCount: 0 };
   await collectBlockContent(page.id, state);
   return {
     ...normalized,
+    contentSchemaVersion: CONTENT_SCHEMA_VERSION,
+    blocks: state.blocks,
     plainText: state.lines.join('\n\n'),
     headings: state.headings,
+    assets: state.blocks.flatMap(function collectAssets(block) {
+      const own = block.url ? [{ id: block.id, type: block.type, url: block.url }] : [];
+      return [...own, ...(block.children || []).flatMap(collectAssets)];
+    }),
     blockCount: state.blockCount,
     truncated: state.blockCount >= MAX_CONTENT_BLOCKS,
     fetchedAt: new Date().toISOString(),

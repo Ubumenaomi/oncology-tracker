@@ -5,6 +5,8 @@
 The Knowledge Hub can index the existing Notion `Fellow training` data source through `/api/notion-library`.
 Notion remains the source of truth: the endpoint accepts `GET` only and never creates or updates Notion pages.
 
+Use `npm run dev:full` when testing Notion content locally. Plain `npm run dev` starts only Vite and does not run the Vercel Function under `/api`.
+
 Configure these server-side environment variables in Vercel (see `.env.example`):
 
 - `NOTION_TOKEN`
