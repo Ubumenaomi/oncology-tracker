@@ -1,4 +1,4 @@
-const CACHE_NAME = 'oncology-tracker-v4'
+const CACHE_NAME = 'oncology-tracker-v5'
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -42,6 +42,12 @@ self.addEventListener('fetch', (event) => {
 
   const requestUrl = new URL(event.request.url)
   if (requestUrl.origin !== self.location.origin) {
+    return
+  }
+
+  // Authenticated API responses must always reach the server. Caching these
+  // would make explicit sync actions return stale Notion/Firebase data.
+  if (requestUrl.pathname.startsWith('/api/')) {
     return
   }
 
