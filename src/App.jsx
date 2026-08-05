@@ -3316,35 +3316,44 @@ function getQuestReviewHistory(state, flashcardState) {
 function buildBossChallenges(task) {
   const goldenTrials = [...new Set(task?.goldenTrials || [])];
   const relatedTrials = [...new Set(task?.relatedTrials || [])];
-  const firstTrial = goldenTrials[0] || relatedTrials[0] || '本日無可回想 Trial';
+  const firstTrial = goldenTrials[0] || relatedTrials[0] || null;
   const goldenTrialList = goldenTrials.length ? goldenTrials.join('、') : '本日無 Golden Trial';
   const relatedTrialList = relatedTrials.length ? relatedTrials.join('、') : '本日無 Related Trial';
   const topicLabel = `${task?.day || 'Today'}｜${task?.topic || 'today topic'}`;
+  const focusLabel = (task?.focusTags || []).join('、') || task?.details || task?.topic || '今日核心主題';
   return [
     {
       id: 'trial',
-      title: 'Boss 1｜Trial Recall',
-      prompt: `${topicLabel}\n${firstTrial}: population / endpoint / implication`,
-      answerHint: '說出 P/I/C/O、primary endpoint，以及正式考最可能改寫的陷阱。',
-      available: goldenTrials.length + relatedTrials.length > 0,
+      title: firstTrial ? 'Boss 1｜Trial Recall' : 'Boss 1｜Topic Recall',
+      prompt: firstTrial
+        ? `${topicLabel}\n${firstTrial}: population / endpoint / implication`
+        : `${topicLabel}\n說出本日主題的核心臨床決策與關鍵陷阱。`,
+      answerHint: firstTrial
+        ? '說出 P/I/C/O、primary endpoint，以及正式考最可能改寫的陷阱。'
+        : task?.details || `用自己的話整理：${focusLabel}。`,
+      available: true,
     },
     {
       id: 'golden-trial-list',
-      title: 'Boss 2｜Golden Trial 整理',
-      prompt: `${topicLabel}\n確認本日 Golden Trial：${goldenTrialList}`,
+      title: goldenTrials.length ? 'Boss 2｜Golden Trial 整理' : 'Boss 2｜Treatment Algorithm',
+      prompt: goldenTrials.length
+        ? `${topicLabel}\n確認本日 Golden Trial：${goldenTrialList}`
+        : `${topicLabel}\n依照 patient / disease / treatment factors 說出處置順序。`,
       answerHint: goldenTrials.length
         ? `本日 Golden Trial 共 ${goldenTrials.length} 個：${goldenTrialList}。確認名稱後再按 Pass。`
-        : '本日沒有已通過審核且分配完成的 Golden Trial。',
-      available: goldenTrials.length > 0,
+        : `用「先分層、再選治療、最後處理毒性」的順序整理：${focusLabel}。`,
+      available: true,
     },
     {
       id: 'related-trial-list',
-      title: 'Boss 3｜Related Trial 整理',
-      prompt: `${topicLabel}\n確認本日 Related Trial：${relatedTrialList}`,
+      title: relatedTrials.length ? 'Boss 3｜Related Trial 整理' : 'Boss 3｜Exam Trap',
+      prompt: relatedTrials.length
+        ? `${topicLabel}\n確認本日 Related Trial：${relatedTrialList}`
+        : `${topicLabel}\n說出一個正式考最可能改寫的毒性、禁忌或治療順序陷阱。`,
       answerHint: relatedTrials.length
         ? `本日 Related Trial 共 ${relatedTrials.length} 個：${relatedTrialList}。確認它們與 Golden Trial 的差異後再按 Pass。`
-        : '本日沒有已通過審核且分配完成的 Related Trial。',
-      available: relatedTrials.length > 0,
+        : `從以下重點挑一個說明「怎麼監測、何時停藥或換藥」：${focusLabel}。`,
+      available: true,
     },
   ];
 }
