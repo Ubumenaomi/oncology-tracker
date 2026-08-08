@@ -4,6 +4,7 @@ const DEFAULT_FIREBASE_API_KEY = 'AIzaSyAIHA_tbHQbK7-7mQrPA-Y2RMN7c-FZrIk';
 const MAX_QUERY_PAGES = 10;
 const MAX_CONTENT_BLOCKS = 500;
 const MAX_CONTENT_DEPTH = 4;
+const MAX_PARENT_DEPTH = 20;
 const CONTENT_SCHEMA_VERSION = 2;
 
 function sendJson(res, status, payload) {
@@ -173,14 +174,34 @@ function normalizeId(value = '') {
 }
 
 async function assertLibraryPage(page, dataSourceId) {
-  const pageDataSourceId = page?.parent?.data_source_id || '';
-  if (pageDataSourceId && normalizeId(pageDataSourceId) === normalizeId(dataSourceId)) return;
+  const targetDataSourceId = normalizeId(dataSourceId);
+  const visitedPageIds = new Set();
+  let targetDatabaseId = null;
+  let currentPage = page;
 
-  const pageDatabaseId = page?.parent?.database_id || '';
-  if (pageDatabaseId) {
-    const dataSource = await notionFetch(`/data_sources/${dataSourceId}`);
-    const parentDatabaseId = dataSource?.parent?.database_id || '';
-    if (parentDatabaseId && normalizeId(parentDatabaseId) === normalizeId(pageDatabaseId)) return;
+  for (let depth = 0; depth < MAX_PARENT_DEPTH; depth += 1) {
+    const parent = currentPage?.parent || {};
+    const pageDataSourceId = parent.data_source_id || '';
+    if (pageDataSourceId) {
+      if (normalizeId(pageDataSourceId) === targetDataSourceId) return;
+      break;
+    }
+
+    const pageDatabaseId = parent.database_id || '';
+    if (pageDatabaseId) {
+      if (targetDatabaseId === null) {
+        const dataSource = await notionFetch(`/data_sources/${dataSourceId}`);
+        targetDatabaseId = normalizeId(dataSource?.parent?.database_id || '');
+      }
+      if (targetDatabaseId && normalizeId(pageDatabaseId) === targetDatabaseId) return;
+      break;
+    }
+
+    const parentPageId = parent.page_id || '';
+    const normalizedParentPageId = normalizeId(parentPageId);
+    if (!normalizedParentPageId || visitedPageIds.has(normalizedParentPageId)) break;
+    visitedPageIds.add(normalizedParentPageId);
+    currentPage = await notionFetch(`/pages/${parentPageId}`);
   }
 
   const error = new Error('The requested page is not part of Fellow training.');
