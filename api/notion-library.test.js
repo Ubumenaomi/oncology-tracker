@@ -175,3 +175,109 @@ test('returns structured rich blocks for a read-only page preview', async () => 
     else process.env.NOTION_TOKEN = originalToken;
   }
 });
+
+test('accepts a nested page whose ancestor belongs to Fellow training', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalPolicy = process.env.NOTION_ALLOWED_UIDS;
+  const originalToken = process.env.NOTION_TOKEN;
+  process.env.NOTION_ALLOWED_UIDS = 'allowed-user';
+  process.env.NOTION_TOKEN = 'server-only-test-token';
+  const pageId = '12345678-1234-1234-1234-123456789abc';
+  const parentPageId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  globalThis.fetch = async (url) => {
+    const value = String(url);
+    if (value.includes('accounts:lookup')) {
+      return jsonResponse({ users: [{ localId: 'allowed-user' }] });
+    }
+    if (value.endsWith(`/pages/${pageId}`)) {
+      return jsonResponse({
+        id: pageId,
+        url: `https://notion.so/${pageId.replaceAll('-', '')}`,
+        parent: { type: 'page_id', page_id: parentPageId },
+        properties: { Page: { title: [{ plain_text: 'Nested note' }] } },
+      });
+    }
+    if (value.endsWith(`/pages/${parentPageId}`)) {
+      return jsonResponse({
+        id: parentPageId,
+        parent: {
+          type: 'data_source_id',
+          data_source_id: '105bb19a-c0c2-8160-aaab-000b49de9e79',
+        },
+      });
+    }
+    if (value.includes(`/blocks/${pageId}/children`)) {
+      return jsonResponse({ has_more: false, results: [] });
+    }
+    throw new Error(`Unexpected request: ${value}`);
+  };
+
+  try {
+    const res = createResponse();
+    await handler({
+      method: 'GET',
+      headers: { authorization: 'Bearer firebase-id-token' },
+      url: `/api/notion-library?pageId=${pageId}`,
+    }, res);
+    const payload = JSON.parse(res.body);
+    assert.equal(res.statusCode, 200);
+    assert.equal(payload.item.title, 'Nested note');
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalPolicy === undefined) delete process.env.NOTION_ALLOWED_UIDS;
+    else process.env.NOTION_ALLOWED_UIDS = originalPolicy;
+    if (originalToken === undefined) delete process.env.NOTION_TOKEN;
+    else process.env.NOTION_TOKEN = originalToken;
+  }
+});
+
+test('rejects a nested page whose ancestor belongs to another data source', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalPolicy = process.env.NOTION_ALLOWED_UIDS;
+  const originalToken = process.env.NOTION_TOKEN;
+  process.env.NOTION_ALLOWED_UIDS = 'allowed-user';
+  process.env.NOTION_TOKEN = 'server-only-test-token';
+  const pageId = '12345678-1234-1234-1234-123456789abc';
+  const parentPageId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+  globalThis.fetch = async (url) => {
+    const value = String(url);
+    if (value.includes('accounts:lookup')) {
+      return jsonResponse({ users: [{ localId: 'allowed-user' }] });
+    }
+    if (value.endsWith(`/pages/${pageId}`)) {
+      return jsonResponse({
+        id: pageId,
+        parent: { type: 'page_id', page_id: parentPageId },
+        properties: { Page: { title: [{ plain_text: 'Outside note' }] } },
+      });
+    }
+    if (value.endsWith(`/pages/${parentPageId}`)) {
+      return jsonResponse({
+        id: parentPageId,
+        parent: {
+          type: 'data_source_id',
+          data_source_id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+        },
+      });
+    }
+    throw new Error(`Unexpected request: ${value}`);
+  };
+
+  try {
+    const res = createResponse();
+    await handler({
+      method: 'GET',
+      headers: { authorization: 'Bearer firebase-id-token' },
+      url: `/api/notion-library?pageId=${pageId}`,
+    }, res);
+    const payload = JSON.parse(res.body);
+    assert.equal(res.statusCode, 404);
+    assert.equal(payload.error, 'notion_page_outside_library');
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalPolicy === undefined) delete process.env.NOTION_ALLOWED_UIDS;
+    else process.env.NOTION_ALLOWED_UIDS = originalPolicy;
+    if (originalToken === undefined) delete process.env.NOTION_TOKEN;
+    else process.env.NOTION_TOKEN = originalToken;
+  }
+});
