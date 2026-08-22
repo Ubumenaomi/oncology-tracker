@@ -283,7 +283,6 @@ const FLASHCARD_RATINGS = {
 };
 
 const XP_RULES = {
-  stageClear: 100,
   planTask: 50,
   wrongAgainRecovery: 80,
   highConfidenceWrongCorrected: 120,
@@ -3053,42 +3052,13 @@ function getSavedDailyQuestTask(state, date, taskId) {
     || {};
 }
 
-function writeDailyQuestTask(state, date, taskId, progress) {
-  const bucket = getDailyQuestBucket(state, date);
-  const task = getStudyPlanTaskById(taskId);
-  const storageId = task ? getPlanTaskStorageId(task) : taskId;
-  const existingTasks = { ...(bucket.tasks || {}) };
-  if (task && storageId !== String(task.id)) delete existingTasks[task.id];
-  return {
-    ...bucket,
-    activeTaskId: storageId,
-    tasks: {
-      ...existingTasks,
-      [storageId]: progress,
-    },
-  };
-}
-
 function getDailyQuestProgress(state, date = TODAY, task = getTodayPlanTask(state), practiceDone = false) {
   const planTaskId = getPlanTaskStorageId(task) || 'day-1';
   const activeSaved = getSavedDailyQuestTask(state, date, planTaskId);
-  const memoryDone = Boolean(activeSaved.memoryDone);
-  const bossDone = Boolean(activeSaved.bossDone);
-  const practiceStar = Boolean(activeSaved.practiceDone || practiceDone);
-  const stars = [practiceStar, memoryDone, bossDone].filter(Boolean).length;
   return {
     ...makePlanTaskSnapshot(task),
     planTaskId,
-    practiceDone: practiceStar,
-    memoryDone,
-    bossDone,
-    stars,
-    xpClaimed: Boolean(activeSaved.xpClaimed),
-    stageClearedAt: activeSaved.stageClearedAt || null,
-    recallRatings: activeSaved.recallRatings || {},
-    bossResults: activeSaved.bossResults || {},
-    failedMasteryReviewDate: activeSaved.failedMasteryReviewDate || null,
-    perfectClear: Boolean(activeSaved.perfectClear),
+    practiceDone: Boolean(activeSaved.practiceDone || practiceDone),
   };
 }
 
@@ -3158,203 +3128,6 @@ function buildFullPlanItemProgress(task, checked) {
     knowledge: checked ? Object.fromEntries(getTaskKnowledgeItems(task).map((item) => [item, true])) : {},
     updatedAt: now,
   };
-}
-
-function updateDailyQuestMemoryProgress(state, date, task, practiceDone, cardId, rating = 'Read') {
-  const current = getDailyQuestProgress(state, date, task, practiceDone);
-  const nextRatings = { ...(current.recallRatings || {}), [cardId]: rating };
-  const reviewedCount = Object.keys(nextRatings).length;
-  const memoryDone = current.memoryDone || reviewedCount >= 5;
-  const next = {
-    ...current,
-    recallRatings: nextRatings,
-    memoryCardsReviewed: reviewedCount,
-    memoryDone,
-  };
-  next.stars = [next.practiceDone, next.memoryDone, next.bossDone].filter(Boolean).length;
-  return next;
-}
-
-function buildTopicRecallCards(task) {
-  const firstTrial = task?.goldenTrials?.[0] || 'Golden Trial';
-  const secondTrial = task?.goldenTrials?.[1] || firstTrial;
-  const focus = (task?.focusTags || []).join(', ') || task?.topic || 'core trap';
-  return [
-    {
-      id: `recall-${task?.id || 'x'}-topic`,
-      sourceType: 'topic-recall',
-      type: 'Algorithm Card',
-      cancer: task?.cancer || 'Today',
-      topic: task?.topic || 'Today topic',
-      front: `${task?.topic || 'Today topic'} 的核心考點是什麼？`,
-      back: task?.details || '用自己的話說出適應症、治療順序、endpoint 與常見陷阱。',
-    },
-    {
-      id: `recall-${task?.id || 'x'}-trial`,
-      sourceType: 'topic-recall',
-      type: 'Trial Card',
-      cancer: task?.cancer || 'Today',
-      topic: task?.topic || 'Golden trial',
-      front: `${firstTrial} 的 population / endpoint / implication？`,
-      back: `${firstTrial}: population、intervention、primary endpoint、臨床意義與常考陷阱。`,
-    },
-    {
-      id: `recall-${task?.id || 'x'}-focus`,
-      sourceType: 'topic-recall',
-      type: 'Algorithm Card',
-      cancer: task?.cancer || 'Today',
-      topic: task?.topic || 'Focus',
-      front: `今天 ${task?.module || task?.cancer || 'topic'} 要主動回想哪些 focus tags？`,
-      back: focus,
-    },
-    {
-      id: `recall-${task?.id || 'x'}-algorithm`,
-      sourceType: 'topic-recall',
-      type: 'Algorithm Card',
-      cancer: task?.cancer || 'Today',
-      topic: task?.topic || 'Algorithm',
-      front: `${task?.topic || 'Today topic'} 的 treatment sequencing / algorithm 怎麼走？`,
-      back: task?.details || '先說 staging / biomarker，再說 first choice、contraindication、progression next step。',
-    },
-    {
-      id: `recall-${task?.id || 'x'}-trap`,
-      sourceType: 'topic-recall',
-      type: 'Trap Card',
-      cancer: task?.cancer || 'Today',
-      topic: task?.topic || 'Exam trap',
-      front: `${secondTrial} 或今日主題最容易被考成什麼陷阱？`,
-      back: `${secondTrial}: endpoint、eligibility、toxicity、或和相似 trial 的差異。Focus: ${focus}`,
-    },
-  ];
-}
-
-function getQuestMemoryCards(state, task) {
-  const allCards = getFlashcardList(state);
-  const taskText = getTaskSearchText(task);
-  const matchesTask = (card) => {
-    const cardTags = normalizeTextList(card.tags);
-    const cardTrials = normalizeTextList(card.trial);
-    const cardText = `${card.cancer || ''} ${card.topic || ''} ${card.type || ''} ${card.front || ''} ${card.back || ''} ${cardTags.join(' ')} ${cardTrials.join(' ')}`.toLowerCase();
-    const trialHit = (task?.goldenTrials || []).some((trial) => cardText.includes(String(trial).toLowerCase()));
-    const focusHit = (task?.focusTags || []).some((tag) => cardText.includes(String(tag).toLowerCase()));
-    const keywordHits = getTaskKeywords(task).filter((keyword) => cardText.includes(keyword)).length;
-    return (Boolean(card.cancer && card.cancer === task?.cancer) && (focusHit || trialHit || keywordHits >= 2))
-      || Boolean(card.topic && taskText.includes(String(card.topic).toLowerCase()))
-      || trialHit;
-  };
-  const due = allCards.filter((card) => !card.nextReviewDate || card.nextReviewDate <= TODAY);
-  const topicDue = due.filter(matchesTask);
-  const topicCards = allCards.filter(matchesTask);
-  const picked = [];
-  const used = new Set();
-  buildTopicRecallCards(task).forEach((card) => {
-    if (picked.length >= 5 || used.has(card.id)) return;
-    picked.push(card);
-    used.add(card.id);
-  });
-  [...topicDue, ...topicCards, ...due].forEach((card) => {
-    if (picked.length >= 5 || used.has(card.id)) return;
-    picked.push(card);
-    used.add(card.id);
-  });
-  return picked.slice(0, 5);
-}
-
-function getQuestReviewHistory(state, flashcardState) {
-  const cardsById = new Map(getFlashcardList(flashcardState).map((card) => [card.id, card]));
-  return Object.entries(state.dailyQuestProgress || {})
-    .flatMap(([date]) => {
-      const bucket = getDailyQuestBucket(state, date);
-      return Object.entries(bucket.tasks || {}).map(([taskId, saved]) => {
-        const planTaskId = saved.planTaskId || taskId;
-        const task = getStudyPlanTaskById(planTaskId)
-          || getStudyPlanTaskById(saved.legacyPlanTaskId)
-          || getStudyPlanTaskById(taskId)
-          || null;
-        const taskLabel = task
-          ? `${task.day}｜${task.topic}`
-          : [saved.planDay, saved.planTopic].filter(Boolean).join('｜') || `Task ${planTaskId}`;
-        const topicRecallCards = new Map(buildTopicRecallCards(task).map((card) => [card.id, card]));
-        const recallRows = Object.entries(saved.recallRatings || {}).map(([cardId, rating]) => {
-          const card = cardsById.get(cardId) || topicRecallCards.get(cardId) || {
-            id: cardId,
-            type: 'Flashcard',
-            front: cardId,
-            back: '',
-          };
-          return {
-            id: cardId,
-            rating,
-            type: card.type || card.sourceType || 'Flashcard',
-            front: card.front || cardId,
-            back: card.back || '',
-            topic: card.topic || task?.topic || '',
-          };
-        });
-        return {
-          id: `${date}-${planTaskId}`,
-          date,
-          taskId: planTaskId,
-          legacyTaskId: saved.legacyPlanTaskId || task?.id || null,
-          taskLabel,
-          cancer: task?.cancer || saved.cancer || 'Quest',
-          stars: saved.stars || [saved.practiceDone, saved.memoryDone, saved.bossDone].filter(Boolean).length,
-          memoryDone: Boolean(saved.memoryDone),
-          practiceDone: Boolean(saved.practiceDone),
-          bossDone: Boolean(saved.bossDone),
-          reviewedCount: saved.memoryCardsReviewed || recallRows.length,
-          recallRows,
-        };
-      });
-    })
-    .filter((row) => row.reviewedCount > 0 || row.memoryDone || row.stars > 0)
-    .sort((a, b) => b.date.localeCompare(a.date) || b.taskId - a.taskId)
-    .slice(0, 14);
-}
-
-function buildBossChallenges(task) {
-  const goldenTrials = [...new Set(task?.goldenTrials || [])];
-  const relatedTrials = [...new Set(task?.relatedTrials || [])];
-  const firstTrial = goldenTrials[0] || relatedTrials[0] || null;
-  const goldenTrialList = goldenTrials.length ? goldenTrials.join('、') : '本日無 Golden Trial';
-  const relatedTrialList = relatedTrials.length ? relatedTrials.join('、') : '本日無 Related Trial';
-  const topicLabel = `${task?.day || 'Today'}｜${task?.topic || 'today topic'}`;
-  const focusLabel = (task?.focusTags || []).join('、') || task?.details || task?.topic || '今日核心主題';
-  return [
-    {
-      id: 'trial',
-      title: firstTrial ? 'Boss 1｜Trial Recall' : 'Boss 1｜Topic Recall',
-      prompt: firstTrial
-        ? `${topicLabel}\n${firstTrial}: population / endpoint / implication`
-        : `${topicLabel}\n說出本日主題的核心臨床決策與關鍵陷阱。`,
-      answerHint: firstTrial
-        ? '說出 P/I/C/O、primary endpoint，以及正式考最可能改寫的陷阱。'
-        : task?.details || `用自己的話整理：${focusLabel}。`,
-      available: true,
-    },
-    {
-      id: 'golden-trial-list',
-      title: goldenTrials.length ? 'Boss 2｜Golden Trial 整理' : 'Boss 2｜Treatment Algorithm',
-      prompt: goldenTrials.length
-        ? `${topicLabel}\n確認本日 Golden Trial：${goldenTrialList}`
-        : `${topicLabel}\n依照 patient / disease / treatment factors 說出處置順序。`,
-      answerHint: goldenTrials.length
-        ? `本日 Golden Trial 共 ${goldenTrials.length} 個：${goldenTrialList}。確認名稱後再按 Pass。`
-        : `用「先分層、再選治療、最後處理毒性」的順序整理：${focusLabel}。`,
-      available: true,
-    },
-    {
-      id: 'related-trial-list',
-      title: relatedTrials.length ? 'Boss 3｜Related Trial 整理' : 'Boss 3｜Exam Trap',
-      prompt: relatedTrials.length
-        ? `${topicLabel}\n確認本日 Related Trial：${relatedTrialList}`
-        : `${topicLabel}\n說出一個正式考最可能改寫的毒性、禁忌或治療順序陷阱。`,
-      answerHint: relatedTrials.length
-        ? `本日 Related Trial 共 ${relatedTrials.length} 個：${relatedTrialList}。確認它們與 Golden Trial 的差異後再按 Pass。`
-        : `從以下重點挑一個說明「怎麼監測、何時停藥或換藥」：${focusLabel}。`,
-      available: true,
-    },
-  ];
 }
 
 function getCancerSummary(state) {
@@ -3757,11 +3530,6 @@ function getStatsDashboard(state, planSummary, readiness, cancerSummary, date = 
     .filter((row) => row.attempts > 0)
     .sort((a, b) => b.wrongRate - a.wrongRate || b.wrong - a.wrong)
     .slice(0, 5);
-  const recentQuestStars = Object.entries(state.dailyQuestProgress || {})
-    .sort(([a], [b]) => b.localeCompare(a))
-    .slice(0, 7)
-    .reduce((sum, entry) => sum + (entry[1]?.stars || 0), 0);
-
   return {
     attempts,
     correct,
@@ -3797,7 +3565,6 @@ function getStatsDashboard(state, planSummary, readiness, cancerSummary, date = 
     flashcardTotal: flashcardList.length,
     masteredCards,
     dueCards,
-    recentQuestStars,
   };
 }
 
@@ -4464,10 +4231,6 @@ function StatsDashboard({ stats }) {
             </div>
             <div className="progress-bar large">
               <span style={{ width: `${stats.flashcardTotal ? Math.round((stats.masteredCards / stats.flashcardTotal) * 100) : 0}%` }} />
-            </div>
-            <div className="quest-star-summary">
-              <span>Recent Quest stars</span>
-              <strong>{stats.recentQuestStars}</strong>
             </div>
           </div>
         </article>
@@ -6124,9 +5887,6 @@ function QuestionManagerDetail({ question, stat, onEdit, onDelete, onSaveExplana
 function QuestPanel({
   task,
   progress,
-  recallCards,
-  reviewHistory,
-  bossChallenges,
   highYieldTopics,
   completionStatus,
   checkedInToday,
@@ -6138,59 +5898,14 @@ function QuestPanel({
   hasPracticeSession,
   remainingErrorTypes,
   onPracticeModeChange,
-  onMarkRecall,
-  onSetBossResult,
-  onClaimStageClear,
   onOpenPractice,
 }) {
-  const [openRecallId, setOpenRecallId] = useState(recallCards[0]?.id || '');
-  const [openBossId, setOpenBossId] = useState(bossChallenges[0]?.id || '');
-  const [selectedMemoryView, setSelectedMemoryView] = useState('today');
-  const [openHistoryCardId, setOpenHistoryCardId] = useState('');
-  const bossPassed = Object.values(progress.bossResults || {}).filter(Boolean).length;
-  const bossAnswered = Object.keys(progress.bossResults || {}).length;
-  const allStars = progress.stars >= 3;
-  const selectedHistory = selectedMemoryView === 'today'
-    ? null
-    : reviewHistory.find((item) => item.id === selectedMemoryView) || null;
-
-  useEffect(() => {
-    if (selectedMemoryView !== 'today' && !reviewHistory.some((item) => item.id === selectedMemoryView)) {
-      setSelectedMemoryView('today');
-      setOpenHistoryCardId('');
-    }
-  }, [reviewHistory, selectedMemoryView]);
-
-  const starRows = [
-    {
-      key: 'practice',
-      title: 'Practice Star',
-      done: progress.practiceDone,
-      text: remainingErrorTypes > 0 ? `題目已完成；尚有 ${remainingErrorTypes} 題錯因需要分類。` : '完成今日 Daily Practice 題目並評分。',
-      action: progress.practiceDone || hasPracticeSession ? onOpenPractice : onCreatePractice,
-      actionText: progress.practiceDone
-        ? '查看今日練習'
-        : remainingErrorTypes > 0
-          ? `完成 ${remainingErrorTypes} 題錯因`
-          : hasPracticeSession ? '繼續今日練習' : isCreatingPractice ? '產生中...' : '產生今日練習',
-    },
-    {
-      key: 'memory',
-      title: 'Memory Star',
-      done: progress.memoryDone,
-      text: '確認讀過今日 5 張 Top Recall。',
-      action: null,
-      actionText: '',
-    },
-    {
-      key: 'mastery',
-      title: 'Mastery Star',
-      done: progress.bossDone,
-      text: 'Boss Challenge 至少 2/3 通過。',
-      action: null,
-      actionText: '',
-    },
-  ];
+  const practiceAction = progress.practiceDone || hasPracticeSession ? onOpenPractice : onCreatePractice;
+  const practiceActionText = progress.practiceDone
+    ? '查看今日練習'
+    : remainingErrorTypes > 0
+      ? `完成 ${remainingErrorTypes} 題錯因`
+      : hasPracticeSession ? '繼續今日練習' : isCreatingPractice ? '產生中...' : '產生今日練習';
 
   return (
     <main className="panel quest-panel">
@@ -6217,43 +5932,17 @@ function QuestPanel({
             <span>Weight {task.highYieldWeight || 3}</span>
           </div>
         </div>
-        <div className={allStars ? 'stage-clear-card cleared' : 'stage-clear-card'}>
-          <strong>{allStars ? 'Stage Clear Ready' : `${progress.stars}/3 Stars`}</strong>
-          <span>{progress.xpClaimed ? 'XP claimed' : allStars ? '+100 XP available' : 'Clear all stars to claim XP'}</span>
-          <button className="primary" disabled={!allStars || progress.xpClaimed} onClick={onClaimStageClear}>
-            {progress.xpClaimed ? 'Stage Clear' : 'Claim Stage Clear'}
-          </button>
-        </div>
       </div>
 
-      <section className="quest-star-strip" aria-label="Today quest star progress">
-        {starRows.map((star, index) => (
-          <div className={star.done ? 'quest-star-token done' : 'quest-star-token'} key={star.key}>
-            <span className="quest-star-icon">{star.done ? '★' : '☆'}</span>
-            <span className="quest-star-label">{index + 1}. {star.title.replace(' Star', '')}</span>
-          </div>
-        ))}
-      </section>
-
-      <section className="quest-star-grid">
-        {starRows.map((star) => (
-          <div className={star.done ? 'quest-star done' : 'quest-star'} key={star.key}>
-            <strong>{star.done ? '⭐' : '☆'} {star.title}</strong>
-            <p>{star.text}</p>
-            {star.action && (
-              <button
-                className="secondary"
-                disabled={star.key === 'practice' && isCreatingPractice}
-                onClick={star.action}
-              >
-                {star.actionText}
-              </button>
-            )}
-            {star.key === 'practice' && (
-              <PracticeModeSelector value={practiceMode} onChange={onPracticeModeChange} />
-            )}
-          </div>
-        ))}
+      <section className={progress.practiceDone ? 'quest-practice-card done' : 'quest-practice-card'}>
+        <div>
+          <h3>今日 Daily Practice</h3>
+          <p>{remainingErrorTypes > 0 ? `題目已完成；尚有 ${remainingErrorTypes} 題錯因需要分類。` : '完成今日題目、評分與錯因分類。'}</p>
+        </div>
+        <button className="secondary" disabled={isCreatingPractice} onClick={practiceAction}>
+          {practiceActionText}
+        </button>
+        <PracticeModeSelector value={practiceMode} onChange={onPracticeModeChange} />
       </section>
 
       <section className="adaptive-practice-card">
@@ -6286,143 +5975,6 @@ function QuestPanel({
         </div>
       </section>
 
-      {allStars && (
-        <section className="stage-clear-banner">
-          <h3>{progress.perfectClear ? 'Perfect Clear' : 'Stage Clear'}</h3>
-          <p>今日副本完成。XP +100，下一關會從 40-Day Final Sprint 的下一個未完成任務開始。</p>
-        </section>
-      )}
-
-      <section className="subsection quest-memory-section">
-        <div className="section-head compact">
-          <div>
-            <h3>Memory Star｜Top Recall</h3>
-            <p className="muted">用自己的判斷讀過今日重點，確認 5 張即可拿 Memory Star；切到日期時可回看紀錄。</p>
-          </div>
-          <span className="priority">{selectedMemoryView === 'today' ? 'Today' : 'History'}</span>
-        </div>
-
-        <div className="memory-view-switcher" aria-label="Memory review switcher">
-          <button
-            className={selectedMemoryView === 'today' ? 'memory-view-chip active' : 'memory-view-chip'}
-            type="button"
-            onClick={() => {
-              setSelectedMemoryView('today');
-              setOpenHistoryCardId('');
-            }}
-          >
-            <span>今日</span>
-            <strong>{recallCards.length} recalls · {progress.stars}/3 stars</strong>
-          </button>
-          {reviewHistory.map((item) => (
-            <button
-              className={selectedMemoryView === item.id ? 'memory-view-chip active' : 'memory-view-chip'}
-              type="button"
-              key={item.id}
-              onClick={() => {
-                setSelectedMemoryView(item.id);
-                setOpenHistoryCardId('');
-              }}
-            >
-              <span>{item.date}</span>
-              <strong>{item.reviewedCount} recalls · {item.stars}/3 stars</strong>
-              <em>{item.taskLabel}</em>
-            </button>
-          ))}
-        </div>
-
-        {selectedMemoryView === 'today' ? (
-          <div className="recall-grid">
-            {recallCards.map((card) => {
-              const confirmed = Boolean(progress.recallRatings?.[card.id]);
-              const open = openRecallId === card.id;
-              return (
-                <article className={confirmed ? 'recall-card done' : 'recall-card'} key={card.id}>
-                  <div className="question-top">
-                    <span className="pill">{card.type}</span>
-                    {confirmed && <span className="priority high">已讀</span>}
-                  </div>
-                  <strong>{card.front}</strong>
-                  {open && <p className="recall-back">{card.back}</p>}
-                  <div className="inline-actions">
-                    <button className="secondary" onClick={() => setOpenRecallId(open ? '' : card.id)}>{open ? '收合' : '看內容'}</button>
-                    <button className="good recall-confirm-button" disabled={confirmed} onClick={() => onMarkRecall(card)}>
-                      {confirmed ? '已確認讀過' : '確認讀過'}
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        ) : selectedHistory ? (
-          <div className="quest-history-detail">
-            <div className="quest-history-summary">
-              <div>
-                <span className="pill">{selectedHistory.cancer}</span>
-                <strong>{selectedHistory.taskLabel}</strong>
-                <p>{selectedHistory.date} · {selectedHistory.reviewedCount} 張已讀</p>
-              </div>
-              <div className="quest-history-stars" aria-label="Quest stars">
-                {['Practice', 'Memory', 'Mastery'].map((label, index) => {
-                  const done = [selectedHistory.practiceDone, selectedHistory.memoryDone, selectedHistory.bossDone][index];
-                  return <span className={done ? 'done' : ''} key={label}>{done ? '★' : '☆'} {label}</span>;
-                })}
-              </div>
-            </div>
-
-            {selectedHistory.recallRows.length === 0 ? (
-              <p className="muted">這一天有星星進度，但沒有留下單張 recall 紀錄。</p>
-            ) : (
-              <div className="quest-history-cards">
-                {selectedHistory.recallRows.map((card) => {
-                  const open = openHistoryCardId === card.id;
-                  return (
-                    <article className="quest-history-card" key={card.id}>
-                      <div className="question-top">
-                        <span className="pill">{card.type}</span>
-                        <span className="priority high">{card.rating === 'Read' ? '已讀' : card.rating}</span>
-                      </div>
-                      <strong>{card.front}</strong>
-                      {open && <p className="recall-back">{card.back || '這張卡目前沒有背面內容。'}</p>}
-                      <button className="secondary" type="button" onClick={() => setOpenHistoryCardId(open ? '' : card.id)}>
-                        {open ? '收合' : '看內容'}
-                      </button>
-                    </article>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="empty-state small">
-            <h3>還沒有可回看的記憶紀錄</h3>
-            <p>完成一次 Topic Recall 或 Flashcard Review 後，日期會出現在上方，可直接切換回看。</p>
-          </div>
-        )}
-      </section>
-
-      <section className="subsection">
-        <h3>Boss Challenge</h3>
-        <p className="muted">目前 {bossPassed}/3 通過，{bossAnswered}/3 已判定。2/3 通過即可拿 Mastery Star。</p>
-        <div className="boss-challenge-grid">
-          {bossChallenges.map((boss) => {
-            const result = progress.bossResults?.[boss.id];
-            const open = openBossId === boss.id;
-            return (
-              <article className={result === true ? 'boss-challenge pass' : result === false ? 'boss-challenge fail' : 'boss-challenge'} key={boss.id}>
-                <strong>{boss.title}</strong>
-                <p>{boss.prompt}</p>
-                {open && <p className="recall-back">{boss.answerHint}</p>}
-                <div className="inline-actions">
-                  <button className="secondary" onClick={() => setOpenBossId(open ? '' : boss.id)}>{open ? '收合提示' : '看提示'}</button>
-                  <button className="good" disabled={!boss.available} onClick={() => onSetBossResult(boss.id, true)}>Pass</button>
-                  <button className="bad" disabled={!boss.available} onClick={() => onSetBossResult(boss.id, false)}>Fail</button>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </section>
     </main>
   );
 }
@@ -8762,9 +8314,6 @@ export default function App() {
       const previousStats = prev.flashcardStats?.[cardId] || prev.flashcardStats?.[baseCardId] || makeFlashcardStats(card);
       const schedule = getFlashcardReviewSchedulePreview(rating, previousStats);
       const mastery = Math.max(0, Math.min(5, (previousStats.mastery ?? card.mastery ?? 0) + rule.masteryDelta));
-      const currentQuest = getDailyQuestProgress(prev, TODAY, getTodayPlanTask(prev), todayCompleted);
-      const currentTask = getStudyPlanTaskById(currentQuest.planTaskId) || getTodayPlanTask(prev);
-      const dailyQuestProgress = updateDailyQuestMemoryProgress(prev, TODAY, currentTask, todayCompleted, cardId, rating);
       return {
         ...prev,
         flashcards: {
@@ -8793,14 +8342,10 @@ export default function App() {
             updatedAt: new Date().toISOString(),
           },
         },
-        dailyQuestProgress: {
-          ...(prev.dailyQuestProgress || {}),
-          [TODAY]: writeDailyQuestTask(prev, TODAY, currentTask.id, dailyQuestProgress),
-        },
         activeFlashcardReview: nextReviewSession,
         activeFlashcardReviewClearedAt: completedAt || prev.activeFlashcardReviewClearedAt || null,
       };
-    }, ['flashcards', 'flashcardStats', 'quest', 'activity']);
+    }, ['flashcards', 'flashcardStats', 'activity']);
   };
 
   const updateActiveFlashcardReview = useCallback((review) => {
@@ -9181,9 +8726,6 @@ export default function App() {
   const currentPracticePage = Math.min(practicePage, Math.max(0, Math.ceil(todayQuestions.length / PRACTICE_PAGE_SIZE) - 1));
   const visibleTodayQuestions = todayQuestions.slice(currentPracticePage * PRACTICE_PAGE_SIZE, (currentPracticePage + 1) * PRACTICE_PAGE_SIZE);
   const totalPracticePages = Math.ceil(todayPracticeConfig.total / PRACTICE_PAGE_SIZE);
-  const questRecallCards = tab === 'quest' ? getQuestMemoryCards(flashcardDataState, questTask) : EMPTY_ARRAY;
-  const questReviewHistory = tab === 'quest' ? getQuestReviewHistory(state, flashcardDataState) : EMPTY_ARRAY;
-  const questBossChallenges = tab === 'quest' ? buildBossChallenges(questTask, questionDataState) : EMPTY_ARRAY;
   const highYieldTopics = tab === 'quest' || tab === 'today' ? getRankedHighYieldTopics(questionDataState, questTask) : EMPTY_ARRAY;
   const todayHighValueCards = tab === 'quest' ? getHighValueCardsCreatedToday(flashcardDataState) : EMPTY_ARRAY;
   const todayErrorTypeStatus = tab === 'quest' ? getDailyWrongErrorTypeStatus(questionDataState, todayIds) : {
@@ -9196,11 +8738,6 @@ export default function App() {
       label: 'Daily Practice completed',
       done: todayCompleted,
       detail: todayCompleted ? '今日題目都已評分。' : `${todayRatedCount}/${todayPracticeTargetCount} 題已評分。`,
-    },
-    {
-      label: 'Boss 1-3 at least 2 pass',
-      done: questProgress.bossDone,
-      detail: `${Object.values(questProgress.bossResults || {}).filter(Boolean).length}/3 passed.`,
     },
     {
       label: 'Create 3-5 high-value cards',
@@ -9630,95 +9167,6 @@ export default function App() {
     }, ['game']);
   };
 
-  const markQuestRecall = (card) => {
-    const cardId = typeof card === 'string' ? card : card.id;
-    playResultFeedback('correct');
-    updateState((prev) => {
-      const next = updateDailyQuestMemoryProgress(prev, TODAY, questTask, todayCompleted, cardId, 'Read');
-      return {
-        ...prev,
-        dailyQuestProgress: {
-          ...(prev.dailyQuestProgress || {}),
-          [TODAY]: writeDailyQuestTask(prev, TODAY, getPlanTaskStorageId(questTask), next),
-        },
-      };
-    }, ['quest']);
-  };
-
-  const setQuestBossResult = (bossId, passed) => {
-    playResultFeedback(passed ? 'correct' : 'wrong');
-    updateState((prev) => {
-      const current = getDailyQuestProgress(prev, TODAY, questTask, todayCompleted);
-      const nextResults = { ...(current.bossResults || {}), [bossId]: passed };
-      const passCount = Object.values(nextResults).filter(Boolean).length;
-      const bossDone = passCount >= 2;
-      const next = {
-        ...current,
-        bossResults: nextResults,
-        bossDone,
-        perfectClear: passCount === 3,
-        failedMasteryReviewDate: passCount <= 1 && Object.keys(nextResults).length === 3 ? addDays(TODAY, 1) : current.failedMasteryReviewDate,
-      };
-      next.stars = [next.practiceDone, next.memoryDone, next.bossDone].filter(Boolean).length;
-      return {
-        ...prev,
-        bossProgress: {
-          ...(prev.bossProgress || {}),
-          [TODAY]: {
-            ...makePlanTaskSnapshot(questTask),
-            results: nextResults,
-            passed: passCount,
-            bossDone,
-            perfectClear: passCount === 3,
-          },
-        },
-        dailyQuestProgress: {
-          ...(prev.dailyQuestProgress || {}),
-          [TODAY]: writeDailyQuestTask(prev, TODAY, getPlanTaskStorageId(questTask), next),
-        },
-      };
-    }, ['quest']);
-  };
-
-  const claimStageClear = () => {
-    const current = getDailyQuestProgress(state, TODAY, questTask, todayCompleted);
-    if (current.stars < 3 || current.xpClaimed) return;
-    updateState((prev) => {
-      const currentProgress = getDailyQuestProgress(prev, TODAY, questTask, todayCompleted);
-      if (currentProgress.xpClaimed || currentProgress.stars < 3) return prev;
-      const awardedGame = awardXp(prev.game || defaultState.game, XP_RULES.stageClear, 'Daily quest stage clear', { date: TODAY, taskId: getPlanTaskStorageId(questTask), legacyTaskId: questTask.id });
-      const nextGame = {
-        ...awardedGame,
-        streak: (prev.game?.streak || 0) + 1,
-      };
-      const nextPlayer = {
-        ...(prev.player || defaultState.player),
-        xp: nextGame.xp,
-        level: nextGame.level,
-        streak: nextGame.streak,
-        badges: nextGame.badges || [],
-      };
-      return {
-        ...prev,
-        game: nextGame,
-        player: nextPlayer,
-        planProgress: makePlanProgressEntry(prev.planProgress, questTask, true),
-        dailyQuestProgress: {
-          ...(prev.dailyQuestProgress || {}),
-          [TODAY]: writeDailyQuestTask(prev, TODAY, getPlanTaskStorageId(questTask), {
-            ...currentProgress,
-            practiceDone: true,
-            memoryDone: true,
-            bossDone: true,
-            stars: 3,
-            xpClaimed: true,
-            stageClearedAt: new Date().toISOString(),
-          }),
-        },
-      };
-    }, ['game', 'progress', 'quest']);
-  };
-
   const regenerateTodaySession = () => {
     if (!window.confirm('重新抽題會覆蓋今天的題目清單，但不會刪除作答紀錄。確定？')) return;
     createTodaySession({ force: true });
@@ -10028,12 +9476,8 @@ export default function App() {
         [task.id]: nextItemProgress,
       };
       const fullyConfirmed = isTaskFullyConfirmed(task, nextItemProgress);
-      const questCleared = Object.values(prev.dailyQuestProgress || {}).some((bucket) => {
-        const saved = bucket?.tasks?.[taskId] || bucket?.tasks?.[task.id] || (getStudyPlanTaskById(bucket?.planTaskId) === task ? bucket : null);
-        return Boolean(saved?.xpClaimed || saved?.stageClearedAt);
-      });
       const wasDone = getPlanProgressValue(prev.planProgress, task);
-      const nextPlanProgress = makePlanProgressEntry(prev.planProgress, task, fullyConfirmed || (wasDone && questCleared));
+      const nextPlanProgress = makePlanProgressEntry(prev.planProgress, task, fullyConfirmed);
       const nextState = {
         ...prev,
         game: fullyConfirmed && !wasDone ? awardXp(prev.game || defaultState.game, XP_RULES.planTask, '40-Day sprint task completed', { taskId, legacyTaskId: task.id }) : prev.game,
@@ -10385,9 +9829,6 @@ export default function App() {
         <QuestPanel
           task={questTask}
           progress={questProgress}
-          recallCards={questRecallCards}
-          reviewHistory={questReviewHistory}
-          bossChallenges={questBossChallenges}
           highYieldTopics={highYieldTopics}
           completionStatus={completionStatus}
           checkedInToday={checkedInToday}
@@ -10399,9 +9840,6 @@ export default function App() {
           hasPracticeSession={todayPracticeTargetIds.length > 0}
           remainingErrorTypes={Math.max(0, dailyBatchWrong - dailyWrongClassified)}
           onPracticeModeChange={setPracticeMode}
-          onMarkRecall={markQuestRecall}
-          onSetBossResult={setQuestBossResult}
-          onClaimStageClear={claimStageClear}
           onOpenPractice={() => {
             if (!todayCompleted && firstIncompletePracticeId) {
               openFirstIncompletePracticeQuestion();
