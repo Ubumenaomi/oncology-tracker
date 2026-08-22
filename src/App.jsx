@@ -44,6 +44,11 @@ import {
   studyPlan100,
 } from './data/studyPlan100.js';
 import {
+  FINAL_SPRINT_GUIDANCE,
+  FINAL_SPRINT_PROFILE,
+  FINAL_SPRINT_START_DATE,
+} from './data/finalSprintPlan40.js';
+import {
   auth,
   db,
   firebaseConfigStatus,
@@ -106,7 +111,7 @@ const NAV_GROUPS = [
       ['mock', 'Mock Exam'],
       ['flashcard-review', 'Card Review'],
       ['flashcards', 'Card Manager'],
-      ['plan', '100-Day Plan'],
+      ['plan', '40-Day Final Sprint'],
     ],
   },
   {
@@ -2978,14 +2983,8 @@ function getTodayPlanTask(state) {
 
 function getPlanActivityStartDate(state, date = TODAY) {
   const resetDate = String(state?.cloudMeta?.planResetAt || '').slice(0, 10);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(resetDate)) return resetDate;
-
-  const questDates = Object.keys(state?.dailyQuestProgress || {}).filter((key) => /^\d{4}-\d{2}-\d{2}$/.test(key));
-  const sessionDates = Object.values(state?.sessions || {})
-    .map((session) => session?.date)
-    .filter((key) => /^\d{4}-\d{2}-\d{2}$/.test(key));
-  const dates = [...questDates, ...sessionDates].sort();
-  return dates[0] || date;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(resetDate) && resetDate >= FINAL_SPRINT_START_DATE) return resetDate;
+  return FINAL_SPRINT_START_DATE > date ? date : FINAL_SPRINT_START_DATE;
 }
 
 function getPlanRecoveryStatus(state, planProgress = {}, date = TODAY) {
@@ -4337,7 +4336,7 @@ function StatsDashboard({ stats }) {
       <div className="section-head">
         <div>
           <h2>Stats Dashboard</h2>
-          <p className="muted">把累計作答、今日進度、弱點、100-Day Plan 和 flashcards 統一看。</p>
+          <p className="muted">把累計作答、今日進度、弱點、40-Day Final Sprint 和 flashcards 統一看。</p>
         </div>
         <span className="pill soft">{TODAY}</span>
       </div>
@@ -4436,7 +4435,7 @@ function StatsDashboard({ stats }) {
 
         <article className="stats-panel">
           <div className="stats-panel-head">
-            <strong>100-Day Plan</strong>
+            <strong>40-Day Final Sprint</strong>
             <span>{stats.planCompleted}/{stats.planTotal}</span>
           </div>
           <div className="stats-progress-block">
@@ -5417,7 +5416,7 @@ function SyncPanel({
       <div className="section-head">
         <div>
           <h2>Cloud Sync：手機同步</h2>
-          <p className="muted">登入同一組帳號後，MacBook、iPhone、iPad 會讀取同一份作答紀錄、錯題率、專注時間、讀書時長排行榜與 100-Day Plan checklist。</p>
+          <p className="muted">登入同一組帳號後，MacBook、iPhone、iPad 會讀取同一份作答紀錄、錯題率、專注時間、讀書時長排行榜與 40-Day Final Sprint checklist。</p>
         </div>
         <span className={user ? 'cloud-badge online' : 'cloud-badge offline'}>
           {user ? 'Cloud sync on' : 'Local only'}
@@ -5472,7 +5471,7 @@ function SyncPanel({
           <li>把專案 deploy 到 Vercel 或 Firebase Hosting。</li>
           <li>手機 Safari/Chrome 打開正式網址。</li>
           <li>登入同一組帳號。</li>
-          <li>Daily Practice、Review Queue、專注時間、讀書時長排行榜、100-Day Plan 會自動同步。</li>
+          <li>Daily Practice、Review Queue、專注時間、讀書時長排行榜、40-Day Final Sprint 會自動同步。</li>
         </ol>
       </div>
     </main>
@@ -6290,7 +6289,7 @@ function QuestPanel({
       {allStars && (
         <section className="stage-clear-banner">
           <h3>{progress.perfectClear ? 'Perfect Clear' : 'Stage Clear'}</h3>
-          <p>今日副本完成。XP +100，下一關會從 100-Day Plan 的下一個未完成任務開始。</p>
+          <p>今日副本完成。XP +100，下一關會從 40-Day Final Sprint 的下一個未完成任務開始。</p>
         </section>
       )}
 
@@ -6914,7 +6913,7 @@ function KnowledgeHubPanel({
             </div>
           </div>
           <div className="knowledge-detail-actions">
-            <button className="primary" type="button" onClick={onOpenPlan}>Open 100-Day Plan</button>
+            <button className="primary" type="button" onClick={onOpenPlan}>Open 40-Day Sprint</button>
             {selectedTopic.dueCount > 0 && <button className="secondary" type="button" onClick={onOpenReview}>Review due items</button>}
           </div>
         </section>
@@ -6931,7 +6930,7 @@ function KnowledgeHubPanel({
             <div className="section-head">
               <div>
                 <h3>Decision focus</h3>
-                <p className="muted">這個 topic 在 100-Day Plan 的穩定學習範圍。</p>
+                <p className="muted">這個 topic 在 40-Day Final Sprint 的穩定學習範圍。</p>
               </div>
             </div>
             <div className="knowledge-chip-row">
@@ -7061,7 +7060,7 @@ function KnowledgeHubPanel({
           <h2>{hubView === 'topics' ? '從主題進入所有學習資源' : 'Notion 筆記，集中閱讀'}</h2>
           <p>{hubView !== 'topics'
             ? '在 Tracker 搜尋與閱讀 Fellow training；需要修改時直接回到 Notion，維持唯一筆記來源。'
-            : '以 100-Day Plan 為骨架，唯讀聚合 Questions、Trials、Flashcards、Critical Errors 與 Fellow training。'}</p>
+            : '以 40-Day Final Sprint 為骨架，唯讀聚合 Questions、Trials、Flashcards、Critical Errors 與 Fellow training。'}</p>
         </div>
         <div className="knowledge-hub-summary">
           <strong>{coreTopics.length}</strong><span>clinical topics</span>
@@ -7100,7 +7099,7 @@ function KnowledgeHubPanel({
         <section className="notion-library-section notion-today-section">
           <div className="section-head">
             <div>
-              <div className="knowledge-kicker">Today · 100-Day Plan</div>
+              <div className="knowledge-kicker">Today · 40-Day Final Sprint</div>
               <h3>{selectedTask?.day} · {selectedTask?.topic}</h3>
               <p className="muted">{selectedTask?.details}</p>
             </div>
@@ -7167,7 +7166,7 @@ function KnowledgeHubPanel({
             <p className="muted">顯示 {filteredTopics.length} 個 topic；點擊後進入聚合頁面。</p>
           </div>
           {programTopicCount > 0 && (
-            <p className="knowledge-program-note">Mock、Weakness Repair 與 Final Review 等 {programTopicCount} 個訓練日仍保留在 100-Day Plan，不列為臨床知識主題。</p>
+            <p className="knowledge-program-note">Mock、Weakness Repair 與 Final Review 等 {programTopicCount} 個訓練日仍保留在 40-Day Final Sprint，不列為臨床知識主題。</p>
           )}
         </div>
         {filteredTopics.length ? (
@@ -9957,7 +9956,7 @@ export default function App() {
   const missionControl = {
     goal: '通過腫瘤專科考試',
     loop: '每日任務 → 題目作答 → 錯題修補 → Trial 卡片 → Boss / Mock 驗收',
-    planTarget: nextPlanTask ? `下一個讀書計畫：${nextPlanTask.day} ${nextPlanTask.topic}` : '100-Day Plan 已完成',
+    planTarget: nextPlanTask ? `下一個讀書計畫：${nextPlanTask.day} ${nextPlanTask.topic}` : '40-Day Final Sprint 已完成',
     examLabel: EXAM_DATE.label,
     examDate: EXAM_DATE.display,
     examCountdown: getExamCountdown(),
@@ -9997,7 +9996,7 @@ export default function App() {
       const storageId = getPlanTaskStorageId(task);
       const nextState = {
         ...prev,
-        game: checked && !wasDone ? awardXp(prev.game || defaultState.game, XP_RULES.planTask, '100-Day task completed', { taskId: storageId, legacyTaskId: task.id }) : prev.game,
+        game: checked && !wasDone ? awardXp(prev.game || defaultState.game, XP_RULES.planTask, '40-Day sprint task completed', { taskId: storageId, legacyTaskId: task.id }) : prev.game,
         planProgress: makePlanProgressEntry(prev.planProgress, task, checked),
         planItemProgress: {
           ...(prev.planItemProgress || {}),
@@ -10037,7 +10036,7 @@ export default function App() {
       const nextPlanProgress = makePlanProgressEntry(prev.planProgress, task, fullyConfirmed || (wasDone && questCleared));
       const nextState = {
         ...prev,
-        game: fullyConfirmed && !wasDone ? awardXp(prev.game || defaultState.game, XP_RULES.planTask, '100-Day task completed', { taskId, legacyTaskId: task.id }) : prev.game,
+        game: fullyConfirmed && !wasDone ? awardXp(prev.game || defaultState.game, XP_RULES.planTask, '40-Day sprint task completed', { taskId, legacyTaskId: task.id }) : prev.game,
         planProgress: nextPlanProgress,
         planItemProgress: nextPlanItemProgress,
       };
@@ -10083,14 +10082,14 @@ export default function App() {
     saveState(nextState);
 
     if (!user) {
-      setSyncStatus('已重新開始 100-Day Plan，並重設完成度與 XP。');
+      setSyncStatus('已重新開始 40-Day Final Sprint，並重設完成度與 XP。');
       return;
     }
 
     try {
       const syncedState = await writeCloudState(user.uid, nextState, updatedAt);
       lastSyncedSignatureRef.current = getCloudSyncSignature(syncedState);
-      setSyncStatus('已重新開始 100-Day Plan，並重設完成度與 XP。');
+      setSyncStatus('已重新開始 40-Day Final Sprint，並重設完成度與 XP。');
     } catch (error) {
       lastSyncedSignatureRef.current = '';
       setSyncError(getFirebaseErrorMessage(error));
@@ -10809,10 +10808,10 @@ export default function App() {
         <main className="panel">
           <div className="section-head">
             <div>
-              <h2>100-Day Plan Checklist</h2>
-              <p className="muted">依照主題與 golden trial 拆成 100 個可勾選任務。完成度會依總體、癌別、golden trial 分別統計。</p>
+              <h2>40-Day Final Sprint Checklist</h2>
+              <p className="muted">8/22–9/30 共 40 個可勾選任務；9/14 起停止章節式推進，改由模考與錯題表現分配時間。</p>
             </div>
-            <button className="secondary" onClick={resetPlanProgress}>重新開始 100-Day Plan</button>
+            <button className="secondary" onClick={resetPlanProgress}>重新開始 40-Day Sprint</button>
           </div>
 
           <RewardDashboard
@@ -10828,11 +10827,36 @@ export default function App() {
           <section className="plan-overview">
             <MetricCard label="總完成率" value={`${planSummary.percent}%`} sub={`${planSummary.completed}/${planSummary.total} tasks`} />
             <MetricCard label="Golden trial 完成率" value={`${planSummary.goldenPercent}%`} sub={`${planSummary.goldenCompleted}/${planSummary.goldenTotal} trial tasks`} />
-            <MetricCard label="今日建議" value={`Day ${Math.min(planSummary.completed + 1, 100)}`} sub="照順序推進，錯題用 Review Queue 補強" />
+            <MetricCard label="今日建議" value={nextPlanTask?.day || '已完成'} sub="9/14 起依模考表現動態調整" />
             <MetricCard label="Recovery" value={planRecovery.behindDays ? `落後 ${planRecovery.behindDays} 天` : 'On pace'} sub={planRecovery.mode} />
             <MetricCard label="Game level" value={`Lv ${state.game?.level || 1}`} sub={`${state.game?.xp || 0} XP`} />
             <MetricCard label="Boss defeated" value={(state.game?.defeatedBosses || []).length} sub={`${(state.game?.unlockedBosses || []).length} unlocked`} />
             <MetricCard label="Trial cards" value={trialCardTotal} sub="Trial Boss target 50" />
+          </section>
+
+          <section className="plan-recovery-card" aria-label="Final sprint strategy">
+            <div className="plan-recovery-head">
+              <div>
+                <span className="eyebrow">40-Day Strategy</span>
+                <h3>9/14 起全面轉為考古題與錯題驅動</h3>
+                <p>{FINAL_SPRINT_GUIDANCE.daily}</p>
+                <p><strong>值班／極度疲累：</strong>{FINAL_SPRINT_GUIDANCE.lowEnergy}</p>
+              </div>
+            </div>
+            <div className="recovery-actions">
+              <div>
+                <span>目前分層</span>
+                {FINAL_SPRINT_PROFILE.map((row) => <p key={row.tier}><strong>{row.tier}：</strong>{row.domains}</p>)}
+              </div>
+              <div>
+                <span>模考後動態調整</span>
+                {FINAL_SPRINT_GUIDANCE.adaptive.map((rule) => <p key={rule}>{rule}</p>)}
+              </div>
+              <div>
+                <span>10/1–10/4 緩衝</span>
+                {FINAL_SPRINT_GUIDANCE.buffer.map((rule) => <p key={rule}>{rule}</p>)}
+              </div>
+            </div>
           </section>
 
           <section className={planRecovery.behindDays ? 'plan-recovery-card behind' : 'plan-recovery-card'} aria-label="Plan recovery">
@@ -10867,9 +10891,9 @@ export default function App() {
             </div>
           </section>
 
-          <section className="plan-progress-panel" aria-label="100-Day Plan completion progress">
+          <section className="plan-progress-panel" aria-label="40-Day Final Sprint completion progress">
             <div className="plan-cancer-head">
-              <strong>100-Day Plan 總進度</strong>
+              <strong>40-Day Final Sprint 總進度</strong>
               <span>{planSummary.completed}/{planSummary.total}（{planSummary.percent}%）</span>
             </div>
             <div className="progress-bar large"><span style={{ width: `${planSummary.percent}%` }} /></div>

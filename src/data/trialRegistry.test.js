@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { studyPlan100, trialRegistry } from './studyPlan100.js';
+import { isPlanTaskComplete, normalizePlanProgress, studyPlan100, trialRegistry } from './studyPlan100.js';
 import { normalizeTrialName, reconcileTrialRegistryWithPlan, trialRegistryCandidates } from './trialRegistry.js';
 
 test('registry candidates have valid, unique canonical identities', () => {
@@ -29,19 +29,31 @@ test('approved Daily Plan references resolve to matching approved registry recor
   });
 });
 
-test('reviewed plans support Golden-only, Related-only, mixed, and empty trial days', () => {
-  const day14 = studyPlan100.find((task) => task.id === 14);
-  const day15 = studyPlan100.find((task) => task.id === 15);
-  const day28 = studyPlan100.find((task) => task.id === 28);
-  const day12 = studyPlan100.find((task) => task.id === 12);
-  assert.deepEqual(day14.goldenTrials, ['TAILORx', 'RxPONDER']);
-  assert.deepEqual(day14.relatedTrials, []);
-  assert.deepEqual(day15.goldenTrials, ['TAILORx']);
-  assert.deepEqual(day15.relatedTrials, ['MINDACT']);
-  assert.deepEqual(day28.goldenTrials, []);
-  assert.deepEqual(day28.relatedTrials, ['VELOUR', 'RAISE', 'SUNLIGHT']);
-  assert.deepEqual(day12.goldenTrials, []);
-  assert.deepEqual(day12.relatedTrials, []);
+test('the active final sprint has 40 stable, collision-free tasks', () => {
+  assert.equal(studyPlan100.length, 40);
+  assert.equal(new Set(studyPlan100.map((task) => task.key)).size, 40);
+  assert.equal(new Set(studyPlan100.map((task) => task.id)).size, 40);
+  assert.equal(studyPlan100[0].key, 'final-sprint-2026-d01');
+  assert.equal(studyPlan100[0].id, 101);
+  assert.equal(studyPlan100.at(-1).key, 'final-sprint-2026-d40');
+  assert.equal(studyPlan100.at(-1).id, 140);
+});
+
+test('the redesigned plan keeps trial-bearing and trial-free days explicit', () => {
+  const breastClosure = studyPlan100.find((task) => task.id === 101);
+  const giDay = studyPlan100.find((task) => task.id === 104);
+  const mockDay = studyPlan100.find((task) => task.id === 124);
+  assert.deepEqual(breastClosure.goldenTrials, ['TAILORx', 'RxPONDER', 'KATHERINE', 'KEYNOTE-522', 'OlympiA', 'monarchE']);
+  assert.deepEqual(giDay.goldenTrials, ['KEYNOTE-177', 'BEACON CRC', 'BREAKWATER']);
+  assert.deepEqual(mockDay.goldenTrials, []);
+  assert.deepEqual(mockDay.relatedTrials, []);
+});
+
+test('retired numeric progress is preserved without completing new sprint tasks', () => {
+  const normalized = normalizePlanProgress({ 1: true, 'lung-nsclc-foundation': true });
+  assert.equal(normalized[1], true);
+  assert.equal(normalized['lung-nsclc-foundation'], true);
+  assert.equal(isPlanTaskComplete(normalized, studyPlan100[0]), false);
 });
 
 test('aliases reconcile without creating a duplicate trial', () => {
