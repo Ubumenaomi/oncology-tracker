@@ -1214,14 +1214,16 @@ function registryNameMatches(record, name) {
 export function reconcileTrialRegistryWithPlan(tasks) {
   const records = trialRegistryCandidates.map((candidate) => {
     const matchingTasks = tasks.filter((task) => (
-      task.cancer === candidate.cancer
-      && (task.goldenTrials || []).some((name) => registryNameMatches(candidate, name))
+      (task.goldenTrials || []).some((name) => registryNameMatches(candidate, name))
     ));
     const decision = TRIAL_REVIEW_DECISIONS[candidate.canonicalName];
     const approved = decision?.reviewStatus === 'approved'
       || (!decision && candidate.classification === 'golden' && matchingTasks.length > 0);
     const classification = decision?.classification || candidate.classification;
-    const decidedDayIds = decision?.assignedDayIds || matchingTasks.map((task) => task.id);
+    // Classification and approval are durable review decisions, while day assignment
+    // must follow the current plan. Reusing the retired plan's numeric day IDs would
+    // silently attach trials to unrelated days after a schedule redesign.
+    const decidedDayIds = matchingTasks.map((task) => task.id);
     return {
       ...candidate,
       classification,
@@ -1243,7 +1245,7 @@ export function reconcileTrialRegistryWithPlan(tasks) {
 
   const unregisteredPlanItems = tasks.flatMap((task) => (task.goldenTrials || [])
     .filter((name) => !EXCLUDED_PLAN_ITEM_NAMES.has(name))
-    .filter((name) => !records.some((record) => record.cancer === task.cancer && registryNameMatches(record, name)))
+    .filter((name) => !records.some((record) => registryNameMatches(record, name)))
     .map((name) => ({ name, dayId: task.id, day: task.day, cancer: task.cancer, topic: task.topic })));
 
   return {

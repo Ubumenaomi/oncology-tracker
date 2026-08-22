@@ -4,6 +4,7 @@
 // - id/day are display and legacy compatibility fields. Reordering is safe when key stays unchanged.
 // - New tasks need a new unique key. Do not reuse keys from deleted tasks.
 import { reconcileTrialRegistryWithPlan } from './trialRegistry.js';
+import { FINAL_SPRINT_PLAN } from './finalSprintPlan40.js';
 
 export const HIGH_YIELD_TOPICS = [
   {
@@ -241,13 +242,15 @@ export const HIGH_YIELD_TOPICS = [
 ];
 
 export const dailyCompletionCriteria = [
-  "Daily Practice completed",
-  "Boss 1-3 at least 2 pass",
-  "Create 3-5 high-value cards",
-  "Wrong answers classified by errorType"
+  '48–72 小時到期錯題已處理',
+  '當日 decision algorithm 與 ESMO 重點已完成',
+  '目標題數已作答並完整訂正',
+  '最多製作 3–5 張 high-value cards',
 ];
 
-const STUDY_PLAN_100_BASE = [
+// Retained as an exported archive so old task metadata remains inspectable, but it is
+// no longer used to drive the active plan. The active source is FINAL_SPRINT_PLAN.
+export const LEGACY_STUDY_PLAN_100_BASE = [
   {
     "key": "lung-nsclc-foundation",
     "id": 1,
@@ -3214,14 +3217,14 @@ const STUDY_PLAN_100_BASE = [
 ];
 
 export function buildStudyPlan100() {
-  const baseTasks = STUDY_PLAN_100_BASE.map((task) => ({
+  const baseTasks = FINAL_SPRINT_PLAN.map((task) => ({
     ...task,
     legacyId: task.legacyId || task.id,
   }));
   return reconcileTrialRegistryWithPlan(baseTasks).tasks;
 }
 
-const trialRegistryReconciliation = reconcileTrialRegistryWithPlan(STUDY_PLAN_100_BASE);
+const trialRegistryReconciliation = reconcileTrialRegistryWithPlan(FINAL_SPRINT_PLAN);
 export const studyPlan100 = trialRegistryReconciliation.tasks.map((task) => ({
   ...task,
   legacyId: task.legacyId || task.id,
@@ -3258,5 +3261,5 @@ export function normalizePlanProgress(planProgress = {}) {
       acc[task.legacyId] = true;
     }
     return acc;
-  }, {});
+  }, { ...planProgress });
 }
