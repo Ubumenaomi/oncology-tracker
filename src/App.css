@@ -4977,3 +4977,27 @@ button:disabled {
 
 [data-note-anchor] { scroll-margin-top: 100px; }
 [data-note-anchor]:focus-visible { outline: 2px solid #24577c; outline-offset: 5px; }
+
+/* A compact entry point for focused retrieval practice. */
+.overview-details { margin: 16px 0; }
+.overview-details > summary { cursor: pointer; padding: 12px 16px; color: var(--muted, #536779); }
+.training-path, .training-shortcuts { display: flex; flex-wrap: wrap; gap: 12px; margin: 18px 0; }
+.training-path span { color: #44645e; font-size: 13px; font-weight: 700; }
+.training-modes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.training-mode { display: flex; flex-direction: column; gap: 12px; padding: 20px; text-align: left; border: 1px solid #ceded8; background: #f7faf8; color: #233e36; border-radius: 16px; }
+.training-mode strong { font-size: 19px; }
+.training-mode span { line-height: 1.7; font-weight: 400; }
+.training-mode small { margin-top: auto; }
+.training-mode.selected { border-color: #19745d; background: #e5f4ed; box-shadow: inset 0 0 0 1px #19745d; }
+.training-mode:focus-visible, .training-question-nav button:focus-visible { outline: 3px solid #277dbe; outline-offset: 3px; }
+.training-progress { display: flex; align-items: center; gap: 16px; margin: 16px 0; }
+.training-progress progress { flex: 1; accent-color: #19745d; }
+.training-question-nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+.training-question-nav button { min-width: 44px; min-height: 44px; background: #f4f6f8; border: 1px solid #c4d0d8; color: #30424f; }
+.training-question-nav button.answered { background: #d8eee3; border-color: #559d7c; color: #174631; }
+.training-question-nav button[aria-current] { box-shadow: inset 0 -3px #19745d; }
+.training-debrief { padding: 20px; border-radius: 16px; background: #eef5fc; color: #264767; margin-bottom: 20px; line-height: 1.7; }
+.training-debrief strong { font-size: 22px; }
+[id^="training-question-"] { scroll-margin-top: 24px; min-width: 0; }
+@media (max-width: 900px) { .training-modes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .training-modes { grid-template-columns: 1fr; } .training-mode { padding: 16px; gap: 8px; } }
