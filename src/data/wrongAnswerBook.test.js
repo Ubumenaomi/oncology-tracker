@@ -26,7 +26,7 @@ function load(name) {
   const end = source.indexOf('\n}\n', start) + 2;
   vm.runInContext(source.slice(start, end), context);
 }
-['emptyStat', 'getRemediationForErrorType', 'getAnkiIntervalDays', 'nextIntervalByRating', 'getMasteryDeltaByRating', 'applyBatchQuestionResults', 'regradeBatchQuestionResult', 'getSessionFreshness', 'mergeDailySession', 'getStatAttemptScore', 'getAnswerEventMergeKey', 'mergeAnswerEvents', 'haveSameEventOccurrences', 'getRemediationMergeKey', 'mergeRemediationTasks', 'mergeQuestionStats'].forEach(load);
+['emptyStat', 'getRemediationForErrorType', 'getAnkiIntervalDays', 'nextIntervalByRating', 'getMasteryDeltaByRating', 'applyBatchQuestionResults', 'regradeBatchQuestionResult', 'getSessionFreshness', 'mergeDailySession', 'getStatAttemptScore', 'getAnswerEventMergeKey', 'mergeAnswerEvents', 'getAnswerEventTime', 'getQuestionStatFreshness', 'getMergedAttemptCounts', 'recoverSubmittedQuestionStats', 'getRemediationMergeKey', 'mergeRemediationTasks', 'mergeQuestionStats'].forEach(load);
 test('repeated rounds count separately; duplicate submission and regrading do not inflate attempts', () => {
   const row = { questionId: 'a', selected: 'B', correctAnswer: 'A', isCorrect: false, confidence: 3 };
   let value = context.applyBatchQuestionResults({}, [row], 'wrong-book', 'one');
@@ -68,4 +68,80 @@ test('Daily Practice generation ignores Day Plan and respects chosen years/cance
   assert.equal(JSON.stringify(context.generateDailyQuestionIds(state)), '["a","c"]');
   assert.equal(JSON.stringify(context.generateDailyQuestionIds({ ...state, planProgress: { 'day-1': true } })), '["a","c"]');
   assert.equal(JSON.stringify(context.generateDailyQuestionIds(state, null, ['a'])), '["c"]');
+});
+
+test('submitted unknown answers persist and grading later does not remove another attempt', () => {
+  const row = { questionId: 'a', selected: 'A', correctAnswer: '', isCorrect: null, confidence: 5, submittedAt: '2026-09-01T10:00:00Z' };
+  let value = context.applyBatchQuestionResults({}, [{ ...row, isCorrect: false, correctAnswer: 'B' }], 'daily', 'old');
+  value = context.applyBatchQuestionResults(value, [row], 'daily', 'pending');
+  value = context.applyBatchQuestionResults(value, [row], 'daily', 'pending');
+  assert.equal(value.a.ungradedAttempts, 1);
+  assert.equal(value.a.attempts, 1);
+  assert.equal(value.a.lastAttemptAt, '2026-09-01');
+  value = context.regradeBatchQuestionResult(value, { ...row, correctAnswer: 'A', isCorrect: true }, 'daily', 'pending');
+  assert.equal(value.a.ungradedAttempts, 0);
+  assert.equal(value.a.attempts, 2);
+  assert.equal(value.a.wrong, 1);
+  assert.equal(value.a.correct, 1);
+  assert.equal(value.a.highConfidenceWrong, 1);
+});
+
+test('device merge counts distinct attempts and prefers the latest correction', () => {
+  const row = { questionId: 'a', selected: 'A', correctAnswer: 'A', isCorrect: true, confidence: 3 };
+  const cloud = context.applyBatchQuestionResults({}, [{ ...row, submittedAt: '2026-09-01' }], 'daily', 'cloud');
+  const local = context.applyBatchQuestionResults({}, [{ ...row, submittedAt: '2026-09-02' }], 'daily', 'local');
+  const merged = context.mergeQuestionStats(cloud, local);
+  assert.equal(merged.a.attempts, 2);
+  assert.equal(merged.a.correct, 2);
+  assert.equal(context.mergeQuestionStats(merged, local).a.attempts, 2);
+  const corrected = context.regradeBatchQuestionResult(cloud, { ...row, correctAnswer: 'B', isCorrect: false }, 'daily', 'cloud');
+  assert.equal(context.mergeQuestionStats(cloud, corrected).a.wrong, 1);
+  assert.equal(context.mergeQuestionStats(corrected, cloud).a.correct, 0);
+});
+
+test('bounded histories remain stable after repeated synchronization', () => {
+  const events = Array.from({ length: 60 }, (_, i) => ({ questionId: 'a', attemptId: `id-${String(i).padStart(3, '0')}`, submittedAt: `2026-09-01T00:00:${String(i).padStart(2, '0')}Z`, selected: 'A', isCorrect: true }));
+  const cloud = { a: { attempts: 50, correct: 50, answerHistory: events.slice(0, 50) } };
+  const local = { a: { attempts: 60, correct: 60, answerHistory: events.slice(10) } };
+  let merged = context.mergeQuestionStats(cloud, local);
+  for (let i = 0; i < 3; i++) merged = context.mergeQuestionStats(cloud, merged);
+  assert.equal(merged.a.attempts, 60);
+  assert.equal(merged.a.correct, 60);
+  assert.equal(merged.a.answerHistory.length, 50);
+});
+
+test('recover stored submissions once, keep original date, and never turn drafts into attempts', () => {
+  const row = { questionId: 'a', selected: 'A', correctAnswer: 'A', isCorrect: true, confidence: 3 };
+  const state = { stats: {}, sessions: { '2026-09-01': { attemptId: 'saved', submittedAt: '2026-09-01T12:00:00Z', gradingResults: [row] }, draft: { practiceDrafts: { b: { selected: 'B' } } } } };
+  const recovered = context.recoverSubmittedQuestionStats(state);
+  assert.equal(recovered.a.attempts, 1);
+  assert.equal(recovered.a.lastAttemptAt, '2026-09-01');
+  assert.equal(recovered.b, undefined);
+  assert.equal(context.recoverSubmittedQuestionStats({ ...state, stats: recovered }).a.attempts, 1);
+  const legacy = { a: { attempts: 60, correct: 60, answerHistory: [] } };
+  assert.equal(context.recoverSubmittedQuestionStats({ ...state, stats: legacy }).a.attempts, 60);
+});
+
+test('save flushes every changed storage slice even when given state field names', () => {
+  const disk = new Map();
+  const storageContext = vm.createContext({
+    normalizeState: (state) => state,
+    defaultState: {},
+    localStorage: { setItem: (key, value) => disk.set(key, value) },
+    STORAGE_KEY: 'marker', STORAGE_VERSION: 3,
+    STORAGE_SLICE_KEYS: Object.fromEntries(['app', 'activity', 'sessions', 'progress', 'quest', 'questionRecords', 'questionEdits', 'flashcards', 'flashcardStats', 'game'].map((key) => [key, key])),
+    lastSavedStorageSlices: {},
+  });
+  for (const name of ['buildStorageSlices', 'saveState']) {
+    const start = source.indexOf(`function ${name}(`);
+    vm.runInContext(source.slice(start, source.indexOf('\n}\n', start) + 2), storageContext);
+  }
+  storageContext.saveState({ stats: {}, sessions: {} });
+  const state = { stats: { a: { attempts: 1, correct: 1 } }, sessions: { today: { submittedAt: 'now' } } };
+  storageContext.saveState(state, ['stats', 'sessions']);
+  assert.equal(JSON.parse(disk.get('questionRecords')).stats.a.correct, 1);
+  const next = { ...state, stats: { a: { attempts: 2, correct: 2 } }, game: { xp: 20 } };
+  storageContext.saveState(next, ['game']);
+  assert.equal(JSON.parse(disk.get('questionRecords')).stats.a.attempts, 2);
+  assert.equal(JSON.parse(disk.get('game')).game.xp, 20);
 });

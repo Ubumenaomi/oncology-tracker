@@ -3,6 +3,7 @@ import { AlertTriangle, BarChart3, BookOpen, ChevronDown, ClipboardList, Clock3,
 import './App.css';
 import { jumpToKnowledgeSection, getKnowledgePageId } from './data/knowledgeNavigation.js';
 import { getWrongAnswerRows, gradeWrongAnswerBatch } from './data/wrongAnswerBook.js';
+import { TRAINING_MODES, getTrainingRows, selectTrainingIds } from './data/scoreTraining.js';
 import QuestionNotionLinks, { QuestionNotesContext } from './components/QuestionNotionLinks.jsx';
 import { NotionBlocks } from './components/NotionBlockRenderer.jsx';
 import { QUESTION_BANK_TOTAL, QUESTION_YEARS, cancerCategories } from './data/questionBankMeta.js';
@@ -110,6 +111,7 @@ const NAV_GROUPS = [
     label: 'Practice',
     Icon: ClipboardList,
     items: [
+      ['training', '提分訓練'],
       ['today', 'Daily Practice'],
       ['wrong-book', '錯題本'],
       ['mock', 'Mock Exam'],
@@ -766,12 +768,10 @@ function loadState() {
   }
 }
 
-function saveState(state, sliceNames = null) {
+function saveState(state) {
   const normalized = normalizeState(state);
   const slices = buildStorageSlices(normalized);
-  const requestedSlices = sliceNames ? new Set(sliceNames) : null;
   Object.entries(slices).forEach(([sliceName, value]) => {
-    if (requestedSlices && !requestedSlices.has(sliceName)) return;
     const serialized = JSON.stringify(value);
     if (lastSavedStorageSlices[sliceName] === serialized) return;
     localStorage.setItem(STORAGE_SLICE_KEYS[sliceName], serialized);
@@ -873,6 +873,42 @@ function removeCompletedActiveFocusSession(focusTimer, focusSessions = []) {
   return normalizedTimer;
 }
 
+function getAnswerEventTime(event = {}) {
+  return event.updatedAt || event.submittedAt || event.date || '';
+}
+
+function getQuestionStatFreshness(stat = {}) {
+  return [stat.updatedAt, stat.lastAttemptAt, ...(stat.answerHistory || []).map(getAnswerEventTime)].filter(Boolean).sort().at(-1) || '';
+}
+
+// Retain counts older than the bounded event history, then count the merged
+// visible attempts exactly once. Independent device attempts are not max(count).
+function getMergedAttemptCounts(local, cloud, events) {
+  const counts = (history) => ({
+    correct: history.filter((e) => e.isCorrect === true).length,
+    wrong: history.filter((e) => e.isCorrect === false).length,
+    ungradedAttempts: history.filter((e) => e.isCorrect == null).length,
+  });
+  const orderKey = (event) => `${getAnswerEventTime(event)}|${getAnswerEventMergeKey(event)}`;
+  const boundaries = [local, cloud].flatMap((stat) => {
+    const history = stat.answerHistory || [];
+    const total = (stat.attempts || 0) + (stat.ungradedAttempts || 0);
+    return history.length && (history.length >= 50 || total > history.length)
+      ? [history.map(orderKey).sort()[0]] : [];
+  });
+  const cutoff = boundaries.sort().at(-1) || '';
+  const visible = (history) => history.filter((event) => orderKey(event) >= cutoff);
+  const left = counts(visible(local.answerHistory || []));
+  const right = counts(visible(cloud.answerHistory || []));
+  const merged = counts(visible(events));
+  const result = {};
+  for (const key of ['correct', 'wrong', 'ungradedAttempts']) {
+    result[key] = merged[key] + Math.max(0, (local[key] || 0) - left[key], (cloud[key] || 0) - right[key]);
+  }
+  result.attempts = Math.max(result.correct + result.wrong, local.attempts || 0, cloud.attempts || 0);
+  return result;
+}
+
 function getStatAttemptScore(stat = {}) {
   return (Number(stat.attempts) || 0) + ((stat.answerHistory || []).length / 100);
 }
@@ -882,7 +918,7 @@ function getAnswerEventMergeKey(event = {}) {
   return ['legacy', event.date, event.mode, event.questionId, event.selected, event.rating, event.isCorrect].join('|');
 }
 
-function mergeAnswerEvents(secondaryEvents = [], primaryEvents = []) {
+function mergeAnswerEvents(secondaryEvents = [], primaryEvents = [], limit = 50) {
   const merged = [];
   secondaryEvents.forEach((event) => {
     if (!event.attemptId) {
@@ -898,8 +934,9 @@ function mergeAnswerEvents(secondaryEvents = [], primaryEvents = []) {
     const key = getAnswerEventMergeKey(event);
     if (event.attemptId) {
       const stableIndex = merged.findIndex((candidate) => candidate.attemptId === event.attemptId);
-      if (stableIndex >= 0) merged[stableIndex] = event;
-      else merged.push(event);
+      if (stableIndex >= 0) {
+        if (getAnswerEventTime(event) >= getAnswerEventTime(merged[stableIndex])) merged[stableIndex] = event;
+      } else merged.push(event);
       return;
     }
     const matchingIndex = merged.findIndex((candidate, index) => (
@@ -912,20 +949,7 @@ function mergeAnswerEvents(secondaryEvents = [], primaryEvents = []) {
       merged.push(event);
     }
   });
-  return merged.slice(-50);
-}
-
-function haveSameEventOccurrences(leftEvents = [], rightEvents = []) {
-  const countKeys = (events) => events.reduce((counts, event) => {
-    const key = getAnswerEventMergeKey(event);
-    counts.set(key, (counts.get(key) || 0) + 1);
-    return counts;
-  }, new Map());
-  const leftCounts = countKeys(leftEvents);
-  const rightCounts = countKeys(rightEvents);
-  return leftEvents.length > 0
-    && leftEvents.length === rightEvents.length
-    && [...leftCounts].every(([key, count]) => rightCounts.get(key) === count);
+  return merged.sort((a, b) => getAnswerEventTime(a).localeCompare(getAnswerEventTime(b)) || getAnswerEventMergeKey(a).localeCompare(getAnswerEventMergeKey(b))).slice(-limit);
 }
 
 function getRemediationMergeKey(task = {}) {
@@ -1084,10 +1108,14 @@ function mergeQuestionStats(cloudStats = {}, localStats = {}) {
 
     const localScore = getStatAttemptScore(localStat);
     const cloudScore = getStatAttemptScore(cloudStat);
-    const primary = localScore >= cloudScore ? localStat : cloudStat;
+    const localFreshness = getQuestionStatFreshness(localStat);
+    const cloudFreshness = getQuestionStatFreshness(cloudStat);
+    const primary = localFreshness === cloudFreshness
+      ? (localScore >= cloudScore ? localStat : cloudStat)
+      : (localFreshness > cloudFreshness ? localStat : cloudStat);
     const secondary = primary === localStat ? cloudStat : localStat;
-    const sameEventSet = haveSameEventOccurrences(localStat.answerHistory, cloudStat.answerHistory);
-    const answerHistory = mergeAnswerEvents(secondary.answerHistory || [], primary.answerHistory || []);
+    const mergedEvents = mergeAnswerEvents(secondary.answerHistory || [], primary.answerHistory || [], Infinity);
+    const answerHistory = mergedEvents.slice(-50);
     const mergedConfidenceHistory = answerHistory.flatMap((event) => event.confidence == null ? [] : [Number(event.confidence)]).filter(Number.isFinite).slice(-50);
     const mergedTimeHistory = answerHistory.flatMap((event) => event.timeSpentSec == null ? [] : [Number(event.timeSpentSec)]).filter(Number.isFinite).slice(-50);
     merged[id] = {
@@ -1095,9 +1123,7 @@ function mergeQuestionStats(cloudStats = {}, localStats = {}) {
       ...primary,
       notionLinks: (localStat.notionLinksUpdatedAt || '') >= (cloudStat.notionLinksUpdatedAt || '') ? (localStat.notionLinks || []) : (cloudStat.notionLinks || []),
       notionLinksUpdatedAt: [localStat.notionLinksUpdatedAt, cloudStat.notionLinksUpdatedAt].filter(Boolean).sort().at(-1) || null,
-      attempts: sameEventSet ? (Number(primary.attempts) || 0) : Math.max(Number(localStat.attempts) || 0, Number(cloudStat.attempts) || 0),
-      correct: sameEventSet ? (Number(primary.correct) || 0) : Math.max(Number(localStat.correct) || 0, Number(cloudStat.correct) || 0),
-      wrong: sameEventSet ? (Number(primary.wrong) || 0) : Math.max(Number(localStat.wrong) || 0, Number(cloudStat.wrong) || 0),
+      ...getMergedAttemptCounts(localStat, cloudStat, mergedEvents),
       answerHistory,
       confidenceHistory: mergedConfidenceHistory.length ? mergedConfidenceHistory : (primary.confidenceHistory || secondary.confidenceHistory || []).slice(-50),
       timeHistory: mergedTimeHistory.length ? mergedTimeHistory : (primary.timeHistory || secondary.timeHistory || []).slice(-50),
@@ -1753,6 +1779,43 @@ function mergePlayerState(cloudPlayer = {}, localPlayer = {}, cloudGame = {}, lo
   };
 }
 
+function recoverSubmittedQuestionStats(state) {
+  let stats = state.stats || {};
+  const batches = [
+    ...Object.entries(state.sessions || {}).filter(([, session]) => session.submittedAt).map(([key, session]) => ({
+      id: session.attemptId || `daily-${key}-${session.createdAt || session.submittedAt}`,
+      mode: key === 'wrong-book' || key === 'score-training' ? key : 'daily',
+      date: session.submittedAt, results: session.gradingResults || [],
+    })),
+    ...(state.mockExams || []).filter((exam) => exam.id && (exam.scoredAt || exam.completedAt)).map((exam) => ({
+      id: exam.id, mode: 'mock', date: exam.scoredAt || exam.completedAt, results: exam.results || [],
+    })),
+  ].sort((a, b) => a.date.localeCompare(b.date));
+  for (const batch of batches) {
+    for (const result of batch.results) {
+      if (!result.questionId || !result.selected || state.deletedQuestionIds?.[result.questionId]) continue;
+      const previous = stats[result.questionId] || {};
+      const history = previous.answerHistory || [];
+      if (history.some((event) => event.attemptId === batch.id)) continue;
+      // Legacy or truncated histories cannot prove an attempt was never counted.
+      const recorded = (previous.attempts || 0) + (previous.ungradedAttempts || 0);
+      if (recorded >= 50 || recorded > history.length || history.some((event) => !event.attemptId)) continue;
+      const submittedAt = result.submittedAt || batch.date;
+      const restored = applyBatchQuestionResults(stats, [{ ...result, submittedAt }], batch.mode, batch.id);
+      if (getQuestionStatFreshness(previous) > submittedAt) {
+        const next = restored[result.questionId];
+        restored[result.questionId] = {
+          ...previous, attempts: next.attempts, correct: next.correct, wrong: next.wrong,
+          ungradedAttempts: next.ungradedAttempts,
+          answerHistory: mergeAnswerEvents(history, next.answerHistory),
+        };
+      }
+      stats = restored;
+    }
+  }
+  return stats;
+}
+
 function normalizeState(state) {
   const stateSettings = state?.settings || {};
   const workoutReminder = {
@@ -1794,6 +1857,7 @@ function normalizeState(state) {
   return {
     ...defaultState,
     ...state,
+    stats: recoverSubmittedQuestionStats(state || {}),
     settings: {
       ...defaultState.settings,
       ...stateSettings,
@@ -2281,10 +2345,22 @@ function applyBatchQuestionResults(stats, results, mode, attemptId) {
   const nextStats = { ...(stats || {}) };
 
   results.forEach((result) => {
-    if (result.isCorrect == null) return;
+    if (!result.questionId || !result.selected) return;
     const previous = { ...emptyStat(), ...(nextStats[result.questionId] || {}) };
     if ((previous.answerHistory || []).some((event) => event?.attemptId === attemptId)) return;
 
+    const eventDate = (result.submittedAt || '').slice(0, 10) || TODAY;
+    if (result.isCorrect == null) {
+      nextStats[result.questionId] = {
+        ...previous,
+        ungradedAttempts: (previous.ungradedAttempts || 0) + 1,
+        lastResult: 'ungraded', lastRating: 'Ungraded', lastAttemptAt: eventDate,
+        userAnswer: result.selected, lastConfidence: result.confidence,
+        answerHistory: [...(previous.answerHistory || []), { ...result, isCorrect: null, date: eventDate, mode, rating: 'Ungraded', attemptId }].slice(-50),
+        confidenceHistory: [...(previous.confidenceHistory || []), result.confidence].slice(-50),
+      };
+      return;
+    }
     const rating = FLASHCARD_RATINGS[result.rating]
       ? result.rating
       : (result.isCorrect ? 'Good' : 'Again');
@@ -2292,7 +2368,7 @@ function applyBatchQuestionResults(stats, results, mode, attemptId) {
     const wasPreviouslyWrong = (previous.wrong || 0) > 0;
     const remediation = !result.isCorrect && result.errorType ? getRemediationForErrorType(result.errorType) : null;
     const remediationEvent = remediation ? {
-      date: TODAY,
+      date: eventDate,
       questionId: result.questionId,
       errorType: result.errorType,
       task: remediation.task,
@@ -2302,7 +2378,7 @@ function applyBatchQuestionResults(stats, results, mode, attemptId) {
     } : null;
     const event = {
       ...result,
-      date: TODAY,
+      date: eventDate,
       mode,
       rating,
       attemptId,
@@ -2330,8 +2406,8 @@ function applyBatchQuestionResults(stats, results, mode, attemptId) {
       wrong: (previous.wrong || 0) + (result.isCorrect ? 0 : 1),
       lastResult: result.isCorrect ? 'correct' : 'wrong',
       lastRating: rating,
-      lastAttemptAt: TODAY,
-      nextReviewDate: addDays(TODAY, interval),
+      lastAttemptAt: eventDate,
+      nextReviewDate: addDays(eventDate, interval),
       mastery: Math.max(0, Math.min(5, (previous.mastery || 0) + getMasteryDeltaByRating(rating))),
       intervalDays: interval,
       userAnswer: result.selected,
@@ -2367,25 +2443,26 @@ function regradeBatchQuestionResult(stats, result, mode, attemptId) {
   if (
     previousEvent.correctAnswer === result.correctAnswer
     && previousEvent.isCorrect === result.isCorrect
-    && previousEvent.rating === (result.rating || (result.isCorrect ? 'Good' : 'Again'))
+    && previousEvent.rating === (result.isCorrect == null ? 'Ungraded' : result.rating || (result.isCorrect ? 'Good' : 'Again'))
   ) return stats;
 
-  const previousWasWrongRetest = previousEvent.wasPreviouslyWrong
-    ?? ((previous.wrong || 0) - (previousEvent.isCorrect ? 0 : 1) > 0);
-  const oldMasteryDelta = getMasteryDeltaByRating(previousEvent.rating || (previousEvent.isCorrect ? 'Good' : 'Again'));
+  const previousWasWrongRetest = previousEvent.isCorrect != null && (previousEvent.wasPreviouslyWrong
+    ?? ((previous.wrong || 0) - (previousEvent.isCorrect === false ? 1 : 0) > 0));
+  const oldMasteryDelta = previousEvent.isCorrect == null ? 0 : getMasteryDeltaByRating(previousEvent.rating || (previousEvent.isCorrect ? 'Good' : 'Again'));
   const previousSnapshot = previousEvent.previousStat || {};
   const remainingHistory = (previous.answerHistory || []).filter((event) => event?.attemptId !== attemptId);
   const trailingWrong = [...remainingHistory].reverse().findIndex((event) => event?.isCorrect);
 
   const cleanedStat = {
     ...previous,
-    attempts: Math.max(0, (previous.attempts || 0) - 1),
-    correct: Math.max(0, (previous.correct || 0) - (previousEvent.isCorrect ? 1 : 0)),
-    wrong: Math.max(0, (previous.wrong || 0) - (previousEvent.isCorrect ? 0 : 1)),
+    attempts: Math.max(0, (previous.attempts || 0) - (previousEvent.isCorrect == null ? 0 : 1)),
+    ungradedAttempts: Math.max(0, (previous.ungradedAttempts || 0) - (previousEvent.isCorrect == null ? 1 : 0)),
+    correct: Math.max(0, (previous.correct || 0) - (previousEvent.isCorrect === true ? 1 : 0)),
+    wrong: Math.max(0, (previous.wrong || 0) - (previousEvent.isCorrect === false ? 1 : 0)),
     answerHistory: remainingHistory,
     mastery: previousSnapshot.mastery ?? Math.max(0, Math.min(5, (previous.mastery || 0) - oldMasteryDelta)),
     repeatedWrong: previousSnapshot.repeatedWrong ?? (trailingWrong < 0 ? remainingHistory.filter((event) => event?.isCorrect === false).length : trailingWrong),
-    highConfidenceWrong: Math.max(0, (previous.highConfidenceWrong || 0) - (!previousEvent.isCorrect && previousEvent.confidence >= 4 ? 1 : 0)),
+    highConfidenceWrong: Math.max(0, (previous.highConfidenceWrong || 0) - (previousEvent.isCorrect === false && previousEvent.confidence >= 4 ? 1 : 0)),
     wrongRetestAttempts: previousSnapshot.wrongRetestAttempts ?? Math.max(0, (previous.wrongRetestAttempts || 0) - (previousWasWrongRetest ? 1 : 0)),
     wrongRetestCorrect: previousSnapshot.wrongRetestCorrect ?? Math.max(0, (previous.wrongRetestCorrect || 0) - (previousWasWrongRetest && previousEvent.isCorrect ? 1 : 0)),
     intervalDays: previousSnapshot.intervalDays ?? previous.intervalDays,
@@ -2398,7 +2475,7 @@ function regradeBatchQuestionResult(stats, result, mode, attemptId) {
     timeHistory: previousEvent.timeSpentSec == null ? (previous.timeHistory || []) : (previous.timeHistory || []).slice(0, -1),
     remediationTasks: (previous.remediationTasks || []).filter((task) => task?.attemptId !== attemptId),
   };
-  return applyBatchQuestionResults({ ...(stats || {}), [result.questionId]: cleanedStat }, [result], mode, attemptId);
+  return applyBatchQuestionResults({ ...(stats || {}), [result.questionId]: cleanedStat }, [{ ...result, updatedAt: new Date().toISOString() }], mode, attemptId);
 }
 
 function applyBatchQuestionNotes(stats, questionId, attemptId, patch = {}) {
@@ -3485,7 +3562,7 @@ function getStatsDashboard(state, planSummary, readiness, cancerSummary, date = 
   const attempts = stats.reduce((sum, stat) => sum + (stat.attempts || 0), 0);
   const correct = stats.reduce((sum, stat) => sum + (stat.correct || 0), 0);
   const wrong = stats.reduce((sum, stat) => sum + (stat.wrong || 0), 0);
-  const reviewed = Object.keys(state.stats || {}).filter((id) => (state.stats?.[id]?.attempts || 0) > 0).length;
+  const reviewed = Object.values(state.stats || {}).filter((stat) => (stat.attempts || 0) + (stat.ungradedAttempts || 0) > 0).length;
   const answerEventsByDate = getAnswerEventsByDate(state);
   const activeDates = new Set([
     ...Object.keys(answerEventsByDate),
@@ -4366,14 +4443,17 @@ function PracticeModeSelector({ value, onChange, compact = false }) {
 }
 
 
-function WrongAnswerBookPanel({ state, onChange, onUpdateStat, loading }) {
+function WrongAnswerBookPanel({ state, onChange, onUpdateStat, loading, training = false, onNavigate }) {
+  const [trainingMode, setTrainingMode] = useState('smart');
+  const sessionKey = training ? 'score-training' : 'wrong-book';
   const [filters, setFilters] = useState({ query: '', cancer: 'All', period: 'all', status: 'all', sort: 'recent' });
   const [count, setCount] = useState(10);
   const [page, setPage] = useState(0);
   const [message, setMessage] = useState('');
-  const session = state.sessions?.['wrong-book'];
+  const session = state.sessions?.[sessionKey];
   const questions = getQuestionPool(state).map((q) => getQuestionWithOverride(q.id, state)).filter(Boolean);
-  const rows = getWrongAnswerRows(questions, state.stats, { ...filters, today: TODAY });
+  const trainingRows = getTrainingRows(questions, state.stats, TODAY, trainingMode);
+  const rows = training ? trainingRows.filter(({ q }) => (filters.cancer === 'All' || q.cancer === filters.cancer) && `${q.id} ${q.stem} ${q.cancer} ${q.topic}`.toLowerCase().includes(filters.query.trim().toLowerCase())) : getWrongAnswerRows(questions, state.stats, { ...filters, today: TODAY });
   const activeQuestions = (session?.questionIds || []).map((id) => getQuestionWithOverride(id, state)).filter(Boolean);
   const submitted = Boolean(session?.submittedAt);
   const results = session?.gradingResults || [];
@@ -4381,7 +4461,7 @@ function WrongAnswerBookPanel({ state, onChange, onUpdateStat, loading }) {
   const start = (ids) => {
     if (!ids.length) return;
     const now = new Date().toISOString();
-    onChange((prev) => ({ ...prev, sessions: { ...prev.sessions, 'wrong-book': {
+    onChange((prev) => ({ ...prev, sessions: { ...prev.sessions, [sessionKey]: {
       attemptId: `wrong-book-${crypto.randomUUID()}`, createdAt: now, updatedAt: now,
       date: TODAY, questionIds: ids, practiceDrafts: {}, gradingResults: [],
     } } }));
@@ -4390,7 +4470,7 @@ function WrongAnswerBookPanel({ state, onChange, onUpdateStat, loading }) {
   };
   const updateDraft = (id, patch) => {
     onChange((prev) => {
-      const current = prev.sessions['wrong-book'];
+      const current = prev.sessions[sessionKey];
       if (current?.attemptId !== session?.attemptId) return prev;
       const draft = { ...current.practiceDrafts?.[id], ...patch };
       if (JSON.stringify(draft) === JSON.stringify(current.practiceDrafts?.[id])) return prev;
@@ -4401,13 +4481,13 @@ function WrongAnswerBookPanel({ state, onChange, onUpdateStat, loading }) {
         next.correctAnswer = String(next.correctAnswer || '').trim().toUpperCase();
         next.isCorrect = /^[A-E]$/.test(next.correctAnswer) ? next.selected === next.correctAnswer : null;
         if (patch.correctAnswer !== undefined || patch.rating !== undefined) {
-          nextStats = regradeBatchQuestionResult(nextStats, next, 'wrong-book', current.attemptId);
+          nextStats = regradeBatchQuestionResult(nextStats, next, sessionKey, current.attemptId);
         }
         if (patch.explanation !== undefined || patch.wrongNotes !== undefined) nextStats = applyBatchQuestionNotes(nextStats, id, current.attemptId, patch);
         if (patch.errorType !== undefined) nextStats = applyBatchRemediationsToStats(nextStats, [next], current.attemptId);
         return next;
       });
-      return { ...prev, stats: nextStats, sessions: { ...prev.sessions, 'wrong-book': { ...current, practiceDrafts: { ...current.practiceDrafts, [id]: draft }, gradingResults, updatedAt: new Date().toISOString() } } };
+      return { ...prev, stats: nextStats, sessions: { ...prev.sessions, [sessionKey]: { ...current, practiceDrafts: { ...current.practiceDrafts, [id]: draft }, gradingResults, updatedAt: new Date().toISOString() } } };
     });
   };
   const submit = () => {
@@ -4416,11 +4496,11 @@ function WrongAnswerBookPanel({ state, onChange, onUpdateStat, loading }) {
     const missing = activeQuestions.findIndex((q) => !session.practiceDrafts?.[q.id]?.selected);
     if (missing >= 0) { setPage(Math.floor(missing / 5)); setMessage(`第 ${missing + 1} 題尚未作答。`); return; }
     onChange((prev) => {
-      const current = prev.sessions['wrong-book'];
+      const current = prev.sessions[sessionKey];
       if (current?.submittedAt || current?.attemptId !== session.attemptId) return prev;
       const now = new Date().toISOString();
       const gradingResults = gradeWrongAnswerBatch(activeQuestions, current.practiceDrafts, prev.stats, now);
-      return { ...prev, stats: applyBatchQuestionResults(prev.stats, gradingResults, 'wrong-book', current.attemptId), sessions: { ...prev.sessions, 'wrong-book': { ...current, gradingResults, submittedAt: now, attemptsCommittedAt: now, updatedAt: now } } };
+      return { ...prev, stats: applyBatchQuestionResults(prev.stats, gradingResults, sessionKey, current.attemptId), sessions: { ...prev.sessions, [sessionKey]: { ...current, gradingResults, submittedAt: now, attemptsCommittedAt: now, updatedAt: now } } };
     });
     setPage(0);
     setMessage('已交卷並記錄本輪作答。可補充錯因、筆記，或再次練習。');
@@ -4428,26 +4508,35 @@ function WrongAnswerBookPanel({ state, onChange, onUpdateStat, loading }) {
   const filter = (key, value) => setFilters((prev) => ({ ...prev, [key]: value }));
   const activePage = Math.min(page, Math.max(0, Math.ceil(activeQuestions.length / 5) - 1));
   return <main className="panel wrong-answer-book">
-    <div className="section-head"><div><h2>錯題本</h2><p className="muted">曾答錯的題目自動收錄；答對後仍保留，想練幾次都可以。</p></div><span className="pill">{rows.length} 題符合篩選</span></div>
+    <div className="section-head"><div><h2>{training ? '提分訓練室' : '錯題本'}</h2><p className="muted">{training ? '用短回合找出失分點：先獨立作答 → 交卷看解析 → 隔日再測。' : '曾答錯的題目自動收錄；答對後仍保留，想練幾次都可以。'}</p></div><span className="pill">{rows.length} 題符合篩選</span></div>
+    {training && <>
+      <div className="training-path"><span>01 選擇目標</span><span>02 完成短回合</span><span>03 訂正與再測</span></div>
+      <div className="training-modes">{TRAINING_MODES.map((mode) => <button type="button" className={`training-mode ${trainingMode === mode.id ? 'selected' : ''}`} aria-pressed={trainingMode === mode.id} key={mode.id} onClick={() => setTrainingMode(mode.id)}><strong>{mode.title}</strong><span>{mode.detail}</span><small>{loading ? '載入中…' : `${getTrainingRows(questions, state.stats, TODAY, mode.id).length} 題可練`}</small></button>)}</div>
+      <p className="muted">每回合約 {count * 2} 分鐘。只納入已有 A–E 正解的題目；實際分數以交卷結果為準，練習表現不代表正式考試預測。</p>
+      <div className="training-shortcuts"><button className="secondary" onClick={() => onNavigate('flashcard-review')}>複習記憶卡</button><button className="secondary" onClick={() => onNavigate('knowledge')}>查閱知識筆記</button><button className="secondary" onClick={() => onNavigate('mock')}>完整限時模考</button></div>
+    </>}
     <div className="wrong-book-filters">
       <label>搜尋<input value={filters.query} onChange={(e) => filter('query', e.target.value)} placeholder="題幹、題號、錯題筆記" /></label>
       <label>癌別<select value={filters.cancer} onChange={(e) => filter('cancer', e.target.value)}><option value="All">全部癌別</option>{[...new Set(questions.map((q) => q.cancer))].sort().map((cancer) => <option key={cancer}>{cancer}</option>)}</select></label>
-      <label>最近答錯<select value={filters.period} onChange={(e) => filter('period', e.target.value)}><option value="all">不限時間</option><option value="1">今天</option><option value="7">近 7 天</option><option value="30">近 30 天</option></select></label>
+      {!training && <><label>最近答錯<select value={filters.period} onChange={(e) => filter('period', e.target.value)}><option value="all">不限時間</option><option value="1">今天</option><option value="7">近 7 天</option><option value="30">近 30 天</option></select></label>
       <label>狀態<select value={filters.status} onChange={(e) => filter('status', e.target.value)}><option value="all">全部錯題</option><option value="pending">仍需加強</option><option value="corrected">最近已答對</option></select></label>
-      <label>排序<select value={filters.sort} onChange={(e) => filter('sort', e.target.value)}><option value="recent">最近答錯優先</option><option value="wrong">答錯次數最多</option></select></label>
+      <label>排序<select value={filters.sort} onChange={(e) => filter('sort', e.target.value)}><option value="recent">最近答錯優先</option><option value="wrong">答錯次數最多</option></select></label></>}
       <label>本輪題數<select value={count} onChange={(e) => setCount(Number(e.target.value))}>{[5, 10, 20, 30].map((n) => <option key={n} value={n}>{n} 題</option>)}</select></label>
     </div>
     <button className="primary" disabled={loading || !rows.length} onClick={() => {
       if (activeQuestions.length && !submitted && !window.confirm('重新選題會取代本輪尚未交卷的答案。繼續？')) return;
-      start(rows.slice(0, count).map(({ q }) => q.id));
+      start(training ? selectTrainingIds(rows, count, trainingMode) : rows.slice(0, count).map(({ q }) => q.id));
     }}>依篩選開始練習（{Math.min(rows.length, count)} 題）</button>
     {loading && <p role="status">正在載入完整題庫…</p>}
-    {!loading && !rows.length && <p className="empty-state">目前沒有符合條件的錯題。答題交卷後，錯題會自動出現在這裡。</p>}
-    <details className="subsection"><summary>瀏覽錯題清單（{rows.length} 題）</summary>{rows.slice(0, 100).map(({ q, stat, lastWrong }) => <div className="weak-row" key={q.id}><strong>{q.id} · {q.cancer}</strong> · 答錯 {stat.wrong} 次 · {stat.lastResult === 'correct' ? '最近已答對' : '仍需加強'} · {lastWrong.slice(0, 10) || '日期未記錄'}<p>{q.stem}</p><QuestionNotionLinks question={q} /></div>)}{rows.length > 100 && <p>顯示前 100 題，請使用篩選縮小範圍。</p>}</details>
+    {!loading && !rows.length && <p className="empty-state">{training ? '目前沒有符合條件的題目，請切換訓練目標或癌別。完成新題後，系統會依紀錄安排補強。' : '目前沒有符合條件的錯題。答題交卷後，錯題會自動出現在這裡。'}</p>}
+    {!training && <details className="subsection"><summary>瀏覽錯題清單（{rows.length} 題）</summary>{rows.slice(0, 100).map(({ q, stat, lastWrong }) => <div className="weak-row" key={q.id}><strong>{q.id} · {q.cancer}</strong> · 答錯 {stat.wrong} 次 · {stat.lastResult === 'correct' ? '最近已答對' : '仍需加強'} · {lastWrong.slice(0, 10) || '日期未記錄'}<p>{q.stem}</p><QuestionNotionLinks question={q} /></div>)}{rows.length > 100 && <p>顯示前 100 題，請使用篩選縮小範圍。</p>}</details>}
     {activeQuestions.length > 0 && <section className="subsection">
       <h3>本輪練習 · {activeQuestions.length} 題</h3>
+      <div className="training-progress"><span>{submitted ? '已交卷' : `已答 ${activeQuestions.filter((q) => session.practiceDrafts?.[q.id]?.selected).length} / ${activeQuestions.length}`}</span><progress aria-label="本輪作答進度" max={activeQuestions.length} value={activeQuestions.filter((q) => session.practiceDrafts?.[q.id]?.selected).length} /></div>
+      <div className="training-question-nav" aria-label="題號導航">{activeQuestions.map((q, index) => <button key={q.id} type="button" aria-label={`第 ${index + 1} 題，${session.practiceDrafts?.[q.id]?.selected ? '已作答' : '未作答'}`} aria-current={Math.floor(index / 5) === activePage ? 'page' : undefined} className={session.practiceDrafts?.[q.id]?.selected ? 'answered' : ''} onClick={() => { setPage(Math.floor(index / 5)); requestAnimationFrame(() => document.getElementById(`training-question-${q.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }}>{index + 1}</button>)}</div>
+      {submitted && <div className="training-debrief"><strong>本輪正確率 {results.some((r) => r.isCorrect != null) ? `${Math.round(results.filter((r) => r.isCorrect === true).length / results.filter((r) => r.isCorrect != null).length * 100)}%` : '尚無可評分題目'}</strong><p>高信心答錯 {results.filter((r) => r.isCorrect === false && r.confidence >= 4).length} 題 · 低信心答對 {results.filter((r) => r.isCorrect === true && r.confidence <= 2).length} 題</p><p>{wrongIds.length ? '先訂正錯題：寫下一句判斷規則，說明其他選項為何不適用，再重練。隔日回到到期複習，確認不是只記得答案。' : '本輪沒有已確認的錯題。檢查低信心題的推理，再挑新題或完整模考驗證。'}</p></div>}
       {submitted && <p className="feedback-box">答對 {results.filter((r) => r.isCorrect === true).length} ／答錯 {wrongIds.length} ／待補正解 {results.filter((r) => r.isCorrect == null).length}</p>}
-      <div className="question-list">{activeQuestions.slice(activePage * 5, activePage * 5 + 5).map((q) => <QuestionCard key={`${session.attemptId}-${q.id}`} question={q} stat={getStat(state, q.id)} onUpdateStat={onUpdateStat} hideAnswerUntilSubmit practiceMode practiceDraft={session.practiceDrafts?.[q.id]} onPracticeChange={(patch) => updateDraft(q.id, patch)} batchSubmitted={submitted} />)}</div>
+      <div className="question-list">{activeQuestions.slice(activePage * 5, activePage * 5 + 5).map((q) => <div id={`training-question-${q.id}`} key={`${session.attemptId}-${q.id}`}><QuestionCard question={q} stat={getStat(state, q.id)} onUpdateStat={onUpdateStat} hideAnswerUntilSubmit practiceMode practiceDraft={session.practiceDrafts?.[q.id]} onPracticeChange={(patch) => updateDraft(q.id, patch)} batchSubmitted={submitted} /></div>)}</div>
       <div className="practice-page-actions"><button className="secondary" disabled={activePage === 0} onClick={() => setPage(activePage - 1)}>上一頁</button><span>{activePage + 1} / {Math.ceil(activeQuestions.length / 5)}</span><button className="secondary" disabled={(activePage + 1) * 5 >= activeQuestions.length} onClick={() => setPage(activePage + 1)}>下一頁</button>
         {!submitted ? <button className="good" disabled={loading} onClick={submit}>整份交卷並顯示答案</button> : <><button className="primary" onClick={() => start(activeQuestions.map((q) => q.id))}>同一份再練一次</button><button className="secondary" disabled={!wrongIds.length} onClick={() => start(wrongIds)}>只重練本輪錯題（{wrongIds.length}）</button></>}
       </div>
@@ -7885,8 +7974,7 @@ export default function App() {
   const [questionBankLoading, setQuestionBankLoading] = useState(false);
   const [questionBankError, setQuestionBankError] = useState('');
   const latestStateRef = useRef(state);
-  const dirtyStorageSlicesRef = useRef(null);
-  const [tab, setTab] = useState('quest');
+  const [tab, setTab] = useState('training');
   useEffect(() => {
     if (tab === 'news') setTab('knowledge');
   }, [tab]);
@@ -7926,7 +8014,7 @@ export default function App() {
     [todaySession?.questionIds]
   );
   const requestedQuestionYears = useMemo(() => {
-    if (tab === 'wrong-book') return QUESTION_YEARS;
+    if (tab === 'wrong-book' || tab === 'training') return QUESTION_YEARS;
     if (tab === 'questions') {
       if (bankYear === 'Custom') return EMPTY_ARRAY;
       return bankYear === 'All' ? QUESTION_YEARS : normalizeQuestionYearList([bankYear]);
@@ -7957,12 +8045,8 @@ export default function App() {
 
   useEffect(() => {
     latestStateRef.current = state;
-    const slicesToSave = dirtyStorageSlicesRef.current && dirtyStorageSlicesRef.current.size
-      ? [...dirtyStorageSlicesRef.current]
-      : null;
-    dirtyStorageSlicesRef.current = new Set();
     let idleId = null;
-    const saveLatestState = () => saveState(latestStateRef.current, slicesToSave);
+    const saveLatestState = () => saveState(latestStateRef.current);
     const timeoutId = window.setTimeout(() => {
       if ('requestIdleCallback' in window) {
         idleId = window.requestIdleCallback(saveLatestState, { timeout: 1200 });
@@ -8165,20 +8249,11 @@ export default function App() {
     return () => clearTimeout(timeout);
   }, [state, user, isApplyingCloudState]);
 
-  const queueStorageSlices = useCallback((sliceNames = null) => {
-    if (!sliceNames) {
-      dirtyStorageSlicesRef.current = null;
-      return;
-    }
-    if (dirtyStorageSlicesRef.current === null) return;
-    const names = Array.isArray(sliceNames) ? sliceNames : [sliceNames];
-    names.forEach((name) => dirtyStorageSlicesRef.current.add(name));
-  }, []);
-
-  const updateState = useCallback((updater, sliceNames = null) => {
-    queueStorageSlices(sliceNames);
+  // Always flush changed storage slices. State keys such as `stats` are not
+  // storage keys (`questionRecords`), and cancelled debounce jobs must not lose writes.
+  const updateState = useCallback((updater) => {
     setState((prev) => normalizeState(typeof updater === 'function' ? updater(prev) : updater));
-  }, [queueStorageSlices]);
+  }, []);
 
   const setPomodoroPreset = (presetId) => {
     if (activeFocusSession || !POMODORO_PRESETS[presetId]) return;
@@ -8784,8 +8859,7 @@ export default function App() {
   const todayPracticeTargetIds = todayIds.slice(0, todayPracticeTargetCount);
   const dailyBatchSubmitted = Boolean(todaySession?.submittedAt && todaySession?.gradingResults?.length);
   const dailyBatchResults = todaySession?.gradingResults || EMPTY_ARRAY;
-  const dailyGradeableResults = dailyBatchResults.filter((result) => result.isCorrect != null);
-  const dailyBatchAttemptsRecorded = dailyGradeableResults.length > 0 && dailyGradeableResults.every((result) => (
+  const dailyBatchAttemptsRecorded = dailyBatchResults.length > 0 && dailyBatchResults.every((result) => (
     (getStat(state, result.questionId).answerHistory || []).some((event) => event?.attemptId === todaySession?.attemptId)
   ));
   const dailyBatchNotesSynced = dailyBatchResults.every((result) => {
@@ -8892,7 +8966,7 @@ export default function App() {
           ...(patch.wrongNotes !== undefined ? { wrongNotes: patch.wrongNotes } : {}),
         } : result);
         const updatedResult = gradingResults.find((result) => result.questionId === questionId);
-        if ((patch.correctAnswer !== undefined || patch.rating !== undefined) && updatedResult?.isCorrect != null) {
+        if ((patch.correctAnswer !== undefined || patch.rating !== undefined) && updatedResult) {
           nextStats = regradeBatchQuestionResult(nextStats, updatedResult, 'daily', sess.attemptId);
         }
         if (hasNotePatch) nextStats = applyBatchQuestionNotes(nextStats, questionId, sess.attemptId, patch);
@@ -9014,7 +9088,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!dailyBatchSubmitted || !dailyGradeableResults.length || dailyBatchAttemptsRecorded) return;
+    if (!dailyBatchSubmitted || !dailyBatchResults.length || dailyBatchAttemptsRecorded) return;
     updateState((prev) => {
       const session = prev.sessions?.[TODAY] || {};
       const repairedStats = applyBatchQuestionResults(prev.stats, session.gradingResults || [], 'daily', session.attemptId);
@@ -9027,7 +9101,7 @@ export default function App() {
         },
       };
     }, ['stats', 'sessions']);
-  }, [dailyBatchAttemptsRecorded, dailyBatchSubmitted, dailyGradeableResults.length, updateState]);
+  }, [dailyBatchAttemptsRecorded, dailyBatchSubmitted, dailyBatchResults.length, updateState]);
 
   useEffect(() => {
     if (!dailyBatchSubmitted || dailyBatchNotesSynced) return;
@@ -9365,8 +9439,9 @@ export default function App() {
     const attempts = stats.reduce((s, x) => s + (x.attempts || 0), 0);
     const correct = stats.reduce((s, x) => s + (x.correct || 0), 0);
     const wrong = stats.reduce((s, x) => s + (x.wrong || 0), 0);
-    const reviewed = Object.keys(state.stats).filter((id) => state.stats[id]?.attempts > 0).length;
-    return { attempts, correct, wrong, reviewed, accuracy: attempts ? Math.round((correct / attempts) * 100) : 0 };
+    const reviewed = Object.values(state.stats).filter((stat) => (stat.attempts || 0) + (stat.ungradedAttempts || 0) > 0).length;
+    const ungraded = stats.reduce((sum, stat) => sum + (stat.ungradedAttempts || 0), 0);
+    return { attempts, correct, wrong, reviewed, ungraded, accuracy: attempts ? Math.round((correct / attempts) * 100) : 0 };
   }, [state.stats]);
 
   const cancerSummary = useMemo(() => needsCancerSummary ? getCancerSummary(questionDataState) : EMPTY_ARRAY, [needsCancerSummary, questionDataState]);
@@ -9417,9 +9492,7 @@ export default function App() {
       const existingExam = (prev.mockExams || []).find((mock) => mock.id === completedExam.id);
       if (existingExam) {
         const regradedStats = completedExam.results.reduce(
-          (nextStats, result) => result.isCorrect == null
-            ? nextStats
-            : regradeBatchQuestionResult(nextStats, result, 'mock', completedExam.id),
+          (nextStats, result) => regradeBatchQuestionResult(nextStats, result, 'mock', completedExam.id),
           prev.stats,
         );
         return {
@@ -9818,22 +9891,22 @@ export default function App() {
       <header className="app-header">
         <div>
           <div className="eyebrow">Oncology Tracker</div>
-          <h1>Board Readiness Engine</h1>
-          <p>{QUESTION_YEAR_LABEL} 腫專考古題、mixed mock、confidence calibration、critical error queue、≥80 分預測。</p>
+          <h1>把每次複習，變成下一次得分</h1>
+          <p>{QUESTION_YEAR_LABEL} 腫專考古題 · 弱點修復 · 間隔複習 · 限時模考。</p>
         </div>
         <div className="header-actions">
           <button className={checkedInToday ? 'good' : 'primary'} disabled={checkedInToday} onClick={markDailyCheckIn}>
             {checkedInToday ? '今日已打卡' : '每日打卡'}
           </button>
-          <button className="primary" disabled={isCreatingPractice} onClick={startDailyPractice}>
-            {isCreatingPractice ? '產生中...' : dailyBatchSubmitted ? '開始下一份 Daily Practice' : '產生今日 Daily Practice'}
+          <button className="primary" onClick={() => setTab('training')}>
+            {state.sessions?.['score-training']?.questionIds?.length && !state.sessions['score-training'].submittedAt ? '繼續提分訓練' : '開始提分訓練'}
           </button>
         </div>
       </header>
 
-      <section className="metrics-grid">
+      <details className="overview-details"><summary>查看學習總覽與統計</summary><section className="metrics-grid">
         <MetricCard label="題庫總數" value={questionTotal} sub={`${QUESTION_YEAR_LABEL} 年`} />
-        <MetricCard label="已練題目" value={summary.reviewed} sub={`${summary.attempts} total attempts`} />
+        <MetricCard label="已練題目" value={summary.reviewed} sub={`${summary.attempts + summary.ungraded} 次作答 · ${summary.ungraded} 次待補正解`} />
         <MetricCard label="正確率" value={`${summary.accuracy}%`} sub={`${summary.correct} correct / ${summary.wrong} wrong`} />
         <MetricCard label="今日待複習" value={dueCount} sub="依 next review date" />
         <MetricCard label="≥80 機率" value={`${readiness.probability80}%`} sub={readiness.readinessLevel} />
@@ -9844,7 +9917,9 @@ export default function App() {
         <MetricCard label="同步狀態" value={user ? 'Cloud' : 'Local'} sub={user ? user.email : '尚未登入'} />
       </section>
 
-      <section className="mission-control panel">
+      </details>
+
+      {tab === 'quest' && <section className="mission-control panel">
         <div className="section-head">
           <div>
             <div className="eyebrow dark">Mission Control</div>
@@ -9887,10 +9962,15 @@ export default function App() {
         </div>
       </section>
 
+      }
+
       <nav className="tabs grouped-tabs" aria-label="Main navigation">
+        <button className={`nav-home ${tab === 'training' ? 'active' : ''}`} type="button" onClick={() => setTab('training')}>
+          <ClipboardList size={17} strokeWidth={2.4} /><span>提分訓練</span>
+        </button>
         <button className={`nav-home ${tab === 'quest' ? 'active' : ''}`} type="button" onClick={() => setTab('quest')}>
           <Home size={17} strokeWidth={2.4} />
-          <span>Quest</span>
+          <span>讀書計畫</span>
         </button>
         <button className={`nav-knowledge ${tab === 'knowledge' ? 'active' : ''}`} type="button" onClick={() => setTab('knowledge')}>
           <BookOpen size={17} strokeWidth={2.4} />
@@ -10038,6 +10118,7 @@ export default function App() {
         </main>
       )}
 
+      {tab === 'training' && <WrongAnswerBookPanel key="training" training state={state} onChange={(updater) => updateState(updater, ['sessions', 'stats'])} onUpdateStat={updateStat} loading={questionBankLoading || !questionBankReady} onNavigate={setTab} />}
       {tab === 'wrong-book' && <WrongAnswerBookPanel state={state} onChange={(updater) => updateState(updater, ['sessions', 'stats'])} onUpdateStat={updateStat} loading={questionBankLoading || !questionBankReady} />}
 
       {tab === 'mock' && (
