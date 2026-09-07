@@ -25,6 +25,9 @@ export default function QuestionNotionLinks({ question }) {
   const related = query.trim()
     ? notes.filter((note) => `${note.title} ${note.searchText || ''}`.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 6)
     : getLinkedNotionNotes(notes, { cancer: question.cancer, title: question.topic, trials: question.trials || [], focusTags: question.tags?.biomarker || [], details: question.stem }, 4);
+  const open = (note) => {
+    if (!context.onOpen(note)) setMessage('找不到文章識別碼，請從 Knowledge 搜尋結果連結文章。');
+  };
   const add = (value) => {
     const normalized = safeNotionUrl(value);
     if (!normalized) { setMessage('請輸入有效的 HTTPS Notion 頁面網址。'); return; }
@@ -33,18 +36,18 @@ export default function QuestionNotionLinks({ question }) {
     setMessage('已儲存題目連結。');
   };
   return <details className="question-notion-links">
-    <summary>相關 Notion · {links.length} 個連結</summary>
+    <summary>相關 Knowledge · {links.length} 個連結</summary>
     {links.map((link) => <div className="inline-actions" key={link}>
-      <a href={link} target="_blank" rel="noreferrer">{notes.find((note) => safeNotionUrl(note.url) === link)?.title || '開啟 Notion 筆記'}</a>
+      <button type="button" className="link-button" onClick={() => open({ url: link })}>{notes.find((note) => safeNotionUrl(note.url) === link)?.title || '在 Knowledge 開啟文章'}</button>
       {saved.includes(link) && <button className="tiny" type="button" onClick={() => context.onSave(question.id, saved.filter((value) => value !== link))}>移除連結</button>}
     </div>)}
     <div className="inline-actions">
       <input aria-label="Notion 頁面網址" value={url} onChange={(event) => setUrl(event.target.value)} placeholder="貼上 https://www.notion.so/..." />
       <button className="secondary" type="button" onClick={() => add(url)}>新增連結</button>
     </div>
-    <input aria-label="搜尋 Notion 筆記" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜尋已同步的 Notion 筆記" />
+    <input aria-label="搜尋 Knowledge 文章" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜尋 Knowledge 庫文章" />
     <p className="muted">{query ? '搜尋結果' : '可能相關的筆記（請確認內容後連結）'}</p>
-    {related.map((note) => <div className="inline-actions" key={note.id}><a href={safeNotionUrl(note.url)} target="_blank" rel="noreferrer">{note.title}</a><button className="tiny" type="button" disabled={links.includes(safeNotionUrl(note.url))} onClick={() => add(note.url)}>連結此題</button></div>)}
+    {related.map((note) => <div className="inline-actions" key={note.id}><button type="button" className="link-button" onClick={() => open(note)}>{note.title}</button><button className="tiny" type="button" disabled={links.includes(safeNotionUrl(note.url))} onClick={() => add(note.url)}>連結此題</button></div>)}
     {!related.length && <p className="muted">沒有符合的筆記；可直接貼網址，或到 Knowledge Hub 同步筆記。</p>}
     {message && <p role="status">{message}</p>}
   </details>;

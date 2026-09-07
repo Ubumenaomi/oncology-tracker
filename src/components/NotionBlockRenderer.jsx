@@ -69,9 +69,9 @@ function NotionBlock({ block, onOpenNotionPage }) {
     : <NotionBlocks blocks={block.children} onOpenNotionPage={onOpenNotionPage} nested />;
   switch (block.type) {
     case 'paragraph': return <div className="notion-paragraph">{richText}{children}</div>;
-    case 'heading_1': return <h1 id={`notion-${block.id}`}>{richText}</h1>;
-    case 'heading_2': return <h2 id={`notion-${block.id}`}>{richText}</h2>;
-    case 'heading_3': return <h3 id={`notion-${block.id}`}>{richText}</h3>;
+    case 'heading_1': return <><h1 id={`notion-${block.id}`} data-note-anchor={block.id} tabIndex={-1}>{richText}</h1>{children}</>;
+    case 'heading_2': return <><h2 id={`notion-${block.id}`} data-note-anchor={block.id} tabIndex={-1}>{richText}</h2>{children}</>;
+    case 'heading_3': return <><h3 id={`notion-${block.id}`} data-note-anchor={block.id} tabIndex={-1}>{richText}</h3>{children}</>;
     case 'bulleted_list_item': return <li>{richText}{children}</li>;
     case 'numbered_list_item': return <li>{richText}{children}</li>;
     case 'to_do':
