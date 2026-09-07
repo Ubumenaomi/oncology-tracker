@@ -38,6 +38,7 @@ export function useNotionLibrary({ user, fallbackItems = [], enabled = false } =
   const [libraryState, setLibraryState] = useState(() => makeInitialLibraryState(fallbackItems));
   const [notePreview, setNotePreview] = useState({ id: '', title: '', status: 'idle', item: null, error: '' });
   const autoSyncedUserRef = useRef('');
+  const previewRequestRef = useRef(0);
 
   const syncLibrary = useCallback(async () => {
     if (!user) {
@@ -70,6 +71,7 @@ export function useNotionLibrary({ user, fallbackItems = [], enabled = false } =
   const openNotePreview = useCallback(async (note) => {
     const pageId = getNotionPageId(note);
     if (!pageId) return { ok: false };
+    const request = ++previewRequestRef.current;
     const cached = loadNotionPreviewCache(pageId);
     const cacheAge = cached?.fetchedAt ? Date.now() - new Date(cached.fetchedAt).getTime() : Infinity;
     const hasFreshStructuredCache = cached?.contentSchemaVersion >= 2
@@ -82,6 +84,7 @@ export function useNotionLibrary({ user, fallbackItems = [], enabled = false } =
     setNotePreview({ id: pageId, title: note.title, status: 'loading', item: null, error: '' });
     try {
       const preview = await fetchNotionPagePreview(pageId);
+      if (request !== previewRequestRef.current) return { ok: false, superseded: true };
       saveNotionPreviewCache(preview);
       setNotePreview({ id: pageId, title: preview.title, status: 'ready', item: preview, error: '' });
       setLibraryState((prev) => ({
@@ -90,6 +93,7 @@ export function useNotionLibrary({ user, fallbackItems = [], enabled = false } =
       }));
       return { ok: true, source: 'live' };
     } catch (error) {
+      if (request !== previewRequestRef.current) return { ok: false, superseded: true };
       if (cached?.plainText || cached?.blocks?.length) {
         setNotePreview({
           id: pageId,
@@ -106,6 +110,7 @@ export function useNotionLibrary({ user, fallbackItems = [], enabled = false } =
   }, []);
 
   const closeNotePreview = useCallback(() => {
+    previewRequestRef.current += 1;
     setNotePreview({ id: '', title: '', status: 'idle', item: null, error: '' });
   }, []);
 
