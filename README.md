@@ -54,3 +54,13 @@ The React Compiler is not enabled on this template because of its impact on dev 
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+
+## Append review supplements to Notion
+
+Knowledge readers and the question-side reader include a plain-text supplement form. The explicit **儲存到 Notion** action calls `POST /api/notion-append` and appends a dated heading and paragraphs to the selected page. Existing blocks are never replaced. The original `/api/notion-library` route remains GET-only.
+
+The append endpoint reuses Firebase authentication and the configured Notion user allow-list, verifies that the page belongs to Fellow training (including authorized descendants), and requires the Notion integration's Insert content capability. Requests are limited to 10,000 UTF-16 code units and split into valid rich-text blocks. Tokens stay server-side.
+
+Drafts are scoped to the signed-in user and page in session storage. The UI locks while sending and retains uncertain submissions for verification in Notion instead of retrying automatically. A successful append and a failed refresh are reported separately. Writes are tested with mocked API responses; tests do not modify live clinical notes.
+
+Use the existing Vercel deployment or `npm run dev:full` with the server environment and allow-list configured. Plain `npm run dev` serves only Vite and does not execute the API routes.
