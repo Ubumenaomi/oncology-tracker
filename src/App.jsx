@@ -6471,6 +6471,66 @@ function NotionPreviewPanel({ preview, onClose, onOpenInternalPage, readerRef })
   );
 }
 
+function QuestionNoteReader({ origin, onClose }) {
+  const [history, setHistory] = useState([origin.note]);
+  const [mobile, setMobile] = useState(() => window.matchMedia('(max-width: 1050px)').matches);
+  const panelRef = useRef(null);
+  const closeRef = useRef(null);
+  const { notePreview, openNotePreview, closeNotePreview } = useNotionLibrary();
+  const current = history.at(-1);
+  useEffect(() => {
+    openNotePreview(current);
+    panelRef.current?.scrollTo(0, 0);
+    return closeNotePreview;
+  }, [current, openNotePreview, closeNotePreview]);
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 1050px)');
+    const change = () => setMobile(media.matches);
+    media.addEventListener('change', change);
+    closeRef.current?.focus({ preventScroll: true });
+    return () => media.removeEventListener('change', change);
+  }, []);
+  useEffect(() => {
+    const main = document.getElementById('study-workspace');
+    const previousOverflow = document.body.style.overflow;
+    if (mobile) {
+      main?.setAttribute('inert', '');
+      document.body.style.overflow = 'hidden';
+      closeRef.current?.focus({ preventScroll: true });
+    }
+    const keydown = (event) => {
+      if (event.key === 'Escape') { event.preventDefault(); onClose(); }
+      if (mobile && event.key === 'Tab') {
+        const focusable = [...panelRef.current.querySelectorAll('button:not([disabled]), a[href], input, select, textarea, [tabindex="0"]')].filter((element) => element.getClientRects().length);
+        const first = focusable[0];
+        const last = focusable.at(-1);
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
+    };
+    document.addEventListener('keydown', keydown);
+    return () => {
+      main?.removeAttribute('inert');
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', keydown);
+    };
+  }, [mobile, onClose]);
+  return <aside className="question-note-dock" ref={panelRef} role="dialog" aria-modal={mobile || undefined} aria-labelledby="question-note-heading">
+    <header className="question-note-toolbar">
+      <div><strong id="question-note-heading">對照閱讀 · {origin.questionId}</strong><small>保留題目與作答 · Esc 關閉</small></div>
+      <button ref={closeRef} type="button" className="primary" onClick={onClose}>回到題目 ×</button>
+      {history.length > 1 && <button className="secondary" type="button" onClick={() => setHistory((items) => items.slice(0, -1))}>← 上一篇筆記</button>}
+      <a className="secondary" href={`https://www.notion.so/${getKnowledgePageId(current)}`} target="_blank" rel="noreferrer">另開 Notion 分頁 ↗</a>
+    </header>
+    <NotionPreviewPanel preview={notePreview} onClose={onClose} onOpenInternalPage={(pageId) => {
+      const id = getKnowledgePageId({ id: pageId });
+      if (!id) return false;
+      setHistory((items) => [...items, { id }]);
+      return true;
+    }} />
+  </aside>;
+}
+
 function KnowledgeHubPanel({
   topics,
   flashcards,
@@ -7975,6 +8035,16 @@ export default function App() {
   const [questionBankError, setQuestionBankError] = useState('');
   const latestStateRef = useRef(state);
   const [tab, setTab] = useState('training');
+  const [questionReader, setQuestionReader] = useState(null);
+  const questionReaderOrigin = useRef(null);
+  const closeQuestionReader = useCallback(() => {
+    const origin = questionReaderOrigin.current;
+    setQuestionReader(null);
+    requestAnimationFrame(() => {
+      if (origin) window.scrollTo(0, origin.scrollY);
+      origin?.opener?.focus({ preventScroll: true });
+    });
+  }, []);
   useEffect(() => {
     if (tab === 'news') setTab('knowledge');
   }, [tab]);
@@ -9878,16 +9948,18 @@ export default function App() {
   };
 
   return (
-    <QuestionNotesContext.Provider value={{ stats: state.stats, items: notionLibrary.libraryState.items, onOpen: (note) => {
+    <QuestionNotesContext.Provider value={{ stats: state.stats, items: notionLibrary.libraryState.items, onOpen: (note, question) => {
       const pageId = getKnowledgePageId(note);
       const found = notionLibrary.libraryState.items.find((item) => (pageId && getKnowledgePageId(item) === pageId) || item.url === note.url);
       const target = found || note;
       if (!getKnowledgePageId(target)) return false;
-      setTab('knowledge');
-      notionLibrary.openNotePreview(target);
+      const origin = { note: target, questionId: question?.id || '', opener: document.activeElement, scrollY: window.scrollY };
+      questionReaderOrigin.current = origin;
+      setQuestionReader({ ...origin, key: crypto.randomUUID() });
+      requestAnimationFrame(() => origin.opener?.closest('[data-question-id], [data-mock-question-id]')?.scrollIntoView({ block: 'start' }));
       return true;
     }, onSave: (id, notionLinks) => updateState((prev) => ({ ...prev, stats: { ...prev.stats, [id]: { ...getStat(prev, id), notionLinks, notionLinksUpdatedAt: new Date().toISOString() } } }), ['stats']) }}>
-    <div className="app-shell">
+    <div id="study-workspace" className={`app-shell ${questionReader ? 'has-question-reader' : ''}`}>
       <header className="app-header">
         <div>
           <div className="eyebrow">Oncology Tracker</div>
@@ -10724,6 +10796,7 @@ export default function App() {
         </main>
       )}
     </div>
+    {questionReader && <QuestionNoteReader key={questionReader.key} origin={questionReader} onClose={closeQuestionReader} />}
     </QuestionNotesContext.Provider>
   );
 }

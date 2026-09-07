@@ -26,7 +26,7 @@ export default function QuestionNotionLinks({ question }) {
     ? notes.filter((note) => `${note.title} ${note.searchText || ''}`.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 6)
     : getLinkedNotionNotes(notes, { cancer: question.cancer, title: question.topic, trials: question.trials || [], focusTags: question.tags?.biomarker || [], details: question.stem }, 4);
   const open = (note) => {
-    if (!context.onOpen(note)) setMessage('找不到文章識別碼，請從 Knowledge 搜尋結果連結文章。');
+    if (!context.onOpen(note, question)) setMessage('找不到文章識別碼，請從 Knowledge 搜尋結果連結文章。');
   };
   const add = (value) => {
     const normalized = safeNotionUrl(value);
@@ -37,8 +37,9 @@ export default function QuestionNotionLinks({ question }) {
   };
   return <details className="question-notion-links">
     <summary>相關 Knowledge · {links.length} 個連結</summary>
+    <p className="muted">點筆記可在題目旁對照閱讀，按 Esc 或「回到題目」關閉。</p>
     {links.map((link) => <div className="inline-actions" key={link}>
-      <button type="button" className="link-button" onClick={() => open({ url: link })}>{notes.find((note) => safeNotionUrl(note.url) === link)?.title || '在 Knowledge 開啟文章'}</button>
+      <button type="button" className="link-button" onClick={() => open({ url: link })}>{notes.find((note) => safeNotionUrl(note.url) === link)?.title || '在題目旁閱讀文章'}</button>
       {saved.includes(link) && <button className="tiny" type="button" onClick={() => context.onSave(question.id, saved.filter((value) => value !== link))}>移除連結</button>}
     </div>)}
     <div className="inline-actions">
