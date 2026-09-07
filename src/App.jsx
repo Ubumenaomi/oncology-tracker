@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { AlertTriangle, BarChart3, BookOpen, ChevronDown, ClipboardList, Clock3, ExternalLink, FileText, Home, LayoutGrid, List, Pause, Play, RefreshCw, RotateCcw, Settings2 } from 'lucide-react';
 import './App.css';
+import { getWrongAnswerRows, gradeWrongAnswerBatch } from './data/wrongAnswerBook.js';
+import QuestionNotionLinks, { QuestionNotesContext } from './components/QuestionNotionLinks.jsx';
 import { NotionBlocks } from './components/NotionBlockRenderer.jsx';
 import { QUESTION_BANK_TOTAL, QUESTION_YEARS, cancerCategories } from './data/questionBankMeta.js';
 import { buildFlashcardTags } from './data/taxonomy.js';
@@ -108,6 +110,7 @@ const NAV_GROUPS = [
     Icon: ClipboardList,
     items: [
       ['today', 'Daily Practice'],
+      ['wrong-book', '錯題本'],
       ['mock', 'Mock Exam'],
       ['flashcard-review', 'Card Review'],
       ['flashcards', 'Card Manager'],
@@ -972,7 +975,8 @@ function mergeDailySession(cloudSession = {}, localSession = {}) {
   const localIsNewer = getSessionFreshness(localSession) >= getSessionFreshness(cloudSession);
   const primary = localIsNewer ? localSession : cloudSession;
   const secondary = localIsNewer ? cloudSession : localSession;
-  if (primary.attemptId && secondary.attemptId && primary.attemptId !== secondary.attemptId) return primary;
+  if ((primary.attemptId && secondary.attemptId && primary.attemptId !== secondary.attemptId)
+    || (primary.createdAt && secondary.createdAt && primary.createdAt !== secondary.createdAt)) return primary;
   return {
     ...secondary,
     ...primary,
@@ -1088,6 +1092,8 @@ function mergeQuestionStats(cloudStats = {}, localStats = {}) {
     merged[id] = {
       ...secondary,
       ...primary,
+      notionLinks: (localStat.notionLinksUpdatedAt || '') >= (cloudStat.notionLinksUpdatedAt || '') ? (localStat.notionLinks || []) : (cloudStat.notionLinks || []),
+      notionLinksUpdatedAt: [localStat.notionLinksUpdatedAt, cloudStat.notionLinksUpdatedAt].filter(Boolean).sort().at(-1) || null,
       attempts: sameEventSet ? (Number(primary.attempts) || 0) : Math.max(Number(localStat.attempts) || 0, Number(cloudStat.attempts) || 0),
       correct: sameEventSet ? (Number(primary.correct) || 0) : Math.max(Number(localStat.correct) || 0, Number(cloudStat.correct) || 0),
       wrong: sameEventSet ? (Number(primary.wrong) || 0) : Math.max(Number(localStat.wrong) || 0, Number(cloudStat.wrong) || 0),
@@ -2592,7 +2598,7 @@ function getRankedHighYieldTopics(state, task = null) {
 }
 
 function formatPracticeRecipe(config) {
-  return `New ${config.newCount} / Topic ${config.topicCount} / Due ${config.dueCount} / Weakness ${config.weaknessCount} / High-yield ${config.highYieldCount || 0}`;
+  return `New ${config.newCount} / Mixed ${config.topicCount} / Due ${config.dueCount} / Weakness ${config.weaknessCount} / High-yield ${config.highYieldCount || 0}`;
 }
 
 function getCancerAliases(cancer) {
@@ -2725,7 +2731,7 @@ function buildKnowledgeTopics(questionState, flashcardState, planProgress = {}) 
   });
 }
 
-function generateDailyQuestionIds(state, task = getTodayPlanTask(state), excludedIds = [], rankedHighYieldTopics = null) {
+function generateDailyQuestionIds(state, task = null, excludedIds = [], rankedHighYieldTopics = null) {
   const { preferredYears, preferredCancers } = state.settings;
   const modeConfig = getPracticeModeConfig(state.settings?.practiceMode);
   const excluded = new Set(excludedIds);
@@ -2745,7 +2751,7 @@ function generateDailyQuestionIds(state, task = getTodayPlanTask(state), exclude
   const withStats = pool.map((q) => ({ q, stat: getStat(state, q.id), questionText: getQuestionContentText(q) }));
   const topical = withStats
     .map((item) => ({ ...item, taskScore: scoreQuestionForTask(item.q, task) }))
-    .filter((item) => questionMatchesTask(item.q, task))
+    .filter((item) => !task || questionMatchesTask(item.q, task))
     .sort((a, b) => b.taskScore - a.taskScore);
 
   const due = withStats
@@ -4359,6 +4365,96 @@ function PracticeModeSelector({ value, onChange, compact = false }) {
 }
 
 
+function WrongAnswerBookPanel({ state, onChange, onUpdateStat, loading }) {
+  const [filters, setFilters] = useState({ query: '', cancer: 'All', period: 'all', status: 'all', sort: 'recent' });
+  const [count, setCount] = useState(10);
+  const [page, setPage] = useState(0);
+  const [message, setMessage] = useState('');
+  const session = state.sessions?.['wrong-book'];
+  const questions = getQuestionPool(state).map((q) => getQuestionWithOverride(q.id, state)).filter(Boolean);
+  const rows = getWrongAnswerRows(questions, state.stats, { ...filters, today: TODAY });
+  const activeQuestions = (session?.questionIds || []).map((id) => getQuestionWithOverride(id, state)).filter(Boolean);
+  const submitted = Boolean(session?.submittedAt);
+  const results = session?.gradingResults || [];
+  const wrongIds = results.filter((result) => result.isCorrect === false).map((result) => result.questionId);
+  const start = (ids) => {
+    if (!ids.length) return;
+    const now = new Date().toISOString();
+    onChange((prev) => ({ ...prev, sessions: { ...prev.sessions, 'wrong-book': {
+      attemptId: `wrong-book-${crypto.randomUUID()}`, createdAt: now, updatedAt: now,
+      date: TODAY, questionIds: ids, practiceDrafts: {}, gradingResults: [],
+    } } }));
+    setPage(0);
+    setMessage('先完成整份作答，交卷後一起訂正。');
+  };
+  const updateDraft = (id, patch) => {
+    onChange((prev) => {
+      const current = prev.sessions['wrong-book'];
+      if (current?.attemptId !== session?.attemptId) return prev;
+      const draft = { ...current.practiceDrafts?.[id], ...patch };
+      if (JSON.stringify(draft) === JSON.stringify(current.practiceDrafts?.[id])) return prev;
+      let nextStats = prev.stats;
+      const gradingResults = (current.gradingResults || []).map((result) => {
+        if (result.questionId !== id || !current.submittedAt) return result;
+        const next = { ...result, ...patch, selected: result.selected };
+        next.correctAnswer = String(next.correctAnswer || '').trim().toUpperCase();
+        next.isCorrect = /^[A-E]$/.test(next.correctAnswer) ? next.selected === next.correctAnswer : null;
+        if (patch.correctAnswer !== undefined || patch.rating !== undefined) {
+          nextStats = regradeBatchQuestionResult(nextStats, next, 'wrong-book', current.attemptId);
+        }
+        if (patch.explanation !== undefined || patch.wrongNotes !== undefined) nextStats = applyBatchQuestionNotes(nextStats, id, current.attemptId, patch);
+        if (patch.errorType !== undefined) nextStats = applyBatchRemediationsToStats(nextStats, [next], current.attemptId);
+        return next;
+      });
+      return { ...prev, stats: nextStats, sessions: { ...prev.sessions, 'wrong-book': { ...current, practiceDrafts: { ...current.practiceDrafts, [id]: draft }, gradingResults, updatedAt: new Date().toISOString() } } };
+    });
+  };
+  const submit = () => {
+    if (submitted || loading) return;
+    if (activeQuestions.length !== session.questionIds.length) { setMessage('部分題目尚未載入或已刪除，請重新選題。'); return; }
+    const missing = activeQuestions.findIndex((q) => !session.practiceDrafts?.[q.id]?.selected);
+    if (missing >= 0) { setPage(Math.floor(missing / 5)); setMessage(`第 ${missing + 1} 題尚未作答。`); return; }
+    onChange((prev) => {
+      const current = prev.sessions['wrong-book'];
+      if (current?.submittedAt || current?.attemptId !== session.attemptId) return prev;
+      const now = new Date().toISOString();
+      const gradingResults = gradeWrongAnswerBatch(activeQuestions, current.practiceDrafts, prev.stats, now);
+      return { ...prev, stats: applyBatchQuestionResults(prev.stats, gradingResults, 'wrong-book', current.attemptId), sessions: { ...prev.sessions, 'wrong-book': { ...current, gradingResults, submittedAt: now, attemptsCommittedAt: now, updatedAt: now } } };
+    });
+    setPage(0);
+    setMessage('已交卷並記錄本輪作答。可補充錯因、筆記，或再次練習。');
+  };
+  const filter = (key, value) => setFilters((prev) => ({ ...prev, [key]: value }));
+  const activePage = Math.min(page, Math.max(0, Math.ceil(activeQuestions.length / 5) - 1));
+  return <main className="panel wrong-answer-book">
+    <div className="section-head"><div><h2>錯題本</h2><p className="muted">曾答錯的題目自動收錄；答對後仍保留，想練幾次都可以。</p></div><span className="pill">{rows.length} 題符合篩選</span></div>
+    <div className="wrong-book-filters">
+      <label>搜尋<input value={filters.query} onChange={(e) => filter('query', e.target.value)} placeholder="題幹、題號、錯題筆記" /></label>
+      <label>癌別<select value={filters.cancer} onChange={(e) => filter('cancer', e.target.value)}><option value="All">全部癌別</option>{[...new Set(questions.map((q) => q.cancer))].sort().map((cancer) => <option key={cancer}>{cancer}</option>)}</select></label>
+      <label>最近答錯<select value={filters.period} onChange={(e) => filter('period', e.target.value)}><option value="all">不限時間</option><option value="1">今天</option><option value="7">近 7 天</option><option value="30">近 30 天</option></select></label>
+      <label>狀態<select value={filters.status} onChange={(e) => filter('status', e.target.value)}><option value="all">全部錯題</option><option value="pending">仍需加強</option><option value="corrected">最近已答對</option></select></label>
+      <label>排序<select value={filters.sort} onChange={(e) => filter('sort', e.target.value)}><option value="recent">最近答錯優先</option><option value="wrong">答錯次數最多</option></select></label>
+      <label>本輪題數<select value={count} onChange={(e) => setCount(Number(e.target.value))}>{[5, 10, 20, 30].map((n) => <option key={n} value={n}>{n} 題</option>)}</select></label>
+    </div>
+    <button className="primary" disabled={loading || !rows.length} onClick={() => {
+      if (activeQuestions.length && !submitted && !window.confirm('重新選題會取代本輪尚未交卷的答案。繼續？')) return;
+      start(rows.slice(0, count).map(({ q }) => q.id));
+    }}>依篩選開始練習（{Math.min(rows.length, count)} 題）</button>
+    {loading && <p role="status">正在載入完整題庫…</p>}
+    {!loading && !rows.length && <p className="empty-state">目前沒有符合條件的錯題。答題交卷後，錯題會自動出現在這裡。</p>}
+    <details className="subsection"><summary>瀏覽錯題清單（{rows.length} 題）</summary>{rows.slice(0, 100).map(({ q, stat, lastWrong }) => <div className="weak-row" key={q.id}><strong>{q.id} · {q.cancer}</strong> · 答錯 {stat.wrong} 次 · {stat.lastResult === 'correct' ? '最近已答對' : '仍需加強'} · {lastWrong.slice(0, 10) || '日期未記錄'}<p>{q.stem}</p><QuestionNotionLinks question={q} /></div>)}{rows.length > 100 && <p>顯示前 100 題，請使用篩選縮小範圍。</p>}</details>
+    {activeQuestions.length > 0 && <section className="subsection">
+      <h3>本輪練習 · {activeQuestions.length} 題</h3>
+      {submitted && <p className="feedback-box">答對 {results.filter((r) => r.isCorrect === true).length} ／答錯 {wrongIds.length} ／待補正解 {results.filter((r) => r.isCorrect == null).length}</p>}
+      <div className="question-list">{activeQuestions.slice(activePage * 5, activePage * 5 + 5).map((q) => <QuestionCard key={`${session.attemptId}-${q.id}`} question={q} stat={getStat(state, q.id)} onUpdateStat={onUpdateStat} hideAnswerUntilSubmit practiceMode practiceDraft={session.practiceDrafts?.[q.id]} onPracticeChange={(patch) => updateDraft(q.id, patch)} batchSubmitted={submitted} />)}</div>
+      <div className="practice-page-actions"><button className="secondary" disabled={activePage === 0} onClick={() => setPage(activePage - 1)}>上一頁</button><span>{activePage + 1} / {Math.ceil(activeQuestions.length / 5)}</span><button className="secondary" disabled={(activePage + 1) * 5 >= activeQuestions.length} onClick={() => setPage(activePage + 1)}>下一頁</button>
+        {!submitted ? <button className="good" disabled={loading} onClick={submit}>整份交卷並顯示答案</button> : <><button className="primary" onClick={() => start(activeQuestions.map((q) => q.id))}>同一份再練一次</button><button className="secondary" disabled={!wrongIds.length} onClick={() => start(wrongIds)}>只重練本輪錯題（{wrongIds.length}）</button></>}
+      </div>
+    </section>}
+    {message && <p className="save-message" role="status">{message}</p>}
+  </main>;
+}
+
 function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswerUntilSubmit = false, practiceMode = false, practiceDraft = null, onPracticeChange = null, batchSubmitted = false, batchFinalized = false, onEdit }) {
   const initialAnswer = stat.correctAnswer || question.answer || '';
   const [selected, setSelected] = useState(practiceMode ? '' : stat.userAnswer || '');
@@ -4735,6 +4831,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
       </div>
 
       <p className="stem">{question.stem}</p>
+      <QuestionNotionLinks key={question.id} question={question} />
       {!compact && question.tags?.hashTags?.length > 0 && (
         <div className="taxonomy-tags" aria-label="Question taxonomy tags">
           {question.tags.hashTags.map((tag, index) => <span key={`${tag}-${index}`}>{tag}</span>)}
@@ -5409,6 +5506,7 @@ function ManualExplanationPanel({ state, onUpdateStat }) {
               {question.trials?.map((trial) => <span key={trial} className="pill trial">{trial}</span>)}
             </div>
             <p className="stem">{question.stem}</p>
+      <QuestionNotionLinks key={question.id} question={question} />
             <div className="options compact-options">
               {Object.entries(question.options || {}).map(([key, value]) => (
                 <div key={key} className="option readonly-option">
@@ -5815,6 +5913,7 @@ function QuestionManagerDetail({ question, stat, onEdit, onDelete, onSaveExplana
         </div>
       </div>
       <p className="stem">{question.stem || '尚未輸入題幹。'}</p>
+      <QuestionNotionLinks key={question.id} question={question} />
       <div className="options compact-options">
         {Object.entries(question.options || {}).map(([key, value]) => (
           <div key={key} className="option readonly-option">
@@ -7684,6 +7783,7 @@ function MockExamPanel({ state, persistedDraft, onDraftChange, onDraftClear, onF
                 <article className="question-card" key={question.id} data-mock-review-id={question.id}>
                   <div className="question-top"><div><span className="qid">{index + 1}. {question.id}</span><span className="pill">{question.cancer}</span></div></div>
                   <p className="stem">{question.stem}</p>
+      <QuestionNotionLinks key={question.id} question={question} />
                   <div className="options">
                     {Object.entries(question.options || {}).map(([key, value]) => (
                       <label key={key} className={['option', result.selected === key ? 'selected' : '', result.correctAnswer === key ? 'correct-option' : '', result.selected === key && !result.isCorrect ? 'wrong-option' : ''].filter(Boolean).join(' ')}>
@@ -7823,6 +7923,7 @@ export default function App() {
     [todaySession?.questionIds]
   );
   const requestedQuestionYears = useMemo(() => {
+    if (tab === 'wrong-book') return QUESTION_YEARS;
     if (tab === 'questions') {
       if (bankYear === 'Custom') return EMPTY_ARRAY;
       return bankYear === 'All' ? QUESTION_YEARS : normalizeQuestionYearList([bankYear]);
@@ -8666,10 +8767,8 @@ export default function App() {
   }), [state.flashcards, state.flashcardStats, state.deletedFlashcardIds]);
   const baseQuestTask = getTodayPlanTask(state);
   const rawTodayIds = todaySession?.questionIds || EMPTY_ARRAY;
-  const todaySessionPlanTaskId = todaySession?.planTaskId || null;
-  const todaySessionMatchesQuest = getStudyPlanTaskById(todaySessionPlanTaskId) === baseQuestTask
-    || getStudyPlanTaskById(todaySession?.legacyPlanTaskId) === baseQuestTask;
-  const todayIds = todaySessionMatchesQuest ? rawTodayIds : EMPTY_ARRAY;
+  const hasTodaySession = Boolean(todaySession?.questionIds?.length);
+  const todayIds = rawTodayIds;
   const todayQuestions = todayIds.map((id) => getQuestionWithOverride(id, questionDataState)).filter(Boolean);
   const selectedPracticeMode = state.settings?.practiceMode || 'standard';
   const selectedPracticeConfig = getPracticeModeConfig(selectedPracticeMode);
@@ -8708,7 +8807,7 @@ export default function App() {
   const todayRatedCount = todayPracticeTargetIds.filter((id) => hasDailyPracticeRating(state, id, TODAY)).length;
   const firstIncompletePracticeIndex = todayPracticeTargetIds.findIndex((id) => !hasDailyPracticeRating(state, id, TODAY));
   const firstIncompletePracticeId = firstIncompletePracticeIndex >= 0 ? todayPracticeTargetIds[firstIncompletePracticeIndex] : null;
-  const todayCompleted = todaySessionMatchesQuest
+  const todayCompleted = hasTodaySession
     && todayPracticeTargetCount > 0
     && todayPracticeTargetIds.length >= todayPracticeTargetCount
     && todayRatedCount >= todayPracticeTargetCount
@@ -8726,7 +8825,7 @@ export default function App() {
   const currentPracticePage = Math.min(practicePage, Math.max(0, Math.ceil(todayQuestions.length / PRACTICE_PAGE_SIZE) - 1));
   const visibleTodayQuestions = todayQuestions.slice(currentPracticePage * PRACTICE_PAGE_SIZE, (currentPracticePage + 1) * PRACTICE_PAGE_SIZE);
   const totalPracticePages = Math.ceil(todayPracticeConfig.total / PRACTICE_PAGE_SIZE);
-  const highYieldTopics = tab === 'quest' || tab === 'today' ? getRankedHighYieldTopics(questionDataState, questTask) : EMPTY_ARRAY;
+  const highYieldTopics = tab === 'quest' || tab === 'today' ? getRankedHighYieldTopics(questionDataState, tab === 'today' ? null : questTask) : EMPTY_ARRAY;
   const todayHighValueCards = tab === 'quest' ? getHighValueCardsCreatedToday(flashcardDataState) : EMPTY_ARRAY;
   const todayErrorTypeStatus = tab === 'quest' ? getDailyWrongErrorTypeStatus(questionDataState, todayIds) : {
     wrongRatedCount: 0,
@@ -8828,7 +8927,7 @@ export default function App() {
     }
 
     const submittedAt = new Date().toISOString();
-    const attemptId = `daily-${TODAY}-${todaySession?.createdAt || submittedAt}`;
+    const attemptId = todaySession?.attemptId || `daily-${TODAY}-${todaySession?.createdAt || submittedAt}`;
     const gradingResults = todayPracticeTargetIds.map((id) => {
       const question = getQuestionWithOverride(id, questionDataState);
       const draft = todaySession?.practiceDrafts?.[id] || {};
@@ -8974,13 +9073,12 @@ export default function App() {
         updateState((prev) => {
           const modeConfig = getPracticeModeConfig(prev.settings?.practiceMode);
           const existing = prev.sessions?.[TODAY];
-          const existingMatchesQuest = getStudyPlanTaskById(existing?.planTaskId) === questTask
-            || getStudyPlanTaskById(existing?.legacyPlanTaskId) === questTask;
-          const existingQuestionIds = existingMatchesQuest ? (existing?.questionIds || []) : [];
-          const targetCount = force ? modeConfig.total : Math.min(modeConfig.total, Math.max(PRACTICE_PAGE_SIZE, existingQuestionIds.length));
-          const rankedHighYieldTopics = getRankedHighYieldTopics(prev, questTask);
-          const questionIds = fillDailyQuestionIds(prev, questTask, force ? [] : existingQuestionIds, targetCount, rankedHighYieldTopics);
-          if (!force && existingQuestionIds.length >= targetCount && existingMatchesQuest) return prev;
+          const existingAvailable = Boolean(existing?.questionIds?.length);
+          const existingQuestionIds = existingAvailable ? (existing?.questionIds || []) : [];
+          const targetCount = modeConfig.total;
+          const rankedHighYieldTopics = getRankedHighYieldTopics(prev);
+          const questionIds = fillDailyQuestionIds(prev, null, force ? [] : existingQuestionIds, targetCount, rankedHighYieldTopics);
+          if (!force && existingQuestionIds.length >= targetCount && existingAvailable) return prev;
           return {
             ...prev,
             sessions: {
@@ -8988,7 +9086,9 @@ export default function App() {
               [TODAY]: {
                 ...(force ? {} : existing),
                 date: TODAY,
-                ...makePlanTaskSnapshot(questTask),
+                attemptId: force || !existing?.attemptId ? `daily-${crypto.randomUUID()}` : existing.attemptId,
+                planTaskId: null, legacyPlanTaskId: null,
+                practiceTargetCount: questionIds.length,
                 practiceMode: prev.settings?.practiceMode || 'standard',
                 practiceModeLabel: modeConfig.shortLabel,
                 practiceRecipe: {
@@ -9039,13 +9139,12 @@ export default function App() {
     let loadedMore = false;
     updateState((prev) => {
       const existing = prev.sessions?.[TODAY];
-      const existingMatchesQuest = getStudyPlanTaskById(existing?.planTaskId) === questTask
-        || getStudyPlanTaskById(existing?.legacyPlanTaskId) === questTask;
-      if (!existingMatchesQuest) return prev;
+      const existingAvailable = Boolean(existing?.questionIds?.length);
+      if (!existingAvailable) return prev;
       const existingQuestionIds = existing?.questionIds || [];
       const targetCount = Math.min(todayPracticeConfig.total, (nextPage + 1) * PRACTICE_PAGE_SIZE);
-      const rankedHighYieldTopics = getRankedHighYieldTopics(prev, questTask);
-      const questionIds = fillDailyQuestionIds(prev, questTask, existingQuestionIds, targetCount, rankedHighYieldTopics);
+      const rankedHighYieldTopics = getRankedHighYieldTopics(prev);
+      const questionIds = fillDailyQuestionIds(prev, null, existingQuestionIds, targetCount, rankedHighYieldTopics);
       if (questionIds.length <= existingQuestionIds.length) return prev;
       loadedMore = true;
 
@@ -9070,7 +9169,7 @@ export default function App() {
   };
 
   const openFirstIncompletePracticeQuestion = () => {
-    if (!todaySessionMatchesQuest || todayPracticeTargetIds.length === 0) {
+    if (!hasTodaySession || todayPracticeTargetIds.length === 0) {
       createTodaySession();
       return true;
     }
@@ -9117,7 +9216,6 @@ export default function App() {
           ...(prev.sessions || {}),
           [TODAY]: {
             ...session,
-            ...makePlanTaskSnapshot(questTask),
             gradingResults: results.length ? results : session.gradingResults,
             attemptsCommittedAt: session.attemptsCommittedAt || (results.length ? claimedAt : null),
             statsCommittedAt: session.statsCommittedAt || (results.length ? claimedAt : null),
@@ -9558,7 +9656,7 @@ export default function App() {
   };
 
   const setPracticeMode = (practiceMode) => {
-    if (todaySessionMatchesQuest && dailyBatchSubmitted && !dailyBatchClassificationComplete) {
+    if (hasTodaySession && dailyBatchSubmitted && !dailyBatchClassificationComplete) {
       setTab('today');
       setPracticePageMessage('請先完成目前這批所有錯題的錯因分類，再開始下一批 Daily Practice。');
       return;
@@ -9568,8 +9666,7 @@ export default function App() {
     setPracticePageMessage('');
     updateState((prev) => {
       const existing = prev.sessions?.[TODAY];
-      const existingMatchesQuest = getStudyPlanTaskById(existing?.planTaskId) === questTask
-        || getStudyPlanTaskById(existing?.legacyPlanTaskId) === questTask;
+      const existingAvailable = Boolean(existing?.questionIds?.length);
       const existingModeConfig = getPracticeModeConfig(existing?.practiceMode);
       const completedQuestionIds = existing?.submittedAt
         ? [...new Set((existing.gradingResults || []).map((result) => result.questionId).filter(Boolean))]
@@ -9588,7 +9685,7 @@ export default function App() {
         && completedResults.every((result) => (
           result.isCorrect === true || (result.isCorrect === false && result.errorType)
         ));
-      const startsNewBatch = existingMatchesQuest
+      const startsNewBatch = existingAvailable
         && batchReady;
       const newBatchCount = startsNewBatch
         ? (modeConfig.total > completedCount ? modeConfig.total - completedCount : modeConfig.total)
@@ -9599,9 +9696,9 @@ export default function App() {
       const pendingQuestionIds = startsNewBatch
         ? (existing.questionIds || []).filter((id) => !previousQuestionIds.includes(id)).slice(0, newBatchCount)
         : [];
-      const rankedHighYieldTopics = startsNewBatch ? getRankedHighYieldTopics(prev, questTask) : [];
+      const rankedHighYieldTopics = startsNewBatch ? getRankedHighYieldTopics(prev) : [];
       const newBatchQuestionIds = startsNewBatch
-        ? fillDailyQuestionIds(prev, questTask, pendingQuestionIds, newBatchCount, rankedHighYieldTopics, previousQuestionIds)
+        ? fillDailyQuestionIds(prev, null, pendingQuestionIds, newBatchCount, rankedHighYieldTopics, previousQuestionIds)
         : [];
       const now = new Date().toISOString();
       const attemptsRecorded = startsNewBatch && completedResults.every((result) => (
@@ -9623,13 +9720,14 @@ export default function App() {
         },
         sessions: {
           ...(prev.sessions || {}),
-          ...(existingMatchesQuest ? {
+          ...(existingAvailable ? {
             [TODAY]: startsNewBatch ? {
               date: TODAY,
-              ...makePlanTaskSnapshot(questTask),
+              attemptId: `daily-${crypto.randomUUID()}`,
+              planTaskId: null, legacyPlanTaskId: null,
               practiceMode,
               practiceModeLabel: `加練 ${newBatchCount} 題`,
-              practiceTargetCount: newBatchCount,
+              practiceTargetCount: newBatchQuestionIds.length,
               practiceRecipe: {
                 total: newBatchCount,
                 newCount: Math.min(modeConfig.newCount, newBatchCount),
@@ -9704,6 +9802,7 @@ export default function App() {
   };
 
   return (
+    <QuestionNotesContext.Provider value={{ stats: state.stats, items: notionLibrary.libraryState.items, onSave: (id, notionLinks) => updateState((prev) => ({ ...prev, stats: { ...prev.stats, [id]: { ...getStat(prev, id), notionLinks, notionLinksUpdatedAt: new Date().toISOString() } } }), ['stats']) }}>
     <div className="app-shell">
       <header className="app-header">
         <div>
@@ -9928,6 +10027,8 @@ export default function App() {
         </main>
       )}
 
+      {tab === 'wrong-book' && <WrongAnswerBookPanel state={state} onChange={(updater) => updateState(updater, ['sessions', 'stats'])} onUpdateStat={updateStat} loading={questionBankLoading || !questionBankReady} />}
+
       {tab === 'mock' && (
         <MockExamPanel
           state={state}
@@ -9998,7 +10099,7 @@ export default function App() {
           {!todayQuestions.length ? (
             <div className="empty-state">
               <h3>今天尚未產生題目</h3>
-              <p>選擇今日練習模式後，按同一個按鈕產生 New / Topic / Due / Weakness / High-yield 題組。</p>
+              <p>選擇今日練習模式後，按同一個按鈕產生 New / Mixed / Due / Weakness / High-yield 題組。</p>
               <div className="high-yield-list preview">
                 {highYieldTopics.slice(0, 4).map((topic) => (
                   <span key={topic.id} className="high-yield-chip">
@@ -10016,7 +10117,7 @@ export default function App() {
               <div className="adaptive-practice-card compact">
                 <div>
                   <h3>今日題目組成</h3>
-                  <p className="muted">{formatPracticeRecipe(todayPracticeConfig)}。主線：{questTask.day}｜{questTask.topic}</p>
+                  <p className="muted">{formatPracticeRecipe(todayPracticeConfig)}。依你的年份／癌別偏好與作答紀錄抽題，可隨時練習，不綁定 Day Plan。</p>
                 </div>
                 <div className="high-yield-list">
                   {(todaySession?.highYieldInserts || highYieldTopics).slice(0, 4).map((topic) => (
@@ -10531,5 +10632,6 @@ export default function App() {
         </main>
       )}
     </div>
+    </QuestionNotesContext.Provider>
   );
 }
