@@ -14,7 +14,8 @@
     "trials:review": "node scripts/generate-trial-registry-review.js",
     "questions:promote": "node scripts/promote-question-backup.js",
     "tag:questions": "node scripts/tag-question-bank.js",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:practice": "node --test src/data/wrongAnswerBook.test.js"
   },
   "dependencies": {
     "firebase": "^12.13.0",

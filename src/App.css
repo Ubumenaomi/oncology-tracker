@@ -4966,3 +4966,11 @@ button:disabled {
   .notion-draft-list { grid-template-columns: 1fr; }
   .notion-learning-context > div:first-child { align-items: flex-start; flex-direction: column; }
 }
+
+.wrong-book-filters { display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0; }
+.wrong-book-filters label { display: grid; gap: 6px; font-size: .88rem; flex: 1 1 145px; }
+.wrong-book-filters input, .wrong-book-filters select { width: 100%; min-width: 0; }
+.question-notion-links { margin: 12px 0; padding: 12px; border: 1px solid #dbe4ee; border-radius: 12px; background: #f7fafc; overflow-wrap: anywhere; }
+.question-notion-links summary { cursor: pointer; color: #24577c; font-weight: 600; }
+.question-notion-links .inline-actions { margin: 10px 0; flex-wrap: wrap; }
+.question-notion-links input { min-width: 0; max-width: 100%; flex: 1 1 200px; }
