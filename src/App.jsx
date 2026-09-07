@@ -4,6 +4,8 @@ import './App.css';
 import { jumpToKnowledgeSection, getKnowledgePageId } from './data/knowledgeNavigation.js';
 import { getWrongAnswerRows, gradeWrongAnswerBatch } from './data/wrongAnswerBook.js';
 import { TRAINING_MODES, getTrainingRows, selectTrainingIds } from './data/scoreTraining.js';
+import NotionSupplementEditor from './components/NotionSupplementEditor.jsx';
+import { fetchNotionPagePreview } from './data/notionLibraryClient.js';
 import QuestionNotionLinks, { QuestionNotesContext } from './components/QuestionNotionLinks.jsx';
 import { NotionBlocks } from './components/NotionBlockRenderer.jsx';
 import { QUESTION_BANK_TOTAL, QUESTION_YEARS, cancerCategories } from './data/questionBankMeta.js';
@@ -27,6 +29,7 @@ import {
   inferNotionNoteType,
   normalizeNotionExternalUrl,
   sortNotionLibrary,
+  saveNotionPreviewCache,
 } from './data/notionLibrary.js';
 import {
   NOTION_LEARNING_ARTIFACTS,
@@ -6397,7 +6400,18 @@ export function NotionLearningStudio({ note, questions, flashcards, onOpenQuesti
   );
 }
 
-function NotionPreviewPanel({ preview, onClose, onOpenInternalPage, readerRef }) {
+function NotionPreviewPanel(props) {
+  return <EditableNotionPreview key={props.preview?.id || 'empty'} {...props} />;
+}
+
+function EditableNotionPreview({ preview: incomingPreview, onClose, onOpenInternalPage, readerRef }) {
+  const [refreshed, setRefreshed] = useState(null);
+  const preview = refreshed && (refreshed.item?.fetchedAt || '') >= (incomingPreview?.item?.fetchedAt || '') ? refreshed : incomingPreview;
+  const refresh = async () => {
+    const item = await fetchNotionPagePreview(preview.id);
+    saveNotionPreviewCache(item);
+    setRefreshed({ id: preview.id, title: item.title, item, status: 'ready', error: '' });
+  };
   const sections = preview?.item ? buildNotionNoteSections(preview.item) : EMPTY_ARRAY;
   if (!preview?.id) return null;
   const note = preview.item;
@@ -6409,7 +6423,7 @@ function NotionPreviewPanel({ preview, onClose, onOpenInternalPage, readerRef })
     <section ref={readerRef} className="notion-preview-panel" aria-label="Fellow training note preview">
       <div className="notion-reader-head">
         <div>
-          <div className="knowledge-kicker">Fellow training · Read-only</div>
+          <div className="knowledge-kicker">Fellow training · 筆記閱讀</div>
           <h3>{note?.title || preview.title || 'Loading note...'}</h3>
           <div className="knowledge-chip-row">
             {note && <span className="pill soft">{inferNotionNoteType(note)}</span>}
@@ -6425,6 +6439,7 @@ function NotionPreviewPanel({ preview, onClose, onOpenInternalPage, readerRef })
       {preview.status === 'loading' && <p className="notion-preview-status">正在載入筆記內容…</p>}
       {preview.status === 'error' && <p className="notion-preview-status error">{preview.error}</p>}
       {preview.status === 'ready' && preview.error && <p className="notion-preview-status">{preview.error}</p>}
+      {preview.status === 'ready' && note && <NotionSupplementEditor key={`${auth.currentUser?.uid || 'guest'}-${preview.id}`} pageId={preview.id} title={note.title || preview.title} onSaved={refresh} />}
       {preview.status === 'ready' && note && (
         <>
           <div className="notion-preview-layout">
@@ -7009,7 +7024,7 @@ function KnowledgeHubPanel({
           <div>
             <div className="knowledge-kicker">Fellow Training Notes</div>
             <h3>所有筆記</h3>
-            <p className="muted">搜尋、篩選並閱讀腫瘤筆記；Notion 保持為原始資料來源，Tracker 僅做唯讀整理。</p>
+            <p className="muted">搜尋、篩選與閱讀腫瘤筆記，也可新增補充到 Notion；原文編輯請前往 Notion。</p>
           </div>
           <div className="notion-library-sync">
             <span className={`notion-sync-status ${libraryState.status}`}>{libraryState.source === 'live' ? 'Live index' : 'Cached index'}</span>

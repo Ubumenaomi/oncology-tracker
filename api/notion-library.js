@@ -367,3 +367,5 @@ export default async function handler(req, res) {
     });
   }
 }
+
+export { verifyFirebaseRequest, notionFetch, assertLibraryPage, sendJson, DEFAULT_DATA_SOURCE_ID };
