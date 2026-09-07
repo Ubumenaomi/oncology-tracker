@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { getKnowledgePageId } from '../data/knowledgeNavigation.js';
 
 import {
   loadNotionLibraryCache,
@@ -31,11 +32,7 @@ function makeInitialLibraryState(fallbackItems) {
   };
 }
 
-export function getNotionPageId(note = {}) {
-  const id = String(note.id || '');
-  if (/^[0-9a-f-]{32,36}$/i.test(id)) return id;
-  return String(note.url || '').match(/([0-9a-f]{32})(?:[?/#]|$)/i)?.[1] || '';
-}
+export const getNotionPageId = getKnowledgePageId;
 
 export function useNotionLibrary({ user, fallbackItems = [], enabled = false } = {}) {
   const [libraryState, setLibraryState] = useState(() => makeInitialLibraryState(fallbackItems));

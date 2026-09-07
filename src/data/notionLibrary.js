@@ -213,6 +213,17 @@ export function sortNotionLibrary(notes = [], sort = 'updated') {
 }
 
 export function buildNotionNoteSections(note = {}) {
+  if (note.blocks?.length) {
+    const sections = [];
+    const visit = (blocks) => blocks.forEach((block) => {
+      if (/^heading_[123]$/.test(block.type) && block.id) {
+        sections.push({ id: block.id, level: Number(block.type.at(-1)), title: (block.richText || []).map((part) => part.text || '').join('').trim() || '未命名章節' });
+      }
+      if (block.children?.length) visit(block.children);
+    });
+    visit(note.blocks);
+    return sections;
+  }
   const plainText = String(note.plainText || '').trim();
   const headings = (note.headings || [])
     .filter((heading) => heading?.text)

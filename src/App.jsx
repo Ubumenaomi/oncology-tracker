@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState, useRef } from 'react';
 import { AlertTriangle, BarChart3, BookOpen, ChevronDown, ClipboardList, Clock3, ExternalLink, FileText, Home, LayoutGrid, List, Pause, Play, RefreshCw, RotateCcw, Settings2 } from 'lucide-react';
 import './App.css';
+import { jumpToKnowledgeSection, getKnowledgePageId } from './data/knowledgeNavigation.js';
 import { getWrongAnswerRows, gradeWrongAnswerBatch } from './data/wrongAnswerBook.js';
 import QuestionNotionLinks, { QuestionNotesContext } from './components/QuestionNotionLinks.jsx';
 import { NotionBlocks } from './components/NotionBlockRenderer.jsx';
@@ -4456,6 +4457,7 @@ function WrongAnswerBookPanel({ state, onChange, onUpdateStat, loading }) {
 }
 
 function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswerUntilSubmit = false, practiceMode = false, practiceDraft = null, onPracticeChange = null, batchSubmitted = false, batchFinalized = false, onEdit }) {
+  const questionNotes = useContext(QuestionNotesContext);
   const initialAnswer = stat.correctAnswer || question.answer || '';
   const [selected, setSelected] = useState(practiceMode ? '' : stat.userAnswer || '');
   const [correctAnswer, setCorrectAnswer] = useState(initialAnswer);
@@ -4812,7 +4814,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
           <button className="link-button" onClick={() => setOpen(!open)}>{open ? '收合' : '展開'}</button>
           <span className="qid">{question.id}</span>
           {question.notionUrl && (
-            <a className="notion-link" href={normalizeNotionExternalUrl(question.notionUrl)} target="_blank" rel="noreferrer" title="Open Notion explanation">🔗</a>
+            <button type="button" className="link-button" onClick={() => questionNotes?.onOpen({ url: question.notionUrl, title: question.topic })} aria-label="在 Knowledge 開啟詳解">🔗</button>
           )}
           <span className="pill">{question.cancer}</span>
           <span className="pill soft">{question.topic}</span>
@@ -4822,7 +4824,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
         <div className="question-actions">
             {onEdit && <button className="secondary" onClick={() => onEdit(question.id)}>編輯題目</button>}
             {question.notionUrl && (
-              <button className="secondary" onClick={() => window.open(normalizeNotionExternalUrl(question.notionUrl), '_blank')}>Notion 詳解</button>
+              <button className="secondary" onClick={() => questionNotes?.onOpen({ url: question.notionUrl, title: question.topic })}>Knowledge 詳解</button>
             )}
             <button className={stat.bookmarked ? 'bookmark active' : 'bookmark'} onClick={toggleBookmark}>
               {stat.bookmarked ? '★ 已標記' : '☆ 標記'}
@@ -6310,9 +6312,9 @@ function NotionPreviewPanel({ preview, onClose, onOpenInternalPage, readerRef })
   const sections = preview?.item ? buildNotionNoteSections(preview.item) : EMPTY_ARRAY;
   if (!preview?.id) return null;
   const note = preview.item;
-  const jumpToSection = (event, index) => {
+  const jumpToSection = (event, sectionId) => {
     const panel = event.currentTarget.closest('.notion-preview-panel');
-    panel?.querySelector(`[data-note-section="${index}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    jumpToKnowledgeSection(panel, sectionId);
   };
   return (
     <section ref={readerRef} className="notion-preview-panel" aria-label="Fellow training note preview">
@@ -6339,13 +6341,13 @@ function NotionPreviewPanel({ preview, onClose, onOpenInternalPage, readerRef })
           <div className="notion-preview-layout">
             <aside className="notion-reader-toc">
               <strong>章節目錄</strong>
-              {sections.length > 1 ? (
+              {sections.length > 0 ? (
                 <nav aria-label="筆記章節">
-                  {sections.slice(0, 30).map((section, index) => (
+                  {sections.map((section, index) => (
                     <button
                       type="button"
                       className={`level-${section.level}`}
-                      onClick={(event) => jumpToSection(event, index)}
+                      onClick={(event) => jumpToSection(event, section.id)}
                       key={`${section.id}-${index}`}
                     >
                       {section.title}
@@ -6361,7 +6363,8 @@ function NotionPreviewPanel({ preview, onClose, onOpenInternalPage, readerRef })
               ) : sections.length ? sections.map((section, index) => (
                 <section
                   className={`notion-note-section level-${section.level}`}
-                  data-note-section={index}
+                  data-note-anchor={section.id}
+                  tabIndex={-1}
                   key={`${section.id}-${index}`}
                 >
                   {index === 0 && section.title === note.title
@@ -9802,7 +9805,15 @@ export default function App() {
   };
 
   return (
-    <QuestionNotesContext.Provider value={{ stats: state.stats, items: notionLibrary.libraryState.items, onSave: (id, notionLinks) => updateState((prev) => ({ ...prev, stats: { ...prev.stats, [id]: { ...getStat(prev, id), notionLinks, notionLinksUpdatedAt: new Date().toISOString() } } }), ['stats']) }}>
+    <QuestionNotesContext.Provider value={{ stats: state.stats, items: notionLibrary.libraryState.items, onOpen: (note) => {
+      const pageId = getKnowledgePageId(note);
+      const found = notionLibrary.libraryState.items.find((item) => (pageId && getKnowledgePageId(item) === pageId) || item.url === note.url);
+      const target = found || note;
+      if (!getKnowledgePageId(target)) return false;
+      setTab('knowledge');
+      notionLibrary.openNotePreview(target);
+      return true;
+    }, onSave: (id, notionLinks) => updateState((prev) => ({ ...prev, stats: { ...prev.stats, [id]: { ...getStat(prev, id), notionLinks, notionLinksUpdatedAt: new Date().toISOString() } } }), ['stats']) }}>
     <div className="app-shell">
       <header className="app-header">
         <div>

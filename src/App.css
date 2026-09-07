@@ -4974,3 +4974,6 @@ button:disabled {
 .question-notion-links summary { cursor: pointer; color: #24577c; font-weight: 600; }
 .question-notion-links .inline-actions { margin: 10px 0; flex-wrap: wrap; }
 .question-notion-links input { min-width: 0; max-width: 100%; flex: 1 1 200px; }
+
+[data-note-anchor] { scroll-margin-top: 100px; }
+[data-note-anchor]:focus-visible { outline: 2px solid #24577c; outline-offset: 5px; }
