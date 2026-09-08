@@ -1,6 +1,7 @@
+import { STUDY_SECTIONS, getStudySection, getStudyNextStep, getAssessmentExams, getTestRemainingSeconds } from './data/studyNavigation.js';
 import { localPersistence } from './data/localPersistence.js';
 import { useCallback, useContext, useEffect, useMemo, useState, useRef } from 'react';
-import { AlertTriangle, BarChart3, BookOpen, ChevronDown, ClipboardList, Clock3, ExternalLink, FileText, Home, LayoutGrid, List, Pause, Play, RefreshCw, RotateCcw, Settings2 } from 'lucide-react';
+import { AlertTriangle, BarChart3, BookOpen, ClipboardList, Clock3, ExternalLink, FileText, LayoutGrid, List, Pause, Play, RefreshCw, RotateCcw, Settings2 } from 'lucide-react';
 import './App.css';
 import { jumpToKnowledgeSection, getKnowledgePageId } from './data/knowledgeNavigation.js';
 import { getWrongAnswerRows, gradeWrongAnswerBatch } from './data/wrongAnswerBook.js';
@@ -110,52 +111,6 @@ const KNOWLEDGE_CANCER_DOMAINS = new Set([
   'Supportive/Stats',
 ]);
 
-const NAV_GROUPS = [
-  {
-    id: 'practice',
-    label: 'Practice',
-    Icon: ClipboardList,
-    items: [
-      ['training', '提分訓練'],
-      ['history', '測驗紀錄'],
-      ['today', 'Daily Practice'],
-      ['wrong-book', '錯題本'],
-      ['mock', 'Mock Exam'],
-      ['flashcard-review', 'Card Review'],
-      ['flashcards', 'Card Manager'],
-      ['plan', '40-Day Final Sprint'],
-    ],
-  },
-  {
-    id: 'analysis',
-    label: 'Analysis',
-    Icon: BarChart3,
-    items: [
-      ['stats', 'Stats'],
-      ['analytics', 'Analytics'],
-      ['readiness', 'Board Readiness'],
-    ],
-  },
-  {
-    id: 'tools',
-    label: 'Tools',
-    Icon: Settings2,
-    items: [
-      ['settings', 'Settings'],
-      ['sync', 'Cloud Sync'],
-      ['questions', 'Question Manager'],
-    ],
-  },
-  {
-    id: 'review',
-    label: 'Review',
-    Icon: AlertTriangle,
-    items: [
-      ['critical', 'Critical Errors'],
-      ['review', 'Review Queue'],
-    ],
-  },
-];
 const EMPTY_ARRAY = Object.freeze([]);
 const QUESTION_MANAGER_PAGE_SIZE = 50;
 const QUESTION_YEAR_LOADERS = {
@@ -3804,7 +3759,7 @@ function getCriticalErrorItems(state) {
 }
 
 function getReadinessMetrics(state) {
-  const mockExams = state.mockExams || [];
+  const mockExams = getAssessmentExams(state);
   const recentCompleted = [...mockExams]
     .filter((exam) => exam?.completedAt && Number.isFinite(exam.score))
     .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt));
@@ -3841,22 +3796,22 @@ function getReadinessMetrics(state) {
 
   const scoreVolatility = standardDeviation(recentMockScores);
   const minRecentMock = recentMockScores.length ? Math.min(...recentMockScores.slice(0, 3)) : 0;
-  let readinessLevel = 'Not ready';
+  let readinessLevel = '仍需加強';
   let probability80 = clampPercent((readinessScore - 55) * 2);
   if (readinessScore >= 82 && recentMockAverage >= 80 && highConfidenceWrongRate < 5) {
-    readinessLevel = 'High probability ≥80';
+    readinessLevel = '目前表現較穩定';
     probability80 = clampPercent(78 + (readinessScore - 82) * 1.7 - scoreVolatility);
   } else if (readinessScore >= 76 || recentMockAverage >= 78) {
-    readinessLevel = 'Borderline';
+    readinessLevel = '接近目標';
     probability80 = clampPercent(45 + (readinessScore - 76) * 3 + (recentMockAverage - 78) * 2 - scoreVolatility);
   }
 
   const gates = [
-    { label: 'Mixed mock ≥80%', pass: recentMockAverage >= 80, value: `${recentMockAverage || 0}%` },
-    { label: 'Wrong retest ≥90%', pass: wrongRetestConversion >= 90, value: `${wrongRetestConversion}%` },
-    { label: 'High-confidence wrong <5%', pass: highConfidenceWrongRate < 5 && confidenceAttempts > 0, value: `${highConfidenceWrongRate}%` },
-    { label: 'Cancer coverage ≥80%', pass: cancerCoverageScore >= 80, value: `${cancerCoverageScore}%` },
-    { label: 'Red topics ≤3', pass: redTopics.length <= 3, value: `${redTopics.length}` },
+    { label: '綜合模考達 80%', pass: recentMockAverage >= 80, value: `${recentMockAverage || 0}%` },
+    { label: '錯題重測答對率達 90%', pass: wrongRetestConversion >= 90, value: `${wrongRetestConversion}%` },
+    { label: '高信心答錯率低於 5%', pass: highConfidenceWrongRate < 5 && confidenceAttempts > 0, value: `${highConfidenceWrongRate}%` },
+    { label: '癌別練習覆蓋率達 80%', pass: cancerCoverageScore >= 80, value: `${cancerCoverageScore}%` },
+    { label: '待加強主題不超過 3 個', pass: redTopics.length <= 3, value: `${redTopics.length}` },
   ];
 
   return {
@@ -3884,7 +3839,7 @@ function getReadinessMetrics(state) {
 }
 
 function getQuickReadinessMetrics(state) {
-  const mockExams = state.mockExams || [];
+  const mockExams = getAssessmentExams(state);
   const recentCompleted = [...mockExams]
     .filter((exam) => exam?.completedAt && Number.isFinite(exam.score))
     .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt));
@@ -3911,7 +3866,7 @@ function getQuickReadinessMetrics(state) {
   const probability80 = recentMockAverage >= 80
     ? clampPercent(65 + (recentMockAverage - 80) * 2 - scoreVolatility)
     : clampPercent((readinessScore - 55) * 2);
-  const readinessLevel = probability80 >= 75 ? 'High probability >=80' : probability80 >= 45 ? 'Borderline' : 'Not ready';
+  const readinessLevel = probability80 >= 75 ? '目前表現較穩定' : probability80 >= 45 ? '接近目標' : '仍需加強';
 
   return {
     recentMockScores,
@@ -4211,30 +4166,29 @@ function WeeklyFocusChart({ rows, maxMinutes }) {
 
 function StatsDashboard({ stats }) {
   const todayRows = [
-    ['今日作答', stats.todayAttempts.attempts, `${stats.todayAttempts.correct} correct / ${stats.todayAttempts.wrong} wrong`],
-    ['今日正確率', `${stats.todayAccuracy}%`, stats.todayAttempts.attempts ? 'based on today attempts' : '尚未作答'],
-    ['Daily Practice', `${stats.todayRatedCount}/${stats.todayQuestionCount || 0}`, 'rated / loaded questions'],
-    ['Review Queue', stats.todayReviewQuestions, 'review-mode questions'],
-    ['Flashcards', stats.todayFlashcards, 'cards reviewed today'],
-    ['錯題筆記', stats.todayWrongNotes, 'notes added today'],
-    ['專注時長', `${stats.todayFocusMinutes} 分`, `${stats.focusStreak} day focus streak`],
+    ['今日作答', stats.todayAttempts.attempts, `${stats.todayAttempts.correct} 答對／${stats.todayAttempts.wrong} 答錯`],
+    ['今日正確率', `${stats.todayAccuracy}%`, stats.todayAttempts.attempts ? '依今日已評分作答計算' : '尚未作答'],
+    ['已完成複習', stats.todayReviewQuestions, '今日完成的複習題目'],
+    ['記憶卡', stats.todayFlashcards, '今日已複習的卡片'],
+    ['錯題筆記', stats.todayWrongNotes, '今日新增的錯題筆記'],
+    ['專注時長', `${stats.todayFocusMinutes} 分`, `${stats.focusStreak} 天連續專注`],
   ];
 
   return (
     <main className="panel stats-dashboard">
       <div className="section-head">
         <div>
-          <h2>Stats Dashboard</h2>
-          <p className="muted">把累計作答、今日進度、弱點、40-Day Final Sprint 和 flashcards 統一看。</p>
+          <h2>學習統計總覽</h2>
+          <p className="muted">把累計作答、今日進度、弱點、40 天衝刺計畫與記憶卡 統一看。</p>
         </div>
         <span className="pill soft">{TODAY}</span>
       </div>
 
       <section className="stats-hero-grid">
-        <MetricCard label="累計 attempts" value={stats.attempts} sub={`${stats.reviewed} questions reviewed`} />
-        <MetricCard label="Correct / Wrong" value={`${stats.correct}/${stats.wrong}`} sub={`${stats.accuracy}% accuracy`} />
-        <MetricCard label="平均每日題數" value={stats.averageDailyQuestions} sub={`${stats.activeDays} active days`} />
-        <MetricCard label="專注總時長" value={`${Math.round(stats.totalFocusMinutes / 60)}h`} sub={`今日 ${stats.todayFocusMinutes} 分 · streak ${stats.focusStreak}`} />
+        <MetricCard label="累計作答次數" value={stats.attempts} sub={`${stats.reviewed} 題已練習`} />
+        <MetricCard label="答對／答錯" value={`${stats.correct}/${stats.wrong}`} sub={`${stats.accuracy}% 正確率`} />
+        <MetricCard label="平均每日題數" value={stats.averageDailyQuestions} sub={`${stats.activeDays} 天有練習紀錄`} />
+        <MetricCard label="專注總時長" value={`${Math.round(stats.totalFocusMinutes / 60)} 小時`} sub={`今日 ${stats.todayFocusMinutes} 分 · 連續專注天數 ${stats.focusStreak}`} />
       </section>
 
       <section className="stats-layout">
@@ -4263,7 +4217,7 @@ function StatsDashboard({ stats }) {
         <article className="stats-panel">
           <div className="stats-panel-head">
             <strong>最近 7 日趨勢</strong>
-            <span>questions + cards</span>
+            <span>題目＋記憶卡</span>
           </div>
           <div className="trend-list">
             {stats.recentActivity.map((row) => {
@@ -4271,7 +4225,7 @@ function StatsDashboard({ stats }) {
               return (
                 <div className="trend-row" key={row.date}>
                   <span>{row.date.slice(5)}</span>
-                  <div className="trend-track" aria-label={`${row.date} total activity ${total}`}>
+                  <div className="trend-track" aria-label={`${row.date} 總練習量 ${total}`}>
                     <i style={{ width: `${Math.max(4, (total / stats.maxRecentAttempts) * 100)}%` }} />
                   </div>
                   <strong>{total}</strong>
@@ -4287,7 +4241,7 @@ function StatsDashboard({ stats }) {
         <article className="stats-panel">
           <div className="stats-panel-head">
             <strong>今日統計</strong>
-            <span>{stats.todayAttempts.attempts ? `${stats.todayAccuracy}%` : 'not started'}</span>
+            <span>{stats.todayAttempts.attempts ? `${stats.todayAccuracy}%` : '尚未開始'}</span>
           </div>
           <div className="today-stats-grid">
             {todayRows.map(([label, value, sub]) => (
@@ -4305,7 +4259,7 @@ function StatsDashboard({ stats }) {
         <article className="stats-panel">
           <div className="stats-panel-head">
             <strong>弱點癌別</strong>
-            <span>wrong-rate rank</span>
+            <span>依錯誤率排序</span>
           </div>
           {!stats.weakCancerRows.length ? <p className="muted">有作答紀錄後會自動排序弱點。</p> : (
             <div className="rank-list">
@@ -4313,7 +4267,7 @@ function StatsDashboard({ stats }) {
                 <div className="rank-row" key={row.cancer}>
                   <div>
                     <strong>{row.cancer}</strong>
-                    <span>{row.wrong} wrong / {row.attempts} attempts</span>
+                    <span>{row.wrong} 答錯 / {row.attempts} 次作答</span>
                   </div>
                   <em>{row.wrongRate}%</em>
                 </div>
@@ -4324,7 +4278,7 @@ function StatsDashboard({ stats }) {
 
         <article className="stats-panel">
           <div className="stats-panel-head">
-            <strong>40-Day Final Sprint</strong>
+            <strong>40 天衝刺計畫</strong>
             <span>{stats.planCompleted}/{stats.planTotal}</span>
           </div>
           <div className="stats-progress-block">
@@ -4334,7 +4288,7 @@ function StatsDashboard({ stats }) {
             </div>
             <div className="progress-bar large"><span style={{ width: `${stats.planPercent}%` }} /></div>
             <div className="plan-cancer-head">
-              <span>Golden trial</span>
+              <span>關鍵臨床試驗</span>
               <strong>{stats.goldenCompleted}/{stats.goldenTotal}</strong>
             </div>
             <div className="progress-bar"><span style={{ width: `${stats.goldenPercent}%` }} /></div>
@@ -4343,12 +4297,12 @@ function StatsDashboard({ stats }) {
 
         <article className="stats-panel">
           <div className="stats-panel-head">
-            <strong>Flashcards</strong>
-            <span>{stats.dueCards} due</span>
+            <strong>記憶卡</strong>
+            <span>{stats.dueCards} 張到期</span>
           </div>
           <div className="stats-progress-block">
             <div className="plan-cancer-head">
-              <span>Mastered cards</span>
+              <span>已熟練記憶卡</span>
               <strong>{stats.masteredCards}/{stats.flashcardTotal}</strong>
             </div>
             <div className="progress-bar large">
@@ -4481,23 +4435,25 @@ function PracticeModeSelector({ value, onChange, compact = false }) {
 }
 
 
-function PracticeHistoryPanel({ state, onChange, onUpdateStat, loading }) {
-  const [selected, setSelected] = useState('');
+function PracticeHistoryPanel({ state, onChange, onUpdateStat, loading, initialSelected = '' }) {
+  const [selected, setSelected] = useState(initialSelected);
   const [pendingOnly, setPendingOnly] = useState(false);
   const rows = getPracticeHistory(state.sessions).filter((row) => !pendingOnly || !row.reviewCompletedAt);
-  const labels = { daily: 'Daily Practice', 'score-training': '提分訓練', 'wrong-book': '錯題本', mock: 'Mock Exam' };
+  const labels = { daily: '測驗', 'score-training': '測驗', 'wrong-book': '錯題練習', mock: '限時測驗' };
   if (selected && state.sessions[selected]) return <><button className="secondary" onClick={() => setSelected('')}>← 返回測驗紀錄</button><WrongAnswerBookPanel key={selected} state={state} onChange={onChange} onUpdateStat={onUpdateStat} loading={loading} historySessionKey={selected} /></>;
   return <main className="panel"><h2>測驗紀錄</h2><p>每份測驗獨立保存。今天沒檢討完，明天可從這裡接著看。</p><label><input type="checkbox" checked={pendingOnly} onChange={(event) => setPendingOnly(event.target.checked)} />只看尚未檢討完成</label>
     {!rows.length && <p className="empty-state">目前沒有符合條件的測驗紀錄。</p>}
-    <div className="practice-history-list">{rows.map((row) => <button type="button" className="practice-history-item" key={row.key} onClick={() => setSelected(row.key)}><strong>{labels[row.practiceSource] || '練習'} · {row.createdAt ? new Date(row.createdAt).toLocaleString('zh-TW') : row.date} · {row.attemptId.slice(-8)}</strong><span>{row.questionIds.length} 題 · 已檢討 {Object.values(row.reviewedQuestions || {}).filter((item) => item.completed).length} 題 · {row.submittedAt ? `答對 ${(row.gradingResults || []).filter((r) => r.isCorrect === true).length}／答錯 ${(row.gradingResults || []).filter((r) => r.isCorrect === false).length}` : '尚未交卷'} · {row.reviewCompletedAt ? '檢討完成' : '待檢討'}</span>{row.recoveredFromAnswers && <small>由保留的作答紀錄還原，可能只有部分題目，原題序未保留。</small>}<em>繼續作答／檢討 →</em></button>)}</div>
+    <div className="practice-history-list">{rows.map((row) => <button type="button" className="practice-history-item" key={row.key} onClick={() => setSelected(row.key)}><strong>{row.timerMinutes ? `限時測驗 ${row.timerMinutes} 分鐘` : labels[row.practiceSource] || '練習'} · {row.createdAt ? new Date(row.createdAt).toLocaleString('zh-TW') : row.date} · {row.attemptId.slice(-8)}</strong><span>{row.questionIds.length} 題 · 已檢討 {Object.values(row.reviewedQuestions || {}).filter((item) => item.completed).length} 題 · {row.submittedAt ? `答對 ${(row.gradingResults || []).filter((r) => r.isCorrect === true).length}／答錯 ${(row.gradingResults || []).filter((r) => r.isCorrect === false).length}` : '尚未交卷'} · {row.reviewCompletedAt ? '檢討完成' : '待檢討'}</span>{row.recoveredFromAnswers && <small>由保留的作答紀錄還原，可能只有部分題目，原題序未保留。</small>}<em>繼續作答／檢討 →</em></button>)}</div>
   </main>;
 }
 
-function WrongAnswerBookPanel({ state, onChange, onUpdateStat, loading, training = false, onNavigate, historySessionKey = null }) {
-  const [trainingMode, setTrainingMode] = useState('smart');
+function WrongAnswerBookPanel({ state, onChange, onUpdateStat, loading, training = false, onNavigate, historySessionKey = null, preset = 'standard' }) {
+  const [trainingMode, setTrainingMode] = useState(preset === 'timed' ? 'mixed' : 'smart');
+  const [timerMinutes, setTimerMinutes] = useState(preset === 'timed' ? 120 : 0);
+  const [clockNow, setClockNow] = useState(() => Date.now());
   const sessionKey = historySessionKey || (training ? 'score-training' : 'wrong-book');
   const [filters, setFilters] = useState({ query: '', cancer: 'All', period: 'all', status: 'all', sort: 'recent' });
-  const [count, setCount] = useState(10);
+  const [count, setCount] = useState(preset === 'timed' ? 80 : 10);
   const [page, setPageState] = useState(state.sessions?.[historySessionKey]?.reviewPage || 0);
   const setPage = (value) => {
     setPageState(value);
@@ -4505,6 +4461,13 @@ function WrongAnswerBookPanel({ state, onChange, onUpdateStat, loading, training
   };
   const [message, setMessage] = useState('');
   const session = state.sessions?.[sessionKey];
+  useEffect(() => {
+    if (!session?.timerMinutes || session.submittedAt) return;
+    const interval = window.setInterval(() => setClockNow(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, [session?.timerMinutes, session?.submittedAt, session?.attemptId]);
+  const remainingSeconds = getTestRemainingSeconds(session, clockNow);
+
   const questions = getQuestionPool(state).map((q) => getQuestionWithOverride(q.id, state)).filter(Boolean);
   const trainingRows = getTrainingRows(questions, state.stats, TODAY, trainingMode);
   const rows = training ? trainingRows.filter(({ q }) => (filters.cancer === 'All' || q.cancer === filters.cancer) && `${q.id} ${q.stem} ${q.cancer} ${q.topic}`.toLowerCase().includes(filters.query.trim().toLowerCase())) : getWrongAnswerRows(questions, state.stats, { ...filters, today: TODAY });
@@ -4519,8 +4482,9 @@ function WrongAnswerBookPanel({ state, onChange, onUpdateStat, loading, training
     TODAY = formatLocalDate(new Date());
     onChange((prev) => ({ ...prev, sessions: { ...prev.sessions, [sessionKey]: {
       attemptId: `wrong-book-${crypto.randomUUID()}`, createdAt: now, updatedAt: now,
-      date: TODAY, questionIds: ids, questionSnapshots: Object.fromEntries(ids.map((id) => [id, getQuestionWithOverride(id, state)])), practiceDrafts: {}, gradingResults: [],
+      date: TODAY, timerMinutes, trainingMode, questionIds: ids, questionSnapshots: Object.fromEntries(ids.map((id) => [id, getQuestionWithOverride(id, state)])), practiceDrafts: {}, gradingResults: [],
     } } }));
+    setClockNow(Date.now());
     setPage(0);
     setMessage('先完成整份作答，交卷後一起訂正。');
   };
@@ -4564,13 +4528,13 @@ function WrongAnswerBookPanel({ state, onChange, onUpdateStat, loading, training
   const filter = (key, value) => setFilters((prev) => ({ ...prev, [key]: value }));
   const activePage = Math.min(page, Math.max(0, Math.ceil(activeQuestions.length / 5) - 1));
   return <main className="panel wrong-answer-book">
-    <div className="section-head"><div><h2>{historySessionKey ? '測驗檢討' : training ? '提分訓練室' : '錯題本'}</h2><p className="muted">{historySessionKey ? '保留當時作答與評分；勾選已檢討的題目，下次接著看。' : training ? '用短回合找出失分點：先獨立作答 → 交卷看解析 → 隔日再測。' : '曾答錯的題目自動收錄；答對後仍保留，想練幾次都可以。'}</p></div><span className="pill">{historySessionKey ? `${activeQuestions.length} 題` : `${rows.length} 題符合篩選`}</span></div>
+    <div className="section-head"><div><h2>{historySessionKey ? '測驗檢討' : training ? '建立你的測驗' : '錯題本'}</h2><p className="muted">{historySessionKey ? '保留當時作答與評分；勾選已檢討的題目，下次接著看。' : training ? '用短回合找出失分點：先獨立作答 → 交卷看解析 → 隔日再測。' : '曾答錯的題目自動收錄；答對後仍保留，想練幾次都可以。'}</p></div><span className="pill">{historySessionKey ? `${activeQuestions.length} 題` : `${rows.length} 題符合篩選`}</span></div>
     {!historySessionKey && <>
     {training && <>
       <div className="training-path"><span>01 選擇目標</span><span>02 完成短回合</span><span>03 訂正與再測</span></div>
       <div className="training-modes">{TRAINING_MODES.map((mode) => <button type="button" className={`training-mode ${trainingMode === mode.id ? 'selected' : ''}`} aria-pressed={trainingMode === mode.id} key={mode.id} onClick={() => setTrainingMode(mode.id)}><strong>{mode.title}</strong><span>{mode.detail}</span><small>{loading ? '載入中…' : `${getTrainingRows(questions, state.stats, TODAY, mode.id).length} 題可練`}</small></button>)}</div>
       <p className="muted">每回合約 {count * 2} 分鐘。只納入已有 A–E 正解的題目；實際分數以交卷結果為準，練習表現不代表正式考試預測。</p>
-      <div className="training-shortcuts"><button className="secondary" onClick={() => onNavigate('flashcard-review')}>複習記憶卡</button><button className="secondary" onClick={() => onNavigate('knowledge')}>查閱知識筆記</button><button className="secondary" onClick={() => onNavigate('mock')}>完整限時模考</button></div>
+
     </>}
     <div className="wrong-book-filters">
       <label>搜尋<input value={filters.query} onChange={(e) => filter('query', e.target.value)} placeholder="題幹、題號、錯題筆記" /></label>
@@ -4578,22 +4542,25 @@ function WrongAnswerBookPanel({ state, onChange, onUpdateStat, loading, training
       {!training && <><label>最近答錯<select value={filters.period} onChange={(e) => filter('period', e.target.value)}><option value="all">不限時間</option><option value="1">今天</option><option value="7">近 7 天</option><option value="30">近 30 天</option></select></label>
       <label>狀態<select value={filters.status} onChange={(e) => filter('status', e.target.value)}><option value="all">全部錯題</option><option value="pending">仍需加強</option><option value="corrected">最近已答對</option></select></label>
       <label>排序<select value={filters.sort} onChange={(e) => filter('sort', e.target.value)}><option value="recent">最近答錯優先</option><option value="wrong">答錯次數最多</option></select></label></>}
-      <label>本輪題數<select value={count} onChange={(e) => setCount(Number(e.target.value))}>{[5, 10, 20, 30].map((n) => <option key={n} value={n}>{n} 題</option>)}</select></label>
+      <label>計時方式<select value={timerMinutes} onChange={(event) => setTimerMinutes(Number(event.target.value))}><option value={0}>不計時 · 一般練習</option>{[15, 30, 60, 90, 120, 180].map((minutes) => <option key={minutes} value={minutes}>限時 {minutes} 分鐘</option>)}</select></label>
+      <label>本輪題數<select value={count} onChange={(e) => setCount(Number(e.target.value))}>{[5, 10, 20, 30, 50, 80, 120].map((n) => <option key={n} value={n}>{n} 題</option>)}</select></label>
     </div>
     <button className="primary" disabled={loading || !rows.length} onClick={() => {
       if (activeQuestions.length && !submitted && !window.confirm('本輪尚未交卷，會保留在測驗紀錄。要開始新的一份嗎？')) return;
       start(training ? selectTrainingIds(rows, count, trainingMode) : rows.slice(0, count).map(({ q }) => q.id));
-    }}>依篩選開始練習（{Math.min(rows.length, count)} 題）</button>
+    }}>開始測驗（{Math.min(rows.length, count)} 題）</button>
     {loading && <p role="status">正在載入完整題庫…</p>}
     {!loading && !rows.length && <p className="empty-state">{training ? '目前沒有符合條件的題目，請切換訓練目標或癌別。完成新題後，系統會依紀錄安排補強。' : '目前沒有符合條件的錯題。答題交卷後，錯題會自動出現在這裡。'}</p>}
     {!training && <details className="subsection"><summary>瀏覽錯題清單（{rows.length} 題）</summary>{rows.slice(0, 100).map(({ q, stat, lastWrong }) => <div className="weak-row" key={q.id}><strong>{q.id} · {q.cancer}</strong> · 答錯 {stat.wrong} 次 · {stat.lastResult === 'correct' ? '最近已答對' : '仍需加強'} · {lastWrong.slice(0, 10) || '日期未記錄'}<p>{q.stem}</p><QuestionNotionLinks question={q} /></div>)}{rows.length > 100 && <p>顯示前 100 題，請使用篩選縮小範圍。</p>}</details>}
     </>}
     {historySessionKey && <p className="muted">{session?.createdAt?.replace('T', ' ').slice(0, 16)} · {session?.submittedAt ? '已交卷，可跨日繼續訂正' : '尚未交卷，可繼續作答'}</p>}
     {activeQuestions.length > 0 && <section className="subsection">
+      {remainingSeconds !== null && !submitted && <div className="study-timer" role="timer" aria-label="測驗剩餘時間"><Clock3 size={20} /><strong>{remainingSeconds ? `${Math.floor(remainingSeconds / 60)}:${String(remainingSeconds % 60).padStart(2, '0')}` : '時間到，請交卷檢討'}</strong><span>切換頁面仍會計時；到時提醒，不自動交卷。</span></div>}
       <h3>本輪練習 · {activeQuestions.length} 題</h3><p className="muted">建立：{session.createdAt ? new Date(session.createdAt).toLocaleString('zh-TW') : session.date} · 編號 {session.attemptId?.slice(-8)}</p>
       <div className="training-progress"><span>{submitted ? '已交卷' : `已答 ${activeQuestions.filter((q) => session.practiceDrafts?.[q.id]?.selected).length} / ${activeQuestions.length}`}</span><progress aria-label="本輪作答進度" max={activeQuestions.length} value={activeQuestions.filter((q) => session.practiceDrafts?.[q.id]?.selected).length} /></div>
       <div className="training-question-nav" aria-label="題號導航">{activeQuestions.map((q, index) => <button key={q.id} type="button" aria-label={`第 ${index + 1} 題，${session.practiceDrafts?.[q.id]?.selected ? '已作答' : '未作答'}`} aria-current={Math.floor(index / 5) === activePage ? 'page' : undefined} className={session.practiceDrafts?.[q.id]?.selected ? 'answered' : ''} onClick={() => { setPage(Math.floor(index / 5)); requestAnimationFrame(() => document.getElementById(`training-question-${q.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }}>{index + 1}</button>)}</div>
       {submitted && <div className="training-debrief"><strong>本輪正確率 {results.some((r) => r.isCorrect != null) ? `${Math.round(results.filter((r) => r.isCorrect === true).length / results.filter((r) => r.isCorrect != null).length * 100)}%` : '尚無可評分題目'}</strong><p>高信心答錯 {results.filter((r) => r.isCorrect === false && r.confidence >= 4).length} 題 · 低信心答對 {results.filter((r) => r.isCorrect === true && r.confidence <= 2).length} 題</p><p>{wrongIds.length ? '先訂正錯題：寫下一句判斷規則，說明其他選項為何不適用，再重練。隔日回到到期複習，確認不是只記得答案。' : '本輪沒有已確認的錯題。檢查低信心題的推理，再挑新題或完整模考驗證。'}</p></div>}
+      {submitted && !historySessionKey && onNavigate && <button type="button" className="secondary" onClick={() => onNavigate('history')}>到測驗紀錄接續檢討 →</button>}
       {submitted && <p className="feedback-box">答對 {results.filter((r) => r.isCorrect === true).length} ／答錯 {wrongIds.length} ／待補正解 {results.filter((r) => r.isCorrect == null).length}</p>}
       <div className="question-list">{activeQuestions.slice(activePage * 5, activePage * 5 + 5).map((q) => <div id={`training-question-${q.id}`} key={`${session.attemptId}-${q.id}`}><QuestionCard question={q} stat={getStat(state, q.id)} onUpdateStat={onUpdateStat} hideAnswerUntilSubmit practiceMode practiceDraft={{ ...(results.find((r) => r.questionId === q.id) || {}), ...session.practiceDrafts?.[q.id] }} onPracticeChange={(patch) => updateDraft(q.id, patch)} batchSubmitted={submitted} />{historySessionKey && submitted && <label className="history-review-check"><input type="checkbox" checked={Boolean(session.reviewedQuestions?.[q.id]?.completed)} onChange={(event) => {
         const completed = event.target.checked;
@@ -5247,7 +5214,7 @@ function QuestionCard({ question, stat, onUpdateStat, compact = false, hideAnswe
       )}
 
       <div className="stats-line">
-        attempts {stat.attempts} · correct {stat.correct} · wrong {stat.wrong} · ungraded {stat.ungradedAttempts || 0} · wrong rate {wrongRate(stat)}% · high-confidence wrong {stat.highConfidenceWrong || 0} · next review {stat.nextReviewDate || 'not scheduled'}
+        attempts {stat.attempts} · correct {stat.correct} · wrong {stat.wrong} · ungraded {stat.ungradedAttempts || 0} · 錯誤率 {wrongRate(stat)}% · high-confidence wrong {stat.highConfidenceWrong || 0} · next review {stat.nextReviewDate || 'not scheduled'}
         {stat.lastErrorType && <> · last error {stat.lastErrorType}</>}
         {stat.lastRemediationTask?.task && <> · repair {stat.lastRemediationTask.task}</>}
       </div>
@@ -5813,7 +5780,7 @@ function QuestionEditPanel({ state, onSaveOverride }) {
             </div>
             <div className="two-columns">
               <label>正解<select name="edit_answer" value={answer} onChange={(e) => setAnswer(e.target.value)}><option value="">尚未輸入</option>{['A','B','C','D','E'].map((x)=>(<option key={x} value={x}>{x}</option>))}</select></label>
-              <label>Cancer<input name="edit_cancer" value={cancer} onChange={(e) => setCancer(e.target.value)} /></label>
+              <label>癌別<input name="edit_cancer" value={cancer} onChange={(e) => setCancer(e.target.value)} /></label>
             </div>
             <div className="two-columns">
               <label>Topic<input name="edit_topic" value={topic} onChange={(e) => setTopic(e.target.value)} /></label>
@@ -6800,7 +6767,7 @@ function KnowledgeHubPanel({
         <section className="knowledge-metrics">
           <MetricCard label="Related questions" value={selectedTopic.questionRows.length} sub={`${selectedTopic.coverage}% coverage`} />
           <MetricCard label="Accuracy" value={`${selectedTopic.accuracy}%`} sub={`${selectedTopic.attempts} attempts`} />
-          <MetricCard label="Flashcards" value={selectedTopic.cards.length} sub={`${selectedTopic.dueCards.length} due`} />
+          <MetricCard label="記憶卡" value={selectedTopic.cards.length} sub={`${selectedTopic.dueCards.length} due`} />
           <MetricCard label="Critical errors" value={selectedTopic.criticalQuestions.length} sub={`${selectedTopic.dueQuestions.length} questions due`} />
         </section>
 
@@ -7509,7 +7476,7 @@ ${trialText || '目前沒有符合條件的 trial 來源。'}
                 <label>Back<textarea value={editDraft.back} onChange={(e) => setEditDraft((prev) => ({ ...prev, back: e.target.value }))} /></label>
                 <div className="flashcard-editor-grid">
                   <label>Type<select value={editDraft.type} onChange={(e) => setEditDraft((prev) => ({ ...prev, type: e.target.value }))}>{FLASHCARD_TYPE_OPTIONS.map((type) => <option value={type} key={type}>{type}</option>)}</select></label>
-                  <label>Cancer<input value={editDraft.cancer} onChange={(e) => setEditDraft((prev) => ({ ...prev, cancer: e.target.value }))} /></label>
+                  <label>癌別<input value={editDraft.cancer} onChange={(e) => setEditDraft((prev) => ({ ...prev, cancer: e.target.value }))} /></label>
                   <label>Topic<input value={editDraft.topic} onChange={(e) => setEditDraft((prev) => ({ ...prev, topic: e.target.value }))} /></label>
                   <label>Trial names<input value={editDraft.trial} onChange={(e) => setEditDraft((prev) => ({ ...prev, trial: e.target.value }))} placeholder="PACIFIC, KEYNOTE-671" /></label>
                   <label>Exam value<input type="number" min="1" max="5" value={editDraft.examValue} onChange={(e) => setEditDraft((prev) => ({ ...prev, examValue: e.target.value }))} /></label>
@@ -7997,7 +7964,7 @@ function MockExamPanel({ state, persistedDraft, onDraftChange, onDraftClear, onF
             <MetricCard label="答對率" value={`${completed.score}%`} sub={`${completed.correct}/${completed.questionCount - (completed.pendingCount || 0)} graded correct`} />
             <MetricCard label="答錯率" value={`${100 - completed.score}%`} sub={`${completed.questionCount - (completed.pendingCount || 0) - completed.correct}/${completed.questionCount - (completed.pendingCount || 0)} graded wrong`} />
             {completed.pendingCount > 0 && <MetricCard label="待補正解" value={completed.pendingCount} sub="補入後才納入分數" />}
-            <MetricCard label="High-confidence wrong" value={completed.highConfidenceWrong} sub="confidence 4–5 but wrong" />
+            <MetricCard label="High-confidence wrong" value={completed.highConfidenceWrong} sub="信心 4–5 分卻答錯" />
             <MetricCard label="Fast wrong / Slow correct" value={`${completed.fastWrong}/${completed.slowCorrect}`} sub="speed diagnostics" />
             <div className="subsection full-span">
               <h3>Top score loss</h3>
@@ -8117,7 +8084,21 @@ export default function App() {
   const [questionBankLoading, setQuestionBankLoading] = useState(false);
   const [questionBankError, setQuestionBankError] = useState('');
   const latestStateRef = useRef(state);
-  const [tab, setTab] = useState('training');
+  const [tab, setTabState] = useState('training');
+  const [testPreset, setTestPreset] = useState('standard');
+  const setTab = (next) => {
+    if (next === 'mock' && !state.activeMockExam?.exam) {
+      setTestPreset('timed');
+      setTabState('training');
+    } else if (next === 'today') {
+      setTestPreset('standard');
+      setTabState('training');
+    } else setTabState(next);
+  };
+  const [historyTarget, setHistoryTarget] = useState('');
+  const activeSection = getStudySection(tab);
+  const sectionIcons = { practice: ClipboardList, review: AlertTriangle, knowledge: BookOpen, analysis: BarChart3, plan: Clock3, manage: Settings2 };
+
   const [questionReader, setQuestionReader] = useState(null);
   const questionReaderOrigin = useRef(null);
   const closeQuestionReader = useCallback(() => {
@@ -8129,7 +8110,7 @@ export default function App() {
     });
   }, []);
   useEffect(() => {
-    if (tab === 'news') setTab('knowledge');
+    if (tab === 'news') setTabState('knowledge');
   }, [tab]);
   const [search, setSearch] = useState('');
   const [bankCancer, setBankCancer] = useState('All');
@@ -9531,7 +9512,8 @@ export default function App() {
   const readinessDataState = useMemo(() => ({
     ...questionDataState,
     mockExams: state.mockExams,
-  }), [questionDataState, state.mockExams]);
+    sessions: state.sessions,
+  }), [questionDataState, state.mockExams, state.sessions]);
   const bossDataState = useMemo(() => ({
     ...flashcardDataState,
     planProgress: state.planProgress,
@@ -10062,33 +10044,31 @@ export default function App() {
       <header className="app-header">
         <div>
           <div className="eyebrow">Oncology Tracker</div>
-          <h1>把每次複習，變成下一次得分</h1>
+          <h1>每天一點，把觀念練成得分</h1>
           <p>{QUESTION_YEAR_LABEL} 腫專考古題 · 弱點修復 · 間隔複習 · 限時模考。</p>
         </div>
         <div className="header-actions">
           <button className={checkedInToday ? 'good' : 'primary'} disabled={checkedInToday} onClick={markDailyCheckIn}>
             {checkedInToday ? '今日已打卡' : '每日打卡'}
           </button>
-          <button className="primary" onClick={() => setTab('training')}>
-            {state.sessions?.['score-training']?.questionIds?.length && !state.sessions['score-training'].submittedAt ? '繼續提分訓練' : '開始提分訓練'}
-          </button>
+
         </div>
       </header>
 
-      <details className="overview-details"><summary>查看學習總覽與統計</summary><section className="metrics-grid">
+      {activeSection.id === 'analysis' && <details className="overview-details"><summary>查看完整學習數據</summary><section className="metrics-grid">
         <MetricCard label="題庫總數" value={questionTotal} sub={`${QUESTION_YEAR_LABEL} 年`} />
         <MetricCard label="已練題目" value={summary.reviewed} sub={`${summary.attempts + summary.ungraded} 次作答 · ${summary.ungraded} 次待補正解`} />
-        <MetricCard label="正確率" value={`${summary.accuracy}%`} sub={`${summary.correct} correct / ${summary.wrong} wrong`} />
-        <MetricCard label="今日待複習" value={dueCount} sub="依 next review date" />
-        <MetricCard label="≥80 機率" value={`${readiness.probability80}%`} sub={readiness.readinessLevel} />
-        <MetricCard label="Level / XP" value={`Lv ${state.game?.level || 1}`} sub={`${state.game?.xp || 0} XP · streak ${state.game?.streak || 0}`} />
+        <MetricCard label="正確率" value={`${summary.accuracy}%`} sub={`${summary.correct} 答對／${summary.wrong} 答錯`} />
+        <MetricCard label="今日待複習" value={dueCount} sub="依預定複習日期" />
+        <MetricCard label="80 分準備指標" value={`${readiness.probability80}%`} sub={readiness.readinessLevel} />
+        <MetricCard label="等級／經驗值" value={`Lv ${state.game?.level || 1}`} sub={`${state.game?.xp || 0} XP · streak ${state.game?.streak || 0}`} />
         <MetricCard label="每日打卡" value={checkedInToday ? 'Done' : '未打卡'} sub={`連續 ${checkInStreak} 天`} />
         <MetricCard label="今日專注" value={`${todayFocusMinutes} 分`} sub={`focus streak ${focusStreak} 天`} />
-        <MetricCard label="Flashcards" value={flashcardTotal} sub={`${dueFlashcardCount} due today`} />
-        <MetricCard label="同步狀態" value={user ? 'Cloud' : 'Local'} sub={user ? user.email : '尚未登入'} />
+        <MetricCard label="記憶卡" value={flashcardTotal} sub={`${dueFlashcardCount} 張今日到期`} />
+        <MetricCard label="同步狀態" value={user ? '雲端' : '本機'} sub={user ? user.email : '尚未登入'} />
       </section>
 
-      </details>
+      </details>}
 
       {tab === 'quest' && <section className="mission-control panel">
         <div className="section-head">
@@ -10136,51 +10116,24 @@ export default function App() {
       }
 
       {storageError && <p role="alert" className="error-text">{storageError}</p>}
-      <nav className="tabs grouped-tabs" aria-label="Main navigation">
-        <button className={`nav-home ${tab === 'training' ? 'active' : ''}`} type="button" onClick={() => setTab('training')}>
-          <ClipboardList size={17} strokeWidth={2.4} /><span>提分訓練</span>
-        </button>
-        <button type="button" className={`nav-home ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>測驗紀錄</button>
-        <button className={`nav-home ${tab === 'quest' ? 'active' : ''}`} type="button" onClick={() => setTab('quest')}>
-          <Home size={17} strokeWidth={2.4} />
-          <span>讀書計畫</span>
-        </button>
-        <button className={`nav-knowledge ${tab === 'knowledge' ? 'active' : ''}`} type="button" onClick={() => setTab('knowledge')}>
-          <BookOpen size={17} strokeWidth={2.4} />
-          <span>Knowledge</span>
-        </button>
-        <button className={`nav-pomodoro ${tab === 'pomodoro' ? 'active' : ''}`} type="button" onClick={() => setTab('pomodoro')}>
-          <Clock3 size={17} strokeWidth={2.4} />
-          <span>Pomodoro</span>
-        </button>
-        {NAV_GROUPS.map(({ id, label, Icon, items }) => {
-          const active = items.some(([key]) => tab === key);
-          return (
-            <details className={`nav-menu ${active ? 'active' : ''}`} key={id}>
-              <summary>
-                <Icon size={17} strokeWidth={2.4} />
-                <span>{label}</span>
-                <ChevronDown className="nav-chevron" size={16} strokeWidth={2.6} />
-              </summary>
-              <div className="nav-menu-panel">
-                {items.map(([key, itemLabel]) => (
-                  <button
-                    key={key}
-                    className={tab === key ? 'active' : ''}
-                    type="button"
-                    onClick={(event) => {
-                      setTab(key);
-                      event.currentTarget.closest('details')?.removeAttribute('open');
-                    }}
-                  >
-                    {itemLabel}
-                  </button>
-                ))}
-              </div>
-            </details>
-          );
+      <nav className="study-navigation" aria-label="主要功能">
+        {STUDY_SECTIONS.map((section) => {
+          const Icon = sectionIcons[section.id];
+          return <button type="button" key={section.id} aria-current={activeSection.id === section.id ? 'page' : undefined} className={activeSection.id === section.id ? 'active' : ''} onClick={() => setTab(section.items[0][0])}><Icon size={19} /><span>{section.label}</span></button>;
         })}
       </nav>
+      <section className="study-section-heading">
+        <div><span className="eyebrow">你的複習工作台</span><h2>{activeSection.label}</h2><p>{activeSection.description}</p></div>
+        <div className="study-sync-indicator"><span className={user ? 'connected' : ''} />{user ? '已登入雲端' : '本機儲存'}<button type="button" onClick={() => setTab('sync')}>同步與備份 ↗</button></div>
+      </section>
+      <nav className="study-subnav" aria-label={`${activeSection.label}功能`}>
+        {activeSection.items.map(([id, label]) => <button type="button" key={id} aria-current={tab === id ? 'page' : undefined} className={tab === id ? 'active' : ''} onClick={() => { if (id === 'history') setHistoryTarget(''); setTab(id); }}>{label}</button>)}
+      </nav>
+      {tab === 'training' && state.activeMockExam?.exam && <button type="button" className="secondary" onClick={() => setTabState('mock')}>接續更新前的限時試卷 →</button>}
+      {tab === 'training' && (() => {
+        const step = getStudyNextStep(getPracticeHistory(state.sessions), dueCount);
+        return <section className="study-next-step"><div className="study-next-icon"><ClipboardList size={24} /></div><div><span className="eyebrow">建議下一步 · 依你的作答進度</span><h3>{step.title}</h3><p>{step.detail}</p></div>{step.action && <button type="button" className="primary" onClick={() => { setHistoryTarget(step.historyKey || ''); setTab(step.tab); }}>{step.action} →</button>}</section>;
+      })()}
 
       {(questionBankLoading || questionBankError || !questionBankReady) && (
         <div className={questionBankError ? 'question-bank-status error' : 'question-bank-status'}>
@@ -10263,16 +10216,16 @@ export default function App() {
         <main className="panel">
           <div className="section-head">
             <div>
-              <h2>Board Readiness Dashboard</h2>
-              <p className="muted">每天回答：今天正式考，≥80 分機率多少？哪些癌別與 topic 會拖分？</p>
+              <h2>備考狀態評估</h2><p className="muted">以下是依練習紀錄計算的參考指標，並非經驗證的正式考試得分機率。</p>
+              <p className="muted">根據目前練習紀錄觀察準備程度。哪些癌別與主題需要加強？</p>
             </div>
-            <button className="primary" onClick={() => setTab('mock')}>Start mixed mock</button>
+            <button className="primary" onClick={() => setTab('mock')}>建立限時綜合測驗</button>
           </div>
           <section className="readiness-hero">
-            <MetricCard label="Predicted Board Score" value={`${readiness.predictedScore}%`} sub="weighted readiness score" />
-            <MetricCard label="Probability ≥80" value={`${readiness.probability80}%`} sub={readiness.readinessLevel} />
-            <MetricCard label="Safe Exam Zone" value={readiness.safeExamZone ? 'Yes' : 'Not yet'} sub={`volatility SD ${readiness.scoreVolatility}`} />
-            <MetricCard label="Mock average" value={`${readiness.recentMockAverage}%`} sub={readiness.recentMockScores.join(' / ') || 'No mock yet'} />
+            <MetricCard label="綜合準備度分數" value={`${readiness.predictedScore}%`} sub="依作答紀錄加權計算" />
+            <MetricCard label="達到 80 分的參考指標" value={`${readiness.probability80}%`} sub={readiness.readinessLevel} />
+            <MetricCard label="是否達到準備目標" value={readiness.safeExamZone ? '已達標' : '尚未達標'} sub={`成績波動（標準差）${readiness.scoreVolatility}`} />
+            <MetricCard label="近期模考平均" value={`${readiness.recentMockAverage}%`} sub={readiness.recentMockScores.join(' / ') || '尚無模考紀錄'} />
           </section>
           <div className="gate-grid">
             {readiness.gates.map((gate) => (
@@ -10283,16 +10236,16 @@ export default function App() {
             ))}
           </div>
           <div className="subsection">
-            <h3>Main score draggers</h3>
+            <h3>優先加強的主題</h3>
             {readiness.redTopics.slice(0, 8).map((row) => (
-              <div className="weak-row" key={row.key}>{row.cancer} · {row.topic} · accuracy {row.accuracy}% · coverage {row.coverage}% · HC wrong {row.highConfidenceWrong}</div>
+              <div className="weak-row" key={row.key}>{row.cancer} · {row.topic} · 正確率 {row.accuracy}% · 覆蓋率 {row.coverage}% · 高信心答錯 {row.highConfidenceWrong}</div>
             ))}
           </div>
         </main>
       )}
 
-      {tab === 'history' && <PracticeHistoryPanel state={state} onChange={updateState} onUpdateStat={updateStat} loading={questionBankLoading || !questionBankReady} />}
-      {tab === 'training' && <WrongAnswerBookPanel key="training" training state={state} onChange={(updater) => updateState(updater, ['sessions', 'stats'])} onUpdateStat={updateStat} loading={questionBankLoading || !questionBankReady} onNavigate={setTab} />}
+      {tab === 'history' && <PracticeHistoryPanel key={historyTarget} initialSelected={historyTarget} state={state} onChange={updateState} onUpdateStat={updateStat} loading={questionBankLoading || !questionBankReady} />}
+      {tab === 'training' && <WrongAnswerBookPanel key={`training-${testPreset}`} preset={testPreset} training state={state} onChange={(updater) => updateState(updater, ['sessions', 'stats'])} onUpdateStat={updateStat} loading={questionBankLoading || !questionBankReady} onNavigate={setTab} />}
       {tab === 'wrong-book' && <WrongAnswerBookPanel state={state} onChange={(updater) => updateState(updater, ['sessions', 'stats'])} onUpdateStat={updateStat} loading={questionBankLoading || !questionBankReady} />}
 
       {tab === 'mock' && (
@@ -10456,7 +10409,7 @@ export default function App() {
             {remediationQueue.length === 0 ? <p className="muted">答錯並選擇 Error type 後，這裡會自動排入訂正清單；先修正判斷，再決定要不要整理成卡片。</p> : remediationQueue.slice(0, 20).map(({ q, stat, remediation }) => (
               <div className={isReviewQueueItemComplete(q.id) ? 'remediation-row done' : 'remediation-row'} key={`${q.id}-${remediation.errorType || remediation.task}`}>
                 <div className="remediation-summary">
-                  <strong>{q.id}</strong> · {q.cancer} · {q.topic} · wrong rate {wrongRate(stat)}%
+                  <strong>{q.id}</strong> · {q.cancer} · {q.topic} · 錯誤率 {wrongRate(stat)}%
                   <p>{remediation.errorType || stat.lastErrorType} → {remediation.task}</p>
                   <span>{remediation.action}</span>
                 </div>
@@ -10552,9 +10505,9 @@ export default function App() {
 
       {tab === 'analytics' && (
         <main className="panel">
-          <h2>Analytics</h2>
+          <h2>弱點分析</h2><p className="muted">覆蓋率＝已練題目占比；重測正確率＝曾答錯的題目再次作答時答對的比例。</p>
           <div className="analytics-table">
-            <div className="table-row readiness-table header"><span>Cancer</span><span>Coverage</span><span>Accuracy</span><span>Retest</span><span>HC wrong</span><span>Status</span></div>
+            <div className="table-row readiness-table header"><span>癌別</span><span>練習覆蓋率</span><span>正確率</span><span>重測正確率</span><span>高信心答錯</span><span>狀態</span></div>
             {cancerSummary.map((row) => (
               <div className="table-row readiness-table" key={row.cancer}>
                 <span>{row.cancer}</span>
@@ -10562,28 +10515,28 @@ export default function App() {
                 <span>{row.accuracy}%</span>
                 <span>{row.retestAccuracy}%</span>
                 <span>{row.highConfidenceWrong}</span>
-                <span><strong>{row.status}</strong></span>
+                <span><strong>{{ Green: '已達標', Yellow: '持續鞏固', Red: '優先加強' }[row.status] || row.status}</strong></span>
               </div>
             ))}
           </div>
           <section className="readiness-hero subsection">
-            <MetricCard label="Predicted Board Score" value={`${readiness.predictedScore}%`} sub="composite score" />
-            <MetricCard label="Wrong retest conversion" value={`${readiness.wrongRetestConversion}%`} sub="previously wrong now correct" />
-            <MetricCard label="High-confidence wrong rate" value={`${readiness.highConfidenceWrongRate}%`} sub="confidence 4–5 but wrong" />
-            <MetricCard label="Topic mastery" value={`${readiness.topicMasteryScore}%`} sub="core topics mastered" />
+            <MetricCard label="綜合準備度分數" value={`${readiness.predictedScore}%`} sub="綜合作答與複習表現" />
+            <MetricCard label="錯題重測答對率" value={`${readiness.wrongRetestConversion}%`} sub="曾答錯的題目，重測時答對的比例" />
+            <MetricCard label="高信心答錯率" value={`${readiness.highConfidenceWrongRate}%`} sub="信心 4–5 分卻答錯" />
+            <MetricCard label="主題熟練度" value={`${readiness.topicMasteryScore}%`} sub="核心主題掌握情況" />
           </section>
           <div className="subsection">
-            <h3>Taxonomy weakness map</h3>
+            <h3>各類主題弱點分布</h3>
             {[
-              ['Clinical setting', taxonomyAnalytics.clinicalSetting],
-              ['Evidence type', taxonomyAnalytics.evidenceType],
-              ['Biomarker', taxonomyAnalytics.biomarker],
-              ['Treatment modality', taxonomyAnalytics.treatmentModality],
+              ['臨床情境', taxonomyAnalytics.clinicalSetting],
+              ['證據類型', taxonomyAnalytics.evidenceType],
+              ['生物標記', taxonomyAnalytics.biomarker],
+              ['治療方式', taxonomyAnalytics.treatmentModality],
             ].map(([title, rows]) => (
               <section className="taxonomy-analytics-block" key={title}>
                 <h4>{title}</h4>
                 <div className="analytics-table">
-                  <div className="table-row readiness-table header"><span>Tag</span><span>Coverage</span><span>Accuracy</span><span>Wrong rate</span><span>HC wrong</span><span>Status</span></div>
+                  <div className="table-row readiness-table header"><span>分類</span><span>練習覆蓋率</span><span>正確率</span><span>錯誤率</span><span>高信心答錯</span><span>狀態</span></div>
                   {rows.slice(0, 8).map((row) => (
                     <div className="table-row readiness-table" key={row.key}>
                       <span>{row.label}</span>
@@ -10591,7 +10544,7 @@ export default function App() {
                       <span>{row.accuracy}%</span>
                       <span>{row.wrongRate}%</span>
                       <span>{row.highConfidenceWrong}</span>
-                      <span><strong>{row.status}</strong></span>
+                      <span><strong>{{ Green: '已達標', Yellow: '持續鞏固', Red: '優先加強' }[row.status] || row.status}</strong></span>
                     </div>
                   ))}
                 </div>
@@ -10599,10 +10552,10 @@ export default function App() {
             ))}
           </div>
           <div className="subsection">
-            <h3>Top weak questions</h3>
+            <h3>優先補強題目</h3>
             {weakQuestions.slice(0, 12).map(({ q, stat }) => (
               <div className="weak-row" key={q.id}>
-                <strong>{q.id}</strong> · {q.cancer} · {q.tags?.clinicalSetting || q.topic} · {q.tags?.evidenceType || 'evidence'} · wrong rate {wrongRate(stat)}% · {q.stem.slice(0, 120)}...
+                <strong>{q.id}</strong> · {q.cancer} · {q.tags?.clinicalSetting || q.topic} · {q.tags?.evidenceType || 'evidence'} · 錯誤率 {wrongRate(stat)}% · {q.stem.slice(0, 120)}...
               </div>
             ))}
           </div>
