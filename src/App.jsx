@@ -1,3 +1,4 @@
+import { localPersistence } from './data/localPersistence.js';
 import { useCallback, useContext, useEffect, useMemo, useState, useRef } from 'react';
 import { AlertTriangle, BarChart3, BookOpen, ChevronDown, ClipboardList, Clock3, ExternalLink, FileText, Home, LayoutGrid, List, Pause, Play, RefreshCw, RotateCcw, Settings2 } from 'lucide-react';
 import './App.css';
@@ -659,7 +660,7 @@ let lastSavedStorageSlices = {};
 
 function readStorageJSON(key, fallback = null) {
   try {
-    const raw = localStorage.getItem(key);
+    const raw = localPersistence.getItem(key);
     return raw ? JSON.parse(raw) : fallback;
   } catch {
     return fallback;
@@ -774,19 +775,23 @@ function loadState() {
 }
 
 function saveState(state) {
-  const normalized = normalizeState(state);
-  const slices = buildStorageSlices(normalized);
+  const slices = buildStorageSlices(normalizeState(state));
+  const entries = {};
+  const changed = {};
   Object.entries(slices).forEach(([sliceName, value]) => {
     const serialized = JSON.stringify(value);
-    if (lastSavedStorageSlices[sliceName] === serialized) return;
-    localStorage.setItem(STORAGE_SLICE_KEYS[sliceName], serialized);
-    lastSavedStorageSlices[sliceName] = serialized;
+    entries[STORAGE_SLICE_KEYS[sliceName]] = serialized;
+    changed[sliceName] = serialized;
   });
-  const marker = JSON.stringify({ storageVersion: STORAGE_VERSION });
-  if (lastSavedStorageSlices.marker !== marker) {
-    localStorage.setItem(STORAGE_KEY, marker);
-    lastSavedStorageSlices.marker = marker;
-  }
+  if (Object.entries(changed).every(([key, value]) => lastSavedStorageSlices[key] === value)) return;
+  Object.assign(lastSavedStorageSlices, changed);
+  return localPersistence.write(entries).then((saved) => {
+    if (!saved) {
+      for (const [key, value] of Object.entries(changed)) {
+        if (lastSavedStorageSlices[key] === value) delete lastSavedStorageSlices[key];
+      }
+    }
+  });
 }
 
 function normalizeFocusSessions(focusSessions = []) {
@@ -8102,6 +8107,12 @@ function MockExamPanel({ state, persistedDraft, onDraftChange, onDraftClear, onF
 
 export default function App() {
   const [state, setState] = useState(loadState);
+  const [storageError, setStorageError] = useState(localPersistence.error);
+  useEffect(() => {
+    const onStorageStatus = (event) => setStorageError(event.detail);
+    window.addEventListener('study-storage-status', onStorageStatus);
+    return () => window.removeEventListener('study-storage-status', onStorageStatus);
+  }, []);
   const [questionBankVersion, setQuestionBankVersion] = useState(0);
   const [questionBankLoading, setQuestionBankLoading] = useState(false);
   const [questionBankError, setQuestionBankError] = useState('');
@@ -10124,6 +10135,7 @@ export default function App() {
 
       }
 
+      {storageError && <p role="alert" className="error-text">{storageError}</p>}
       <nav className="tabs grouped-tabs" aria-label="Main navigation">
         <button className={`nav-home ${tab === 'training' ? 'active' : ''}`} type="button" onClick={() => setTab('training')}>
           <ClipboardList size={17} strokeWidth={2.4} /><span>提分訓練</span>
