@@ -123,12 +123,12 @@ test('recover stored submissions once, keep original date, and never turn drafts
   assert.equal(context.recoverSubmittedQuestionStats({ ...state, stats: legacy }).a.attempts, 60);
 });
 
-test('save flushes every changed storage slice even when given state field names', () => {
+test('save flushes every changed storage slice even when given state field names', async () => {
   const disk = new Map();
   const storageContext = vm.createContext({
     normalizeState: (state) => state,
     defaultState: {},
-    localStorage: { setItem: (key, value) => disk.set(key, value) },
+    localPersistence: { write: async (entries) => { for (const [key, value] of Object.entries(entries)) disk.set(key, value); return true; } },
     STORAGE_KEY: 'marker', STORAGE_VERSION: 3,
     STORAGE_SLICE_KEYS: Object.fromEntries(['app', 'activity', 'sessions', 'progress', 'quest', 'questionRecords', 'questionEdits', 'flashcards', 'flashcardStats', 'game'].map((key) => [key, key])),
     lastSavedStorageSlices: {},
@@ -137,12 +137,12 @@ test('save flushes every changed storage slice even when given state field names
     const start = source.indexOf(`function ${name}(`);
     vm.runInContext(source.slice(start, source.indexOf('\n}\n', start) + 2), storageContext);
   }
-  storageContext.saveState({ stats: {}, sessions: {} });
+  await storageContext.saveState({ stats: {}, sessions: {} });
   const state = { stats: { a: { attempts: 1, correct: 1 } }, sessions: { today: { submittedAt: 'now' } } };
-  storageContext.saveState(state, ['stats', 'sessions']);
+  await storageContext.saveState(state, ['stats', 'sessions']);
   assert.equal(JSON.parse(disk.get('questionRecords')).stats.a.correct, 1);
   const next = { ...state, stats: { a: { attempts: 2, correct: 2 } }, game: { xp: 20 } };
-  storageContext.saveState(next, ['game']);
+  await storageContext.saveState(next, ['game']);
   assert.equal(JSON.parse(disk.get('questionRecords')).stats.a.attempts, 2);
   assert.equal(JSON.parse(disk.get('game')).game.xp, 20);
 });

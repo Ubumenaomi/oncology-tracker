@@ -15,7 +15,7 @@
     "questions:promote": "node scripts/promote-question-backup.js",
     "tag:questions": "node scripts/tag-question-bank.js",
     "preview": "vite preview",
-    "test:practice": "node --test src/data/wrongAnswerBook.test.js src/data/scoreTraining.test.js src/data/practiceHistory.test.js"
+    "test:practice": "node --test src/data/wrongAnswerBook.test.js src/data/scoreTraining.test.js src/data/practiceHistory.test.js src/data/localPersistence.test.js"
   },
   "dependencies": {
     "firebase": "^12.13.0",
