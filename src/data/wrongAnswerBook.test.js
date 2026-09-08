@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import { preservePracticeHistory } from './practiceHistory.js';
 import { getWrongAnswerRows, gradeWrongAnswerBatch } from './wrongAnswerBook.js';
 
 const questions = [{ id: 'a', cancer: 'Lung', stem: 'EGFR', answer: 'A' }, { id: 'b', cancer: 'GI', stem: 'colon', answer: 'B' }, { id: 'c', cancer: 'GI', stem: 'new' }];
@@ -19,14 +20,14 @@ test('grading honors edited answers and keeps unknown answers ungraded', () => {
 
 // Exercise the actual app accounting and merge functions without mounting React.
 const source = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
-const context = vm.createContext({ TODAY: '2026-09-07', FLASHCARD_RATINGS: { Good: {}, Again: {}, Hard: {}, Easy: {} }, ERROR_TYPE_REMEDIATION: {}, addDays: () => '2026-09-08' });
+const context = vm.createContext({ preservePracticeHistory, TODAY: '2026-09-07', FLASHCARD_RATINGS: { Good: {}, Again: {}, Hard: {}, Easy: {} }, ERROR_TYPE_REMEDIATION: {}, addDays: () => '2026-09-08' });
 function load(name) {
   const start = source.indexOf(`function ${name}(`);
   assert.ok(start >= 0, name);
   const end = source.indexOf('\n}\n', start) + 2;
   vm.runInContext(source.slice(start, end), context);
 }
-['emptyStat', 'getRemediationForErrorType', 'getAnkiIntervalDays', 'nextIntervalByRating', 'getMasteryDeltaByRating', 'applyBatchQuestionResults', 'regradeBatchQuestionResult', 'getSessionFreshness', 'mergeDailySession', 'getStatAttemptScore', 'getAnswerEventMergeKey', 'mergeAnswerEvents', 'getAnswerEventTime', 'getQuestionStatFreshness', 'getMergedAttemptCounts', 'recoverSubmittedQuestionStats', 'getRemediationMergeKey', 'mergeRemediationTasks', 'mergeQuestionStats'].forEach(load);
+['emptyStat', 'getRemediationForErrorType', 'getAnkiIntervalDays', 'nextIntervalByRating', 'getMasteryDeltaByRating', 'applyBatchQuestionResults', 'regradeBatchQuestionResult', 'getSessionFreshness', 'mergeDailySession', 'mergeDailySessions', 'getStatAttemptScore', 'getAnswerEventMergeKey', 'mergeAnswerEvents', 'getAnswerEventTime', 'getQuestionStatFreshness', 'getMergedAttemptCounts', 'recoverSubmittedQuestionStats', 'getRemediationMergeKey', 'mergeRemediationTasks', 'mergeQuestionStats'].forEach(load);
 test('repeated rounds count separately; duplicate submission and regrading do not inflate attempts', () => {
   const row = { questionId: 'a', selected: 'B', correctAnswer: 'A', isCorrect: false, confidence: 3 };
   let value = context.applyBatchQuestionResults({}, [row], 'wrong-book', 'one');
@@ -144,4 +145,30 @@ test('save flushes every changed storage slice even when given state field names
   storageContext.saveState(next, ['game']);
   assert.equal(JSON.parse(disk.get('questionRecords')).stats.a.attempts, 2);
   assert.equal(JSON.parse(disk.get('game')).game.xp, 20);
+});
+
+test('late correction of yesterday paper never replaces newer paper and both are archived', () => {
+  const old = { attemptId: 'old', createdAt: '2026-09-07T08:00:00Z', submittedAt: '2026-09-07T09:00:00Z', updatedAt: '2026-09-09T10:00:00Z', questionIds: ['a'] };
+  const fresh = { attemptId: 'fresh', createdAt: '2026-09-08T08:00:00Z', questionIds: ['b'] };
+  for (const [local, cloud] of [[old, fresh], [fresh, old]]) {
+    const merged = context.mergeDailySessions({ 'score-training': cloud }, { 'score-training': local });
+    assert.equal(merged['score-training'].attemptId, 'fresh');
+    assert.deepEqual([...merged['history:old'].questionIds], ['a']);
+    assert.deepEqual([...merged['history:fresh'].questionIds], ['b']);
+  }
+});
+
+test('correcting an archived attempt preserves the latest answer and review schedule', () => {
+  const row = { questionId: 'a', selected: 'A', correctAnswer: 'B', isCorrect: false, confidence: 4, submittedAt: '2026-09-01' };
+  let value = context.applyBatchQuestionResults({}, [row], 'daily', 'old');
+  value = context.applyBatchQuestionResults(value, [{ ...row, submittedAt: '2026-09-08', selected: 'B', isCorrect: true }], 'daily', 'new');
+  const before = value.a;
+  value = context.regradeBatchQuestionResult(value, { ...row, correctAnswer: 'A', isCorrect: true }, 'daily', 'old');
+  assert.equal(value.a.attempts, 2);
+  assert.equal(value.a.correct, 2);
+  assert.equal(value.a.wrong, 0);
+  assert.equal(value.a.lastAttemptAt, before.lastAttemptAt);
+  assert.equal(value.a.nextReviewDate, before.nextReviewDate);
+  assert.equal(value.a.mastery, before.mastery);
+  assert.equal(value.a.answerHistory.at(-1).attemptId, 'new');
 });

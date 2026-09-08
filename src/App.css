@@ -5028,3 +5028,7 @@ button:disabled {
 .notion-supplement textarea { width: 100%; min-height: 130px; resize: vertical; padding: 12px; border: 1px solid #bdd1c6; border-radius: 10px; background: white; color: #183d30; }
 .notion-supplement .inline-actions { margin-top: 12px; }
 .notion-supplement a { margin-right: 12px; }
+.practice-history-list { display: grid; gap: 12px; margin-top: 20px; }
+.practice-history-item { display: grid; gap: 10px; text-align: left; padding: 20px; border: 1px solid #bdd3ca; border-radius: 14px; background: #f4faf7; color: #244537; }
+.practice-history-item span, .practice-history-item small { line-height: 1.6; }
+.practice-history-item em { font-style: normal; color: #19694f; }

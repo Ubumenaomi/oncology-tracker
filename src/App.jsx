@@ -3,6 +3,7 @@ import { AlertTriangle, BarChart3, BookOpen, ChevronDown, ClipboardList, Clock3,
 import './App.css';
 import { jumpToKnowledgeSection, getKnowledgePageId } from './data/knowledgeNavigation.js';
 import { getWrongAnswerRows, gradeWrongAnswerBatch } from './data/wrongAnswerBook.js';
+import { preservePracticeHistory, restoreHistoryFromAnswers, getPracticeHistory } from './data/practiceHistory.js';
 import { TRAINING_MODES, getTrainingRows, selectTrainingIds } from './data/scoreTraining.js';
 import NotionSupplementEditor from './components/NotionSupplementEditor.jsx';
 import { fetchNotionPagePreview } from './data/notionLibraryClient.js';
@@ -115,6 +116,7 @@ const NAV_GROUPS = [
     Icon: ClipboardList,
     items: [
       ['training', '提分訓練'],
+      ['history', '測驗紀錄'],
       ['today', 'Daily Practice'],
       ['wrong-book', '錯題本'],
       ['mock', 'Mock Exam'],
@@ -512,7 +514,7 @@ function makeCustomQuestionId() {
   return `custom-${Date.now()}`;
 }
 
-const TODAY = formatLocalDate(new Date());
+let TODAY = formatLocalDate(new Date());
 
 const DEFAULT_WORKOUT_REMINDER = {
   enabled: false,
@@ -1000,7 +1002,15 @@ function getSessionFreshness(session = {}) {
 }
 
 function mergeDailySession(cloudSession = {}, localSession = {}) {
-  const localIsNewer = getSessionFreshness(localSession) >= getSessionFreshness(cloudSession);
+  const differentAttempt = (localSession.attemptId && cloudSession.attemptId && localSession.attemptId !== cloudSession.attemptId)
+    || (localSession.createdAt && cloudSession.createdAt && localSession.createdAt !== cloudSession.createdAt);
+  if (differentAttempt) {
+    // Editing yesterday's corrections must never make yesterday's paper active again.
+    return (localSession.createdAt || localSession.date || '') >= (cloudSession.createdAt || cloudSession.date || '') ? localSession : cloudSession;
+  }
+  const localIsNewer = Boolean(localSession.submittedAt) !== Boolean(cloudSession.submittedAt)
+    ? Boolean(localSession.submittedAt)
+    : getSessionFreshness(localSession) >= getSessionFreshness(cloudSession);
   const primary = localIsNewer ? localSession : cloudSession;
   const secondary = localIsNewer ? cloudSession : localSession;
   if ((primary.attemptId && secondary.attemptId && primary.attemptId !== secondary.attemptId)
@@ -1010,6 +1020,10 @@ function mergeDailySession(cloudSession = {}, localSession = {}) {
     ...primary,
     questionIds: (primary.questionIds || []).length >= (secondary.questionIds || []).length ? primary.questionIds : secondary.questionIds,
     practiceDrafts: { ...(secondary.practiceDrafts || {}), ...(primary.practiceDrafts || {}) },
+    reviewedQuestions: Object.fromEntries([...new Set([...Object.keys(secondary.reviewedQuestions || {}), ...Object.keys(primary.reviewedQuestions || {})])].map((id) => {
+      const a = primary.reviewedQuestions?.[id]; const b = secondary.reviewedQuestions?.[id];
+      return [id, (a?.updatedAt || '') >= (b?.updatedAt || '') ? a : b];
+    })),
     gradingResults: (primary.gradingResults || []).length >= (secondary.gradingResults || []).length
       ? primary.gradingResults
       : secondary.gradingResults,
@@ -1020,8 +1034,9 @@ function mergeDailySession(cloudSession = {}, localSession = {}) {
 }
 
 function mergeDailySessions(cloudSessions = {}, localSessions = {}) {
+  const archived = preservePracticeHistory({ sessions: cloudSessions }, { sessions: localSessions }).sessions;
   const merged = { ...(cloudSessions || {}) };
-  Object.entries(localSessions || {}).forEach(([date, localSession]) => {
+  Object.entries(archived).forEach(([date, localSession]) => {
     merged[date] = merged[date] ? mergeDailySession(merged[date], localSession) : localSession;
   });
   return merged;
@@ -1787,7 +1802,7 @@ function recoverSubmittedQuestionStats(state) {
   const batches = [
     ...Object.entries(state.sessions || {}).filter(([, session]) => session.submittedAt).map(([key, session]) => ({
       id: session.attemptId || `daily-${key}-${session.createdAt || session.submittedAt}`,
-      mode: key === 'wrong-book' || key === 'score-training' ? key : 'daily',
+      mode: session.practiceSource || (key === 'wrong-book' || key === 'score-training' ? key : 'daily'),
       date: session.submittedAt, results: session.gradingResults || [],
     })),
     ...(state.mockExams || []).filter((exam) => exam.id && (exam.scoredAt || exam.completedAt)).map((exam) => ({
@@ -1861,6 +1876,7 @@ function normalizeState(state) {
     ...defaultState,
     ...state,
     stats: recoverSubmittedQuestionStats(state || {}),
+    sessions: restoreHistoryFromAnswers(state || {}),
     settings: {
       ...defaultState.settings,
       ...stateSettings,
@@ -2448,6 +2464,20 @@ function regradeBatchQuestionResult(stats, result, mode, attemptId) {
     && previousEvent.isCorrect === result.isCorrect
     && previousEvent.rating === (result.isCorrect == null ? 'Ungraded' : result.rating || (result.isCorrect ? 'Good' : 'Again'))
   ) return stats;
+
+  // Correct an older result without rewinding the latest attempt's review schedule.
+  if (previous.answerHistory.at(-1)?.attemptId !== attemptId) {
+    const correctedEvent = { ...previousEvent, ...result, rating: result.isCorrect == null ? 'Ungraded' : result.rating || (result.isCorrect ? 'Good' : 'Again'), attemptId, updatedAt: new Date().toISOString() };
+    return { ...stats, [result.questionId]: {
+      ...previous,
+      attempts: Math.max(0, previous.attempts + Number(result.isCorrect != null) - Number(previousEvent.isCorrect != null)),
+      ungradedAttempts: Math.max(0, previous.ungradedAttempts + Number(result.isCorrect == null) - Number(previousEvent.isCorrect == null)),
+      correct: Math.max(0, previous.correct + Number(result.isCorrect === true) - Number(previousEvent.isCorrect === true)),
+      wrong: Math.max(0, previous.wrong + Number(result.isCorrect === false) - Number(previousEvent.isCorrect === false)),
+      highConfidenceWrong: Math.max(0, previous.highConfidenceWrong + Number(result.isCorrect === false && result.confidence >= 4) - Number(previousEvent.isCorrect === false && previousEvent.confidence >= 4)),
+      answerHistory: previous.answerHistory.map((event) => event.attemptId === attemptId ? correctedEvent : event),
+    } };
+  }
 
   const previousWasWrongRetest = previousEvent.isCorrect != null && (previousEvent.wasPreviouslyWrong
     ?? ((previous.wrong || 0) - (previousEvent.isCorrect === false ? 1 : 0) > 0));
@@ -4446,27 +4476,45 @@ function PracticeModeSelector({ value, onChange, compact = false }) {
 }
 
 
-function WrongAnswerBookPanel({ state, onChange, onUpdateStat, loading, training = false, onNavigate }) {
+function PracticeHistoryPanel({ state, onChange, onUpdateStat, loading }) {
+  const [selected, setSelected] = useState('');
+  const [pendingOnly, setPendingOnly] = useState(false);
+  const rows = getPracticeHistory(state.sessions).filter((row) => !pendingOnly || !row.reviewCompletedAt);
+  const labels = { daily: 'Daily Practice', 'score-training': '提分訓練', 'wrong-book': '錯題本', mock: 'Mock Exam' };
+  if (selected && state.sessions[selected]) return <><button className="secondary" onClick={() => setSelected('')}>← 返回測驗紀錄</button><WrongAnswerBookPanel key={selected} state={state} onChange={onChange} onUpdateStat={onUpdateStat} loading={loading} historySessionKey={selected} /></>;
+  return <main className="panel"><h2>測驗紀錄</h2><p>每份測驗獨立保存。今天沒檢討完，明天可從這裡接著看。</p><label><input type="checkbox" checked={pendingOnly} onChange={(event) => setPendingOnly(event.target.checked)} />只看尚未檢討完成</label>
+    {!rows.length && <p className="empty-state">目前沒有符合條件的測驗紀錄。</p>}
+    <div className="practice-history-list">{rows.map((row) => <button type="button" className="practice-history-item" key={row.key} onClick={() => setSelected(row.key)}><strong>{labels[row.practiceSource] || '練習'} · {row.createdAt ? new Date(row.createdAt).toLocaleString('zh-TW') : row.date} · {row.attemptId.slice(-8)}</strong><span>{row.questionIds.length} 題 · 已檢討 {Object.values(row.reviewedQuestions || {}).filter((item) => item.completed).length} 題 · {row.submittedAt ? `答對 ${(row.gradingResults || []).filter((r) => r.isCorrect === true).length}／答錯 ${(row.gradingResults || []).filter((r) => r.isCorrect === false).length}` : '尚未交卷'} · {row.reviewCompletedAt ? '檢討完成' : '待檢討'}</span>{row.recoveredFromAnswers && <small>由保留的作答紀錄還原，可能只有部分題目，原題序未保留。</small>}<em>繼續作答／檢討 →</em></button>)}</div>
+  </main>;
+}
+
+function WrongAnswerBookPanel({ state, onChange, onUpdateStat, loading, training = false, onNavigate, historySessionKey = null }) {
   const [trainingMode, setTrainingMode] = useState('smart');
-  const sessionKey = training ? 'score-training' : 'wrong-book';
+  const sessionKey = historySessionKey || (training ? 'score-training' : 'wrong-book');
   const [filters, setFilters] = useState({ query: '', cancer: 'All', period: 'all', status: 'all', sort: 'recent' });
   const [count, setCount] = useState(10);
-  const [page, setPage] = useState(0);
+  const [page, setPageState] = useState(state.sessions?.[historySessionKey]?.reviewPage || 0);
+  const setPage = (value) => {
+    setPageState(value);
+    if (historySessionKey) onChange((prev) => ({ ...prev, sessions: { ...prev.sessions, [historySessionKey]: { ...prev.sessions[historySessionKey], reviewPage: value } } }));
+  };
   const [message, setMessage] = useState('');
   const session = state.sessions?.[sessionKey];
   const questions = getQuestionPool(state).map((q) => getQuestionWithOverride(q.id, state)).filter(Boolean);
   const trainingRows = getTrainingRows(questions, state.stats, TODAY, trainingMode);
   const rows = training ? trainingRows.filter(({ q }) => (filters.cancer === 'All' || q.cancer === filters.cancer) && `${q.id} ${q.stem} ${q.cancer} ${q.topic}`.toLowerCase().includes(filters.query.trim().toLowerCase())) : getWrongAnswerRows(questions, state.stats, { ...filters, today: TODAY });
-  const activeQuestions = (session?.questionIds || []).map((id) => getQuestionWithOverride(id, state)).filter(Boolean);
+  const activeQuestions = (session?.questionIds || []).map((id) => session.questionSnapshots?.[id] || getQuestionWithOverride(id, state)).filter(Boolean);
+  const mode = session?.practiceSource || (training ? 'score-training' : 'wrong-book');
   const submitted = Boolean(session?.submittedAt);
   const results = session?.gradingResults || [];
   const wrongIds = results.filter((result) => result.isCorrect === false).map((result) => result.questionId);
   const start = (ids) => {
     if (!ids.length) return;
     const now = new Date().toISOString();
+    TODAY = formatLocalDate(new Date());
     onChange((prev) => ({ ...prev, sessions: { ...prev.sessions, [sessionKey]: {
       attemptId: `wrong-book-${crypto.randomUUID()}`, createdAt: now, updatedAt: now,
-      date: TODAY, questionIds: ids, practiceDrafts: {}, gradingResults: [],
+      date: TODAY, questionIds: ids, questionSnapshots: Object.fromEntries(ids.map((id) => [id, getQuestionWithOverride(id, state)])), practiceDrafts: {}, gradingResults: [],
     } } }));
     setPage(0);
     setMessage('先完成整份作答，交卷後一起訂正。');
@@ -4484,7 +4532,7 @@ function WrongAnswerBookPanel({ state, onChange, onUpdateStat, loading, training
         next.correctAnswer = String(next.correctAnswer || '').trim().toUpperCase();
         next.isCorrect = /^[A-E]$/.test(next.correctAnswer) ? next.selected === next.correctAnswer : null;
         if (patch.correctAnswer !== undefined || patch.rating !== undefined) {
-          nextStats = regradeBatchQuestionResult(nextStats, next, sessionKey, current.attemptId);
+          nextStats = regradeBatchQuestionResult(nextStats, next, mode, current.attemptId);
         }
         if (patch.explanation !== undefined || patch.wrongNotes !== undefined) nextStats = applyBatchQuestionNotes(nextStats, id, current.attemptId, patch);
         if (patch.errorType !== undefined) nextStats = applyBatchRemediationsToStats(nextStats, [next], current.attemptId);
@@ -4503,7 +4551,7 @@ function WrongAnswerBookPanel({ state, onChange, onUpdateStat, loading, training
       if (current?.submittedAt || current?.attemptId !== session.attemptId) return prev;
       const now = new Date().toISOString();
       const gradingResults = gradeWrongAnswerBatch(activeQuestions, current.practiceDrafts, prev.stats, now);
-      return { ...prev, stats: applyBatchQuestionResults(prev.stats, gradingResults, sessionKey, current.attemptId), sessions: { ...prev.sessions, [sessionKey]: { ...current, gradingResults, submittedAt: now, attemptsCommittedAt: now, updatedAt: now } } };
+      return { ...prev, stats: applyBatchQuestionResults(prev.stats, gradingResults, mode, current.attemptId), sessions: { ...prev.sessions, [sessionKey]: { ...current, gradingResults, submittedAt: now, attemptsCommittedAt: now, updatedAt: now } } };
     });
     setPage(0);
     setMessage('已交卷並記錄本輪作答。可補充錯因、筆記，或再次練習。');
@@ -4511,7 +4559,8 @@ function WrongAnswerBookPanel({ state, onChange, onUpdateStat, loading, training
   const filter = (key, value) => setFilters((prev) => ({ ...prev, [key]: value }));
   const activePage = Math.min(page, Math.max(0, Math.ceil(activeQuestions.length / 5) - 1));
   return <main className="panel wrong-answer-book">
-    <div className="section-head"><div><h2>{training ? '提分訓練室' : '錯題本'}</h2><p className="muted">{training ? '用短回合找出失分點：先獨立作答 → 交卷看解析 → 隔日再測。' : '曾答錯的題目自動收錄；答對後仍保留，想練幾次都可以。'}</p></div><span className="pill">{rows.length} 題符合篩選</span></div>
+    <div className="section-head"><div><h2>{historySessionKey ? '測驗檢討' : training ? '提分訓練室' : '錯題本'}</h2><p className="muted">{historySessionKey ? '保留當時作答與評分；勾選已檢討的題目，下次接著看。' : training ? '用短回合找出失分點：先獨立作答 → 交卷看解析 → 隔日再測。' : '曾答錯的題目自動收錄；答對後仍保留，想練幾次都可以。'}</p></div><span className="pill">{historySessionKey ? `${activeQuestions.length} 題` : `${rows.length} 題符合篩選`}</span></div>
+    {!historySessionKey && <>
     {training && <>
       <div className="training-path"><span>01 選擇目標</span><span>02 完成短回合</span><span>03 訂正與再測</span></div>
       <div className="training-modes">{TRAINING_MODES.map((mode) => <button type="button" className={`training-mode ${trainingMode === mode.id ? 'selected' : ''}`} aria-pressed={trainingMode === mode.id} key={mode.id} onClick={() => setTrainingMode(mode.id)}><strong>{mode.title}</strong><span>{mode.detail}</span><small>{loading ? '載入中…' : `${getTrainingRows(questions, state.stats, TODAY, mode.id).length} 題可練`}</small></button>)}</div>
@@ -4527,23 +4576,30 @@ function WrongAnswerBookPanel({ state, onChange, onUpdateStat, loading, training
       <label>本輪題數<select value={count} onChange={(e) => setCount(Number(e.target.value))}>{[5, 10, 20, 30].map((n) => <option key={n} value={n}>{n} 題</option>)}</select></label>
     </div>
     <button className="primary" disabled={loading || !rows.length} onClick={() => {
-      if (activeQuestions.length && !submitted && !window.confirm('重新選題會取代本輪尚未交卷的答案。繼續？')) return;
+      if (activeQuestions.length && !submitted && !window.confirm('本輪尚未交卷，會保留在測驗紀錄。要開始新的一份嗎？')) return;
       start(training ? selectTrainingIds(rows, count, trainingMode) : rows.slice(0, count).map(({ q }) => q.id));
     }}>依篩選開始練習（{Math.min(rows.length, count)} 題）</button>
     {loading && <p role="status">正在載入完整題庫…</p>}
     {!loading && !rows.length && <p className="empty-state">{training ? '目前沒有符合條件的題目，請切換訓練目標或癌別。完成新題後，系統會依紀錄安排補強。' : '目前沒有符合條件的錯題。答題交卷後，錯題會自動出現在這裡。'}</p>}
     {!training && <details className="subsection"><summary>瀏覽錯題清單（{rows.length} 題）</summary>{rows.slice(0, 100).map(({ q, stat, lastWrong }) => <div className="weak-row" key={q.id}><strong>{q.id} · {q.cancer}</strong> · 答錯 {stat.wrong} 次 · {stat.lastResult === 'correct' ? '最近已答對' : '仍需加強'} · {lastWrong.slice(0, 10) || '日期未記錄'}<p>{q.stem}</p><QuestionNotionLinks question={q} /></div>)}{rows.length > 100 && <p>顯示前 100 題，請使用篩選縮小範圍。</p>}</details>}
+    </>}
+    {historySessionKey && <p className="muted">{session?.createdAt?.replace('T', ' ').slice(0, 16)} · {session?.submittedAt ? '已交卷，可跨日繼續訂正' : '尚未交卷，可繼續作答'}</p>}
     {activeQuestions.length > 0 && <section className="subsection">
-      <h3>本輪練習 · {activeQuestions.length} 題</h3>
+      <h3>本輪練習 · {activeQuestions.length} 題</h3><p className="muted">建立：{session.createdAt ? new Date(session.createdAt).toLocaleString('zh-TW') : session.date} · 編號 {session.attemptId?.slice(-8)}</p>
       <div className="training-progress"><span>{submitted ? '已交卷' : `已答 ${activeQuestions.filter((q) => session.practiceDrafts?.[q.id]?.selected).length} / ${activeQuestions.length}`}</span><progress aria-label="本輪作答進度" max={activeQuestions.length} value={activeQuestions.filter((q) => session.practiceDrafts?.[q.id]?.selected).length} /></div>
       <div className="training-question-nav" aria-label="題號導航">{activeQuestions.map((q, index) => <button key={q.id} type="button" aria-label={`第 ${index + 1} 題，${session.practiceDrafts?.[q.id]?.selected ? '已作答' : '未作答'}`} aria-current={Math.floor(index / 5) === activePage ? 'page' : undefined} className={session.practiceDrafts?.[q.id]?.selected ? 'answered' : ''} onClick={() => { setPage(Math.floor(index / 5)); requestAnimationFrame(() => document.getElementById(`training-question-${q.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }}>{index + 1}</button>)}</div>
       {submitted && <div className="training-debrief"><strong>本輪正確率 {results.some((r) => r.isCorrect != null) ? `${Math.round(results.filter((r) => r.isCorrect === true).length / results.filter((r) => r.isCorrect != null).length * 100)}%` : '尚無可評分題目'}</strong><p>高信心答錯 {results.filter((r) => r.isCorrect === false && r.confidence >= 4).length} 題 · 低信心答對 {results.filter((r) => r.isCorrect === true && r.confidence <= 2).length} 題</p><p>{wrongIds.length ? '先訂正錯題：寫下一句判斷規則，說明其他選項為何不適用，再重練。隔日回到到期複習，確認不是只記得答案。' : '本輪沒有已確認的錯題。檢查低信心題的推理，再挑新題或完整模考驗證。'}</p></div>}
       {submitted && <p className="feedback-box">答對 {results.filter((r) => r.isCorrect === true).length} ／答錯 {wrongIds.length} ／待補正解 {results.filter((r) => r.isCorrect == null).length}</p>}
-      <div className="question-list">{activeQuestions.slice(activePage * 5, activePage * 5 + 5).map((q) => <div id={`training-question-${q.id}`} key={`${session.attemptId}-${q.id}`}><QuestionCard question={q} stat={getStat(state, q.id)} onUpdateStat={onUpdateStat} hideAnswerUntilSubmit practiceMode practiceDraft={session.practiceDrafts?.[q.id]} onPracticeChange={(patch) => updateDraft(q.id, patch)} batchSubmitted={submitted} /></div>)}</div>
+      <div className="question-list">{activeQuestions.slice(activePage * 5, activePage * 5 + 5).map((q) => <div id={`training-question-${q.id}`} key={`${session.attemptId}-${q.id}`}><QuestionCard question={q} stat={getStat(state, q.id)} onUpdateStat={onUpdateStat} hideAnswerUntilSubmit practiceMode practiceDraft={{ ...(results.find((r) => r.questionId === q.id) || {}), ...session.practiceDrafts?.[q.id] }} onPracticeChange={(patch) => updateDraft(q.id, patch)} batchSubmitted={submitted} />{historySessionKey && submitted && <label className="history-review-check"><input type="checkbox" checked={Boolean(session.reviewedQuestions?.[q.id]?.completed)} onChange={(event) => {
+        const completed = event.target.checked;
+        onChange((prev) => ({ ...prev, sessions: { ...prev.sessions, [sessionKey]: { ...prev.sessions[sessionKey], reviewCompletedAt: null, reviewedQuestions: { ...prev.sessions[sessionKey].reviewedQuestions, [q.id]: { completed, updatedAt: new Date().toISOString() } } } } }));
+      }} />這題已檢討</label>}</div>)}</div>
       <div className="practice-page-actions"><button className="secondary" disabled={activePage === 0} onClick={() => setPage(activePage - 1)}>上一頁</button><span>{activePage + 1} / {Math.ceil(activeQuestions.length / 5)}</span><button className="secondary" disabled={(activePage + 1) * 5 >= activeQuestions.length} onClick={() => setPage(activePage + 1)}>下一頁</button>
-        {!submitted ? <button className="good" disabled={loading} onClick={submit}>整份交卷並顯示答案</button> : <><button className="primary" onClick={() => start(activeQuestions.map((q) => q.id))}>同一份再練一次</button><button className="secondary" disabled={!wrongIds.length} onClick={() => start(wrongIds)}>只重練本輪錯題（{wrongIds.length}）</button></>}
+        {!submitted ? <button className="good" disabled={loading} onClick={submit}>整份交卷並顯示答案</button> : !historySessionKey && <><button className="primary" onClick={() => start(activeQuestions.map((q) => q.id))}>同一份再練一次</button><button className="secondary" disabled={!wrongIds.length} onClick={() => start(wrongIds)}>只重練本輪錯題（{wrongIds.length}）</button></>}
       </div>
     </section>}
+    {historySessionKey && activeQuestions.length !== (session?.questionIds || []).length && <p role="status">部分舊題目未載入或已刪除；目前顯示可取得的題目。</p>}
+    {historySessionKey && submitted && <button className="good" onClick={() => onChange((prev) => ({ ...prev, sessions: { ...prev.sessions, [sessionKey]: { ...prev.sessions[sessionKey], reviewCompletedAt: new Date().toISOString(), reviewedQuestions: Object.fromEntries((prev.sessions[sessionKey].questionIds || []).map((id) => [id, { completed: true, updatedAt: new Date().toISOString() }])) } } }))}>標記整份檢討完成</button>}
     {message && <p className="save-message" role="status">{message}</p>}
   </main>;
 }
@@ -7821,6 +7877,7 @@ function MockExamPanel({ state, persistedDraft, onDraftChange, onDraftClear, onF
       mode: exam.mode || examMode,
       year: exam.year || null,
       questionCount: results.length,
+      questionSnapshots: Object.fromEntries(examQuestions.map((q) => [q.id, q])),
       timerMinutes: Number(timerMinutes),
       elapsedSec,
       ...summary,
@@ -8099,7 +8156,7 @@ export default function App() {
     [todaySession?.questionIds]
   );
   const requestedQuestionYears = useMemo(() => {
-    if (tab === 'wrong-book' || tab === 'training') return QUESTION_YEARS;
+    if (tab === 'wrong-book' || tab === 'training' || tab === 'history') return QUESTION_YEARS;
     if (tab === 'questions') {
       if (bankYear === 'Custom') return EMPTY_ARRAY;
       return bankYear === 'All' ? QUESTION_YEARS : normalizeQuestionYearList([bankYear]);
@@ -8227,21 +8284,25 @@ export default function App() {
         const cloudState = await readCloudState(firebaseUser.uid);
 
         if (cloudState) {
-          const merged = mergeCloudState(loadState(), cloudState);
+          const merged = mergeCloudState(latestStateRef.current, cloudState);
           const syncedAt = new Date().toISOString();
           const syncedState = await writeCloudState(firebaseUser.uid, merged, syncedAt);
           lastSyncedSignatureRef.current = getCloudSyncSignature(syncedState);
           isApplyingCloudStateRef.current = true;
           setIsApplyingCloudState(true);
-          setState(syncedState);
-          saveState(syncedState);
+          setState((current) => {
+            const latest = mergeCloudState(current, syncedState);
+            latestStateRef.current = latest;
+            saveState(latest);
+            return latest;
+          });
           setTimeout(() => {
             isApplyingCloudStateRef.current = false;
             setIsApplyingCloudState(false);
           }, 500);
           setSyncStatus('已從雲端載入資料，之後會即時同步。');
         } else {
-          const localState = loadState();
+          const localState = latestStateRef.current;
           const syncedAt = new Date().toISOString();
           const nextState = normalizeState({
             ...localState,
@@ -8275,7 +8336,7 @@ export default function App() {
 
       try {
         const cloudState = await readCloudState(user.uid, snapshot);
-        const localState = loadState();
+        const localState = latestStateRef.current;
         const cloudUpdatedAt = cloudState?.cloudMeta?.updatedAt;
         const localUpdatedAt = localState?.cloudMeta?.updatedAt;
 
@@ -8284,8 +8345,12 @@ export default function App() {
           lastSyncedSignatureRef.current = getCloudSyncSignature(merged);
           isApplyingCloudStateRef.current = true;
           setIsApplyingCloudState(true);
-          setState(merged);
-          saveState(merged);
+          setState((current) => {
+            const latest = mergeCloudState(current, cloudState);
+            latestStateRef.current = latest;
+            saveState(latest);
+            return latest;
+          });
           setTimeout(() => {
             isApplyingCloudStateRef.current = false;
             setIsApplyingCloudState(false);
@@ -8337,7 +8402,18 @@ export default function App() {
   // Always flush changed storage slices. State keys such as `stats` are not
   // storage keys (`questionRecords`), and cancelled debounce jobs must not lose writes.
   const updateState = useCallback((updater) => {
-    setState((prev) => normalizeState(typeof updater === 'function' ? updater(prev) : updater));
+    setState((prev) => {
+      const updated = typeof updater === 'function' ? updater(prev) : updater;
+      if (updated === prev) return prev;
+      const sessions = { ...(updated.sessions || {}) };
+      const now = new Date().toISOString();
+      for (const [key, session] of Object.entries(sessions)) {
+        if (session !== prev.sessions?.[key]) sessions[key] = { ...session, updatedAt: now };
+      }
+      const next = normalizeState(preservePracticeHistory(prev, { ...updated, sessions }));
+      latestStateRef.current = next;
+      return next;
+    });
   }, []);
 
   const setPomodoroPreset = (presetId) => {
@@ -8869,7 +8945,7 @@ export default function App() {
     if (!user) return;
     setSyncError('');
     try {
-      const localState = loadState();
+      const localState = latestStateRef.current;
       const syncedAt = new Date().toISOString();
       const nextState = normalizeState({
         ...localState,
@@ -9111,7 +9187,7 @@ export default function App() {
 
     updateState((prev) => {
       const existingSession = prev.sessions?.[TODAY] || {};
-      if (existingSession.attemptsCommittedAt) return prev;
+      if (existingSession.attemptsCommittedAt || (existingSession.attemptId && existingSession.attemptId !== attemptId)) return prev;
       return {
         ...prev,
         stats: applyBatchQuestionResults(prev.stats, gradingResults, 'daily', attemptId),
@@ -9219,6 +9295,7 @@ export default function App() {
 
   const createTodaySession = ({ force = false } = {}) => {
     if (isCreatingPracticeRef.current) return;
+    TODAY = formatLocalDate(new Date());
     isCreatingPracticeRef.current = true;
     setIsCreatingPractice(true);
     setPracticePageMessage('');
@@ -9263,6 +9340,7 @@ export default function App() {
                 },
                 highYieldInserts: rankedHighYieldTopics.slice(0, 5).map(({ id, label, type, priorityScore }) => ({ id, label, type, priorityScore })),
                 questionIds,
+                questionSnapshots: Object.fromEntries(questionIds.map((id) => [id, getQuestionWithOverride(id, prev)])),
                 createdAt: force || !existing?.createdAt ? new Date().toISOString() : existing.createdAt,
                 updatedAt: new Date().toISOString(),
                 completed: false,
@@ -9817,11 +9895,6 @@ export default function App() {
   };
 
   const setPracticeMode = (practiceMode) => {
-    if (hasTodaySession && dailyBatchSubmitted && !dailyBatchClassificationComplete) {
-      setTab('today');
-      setPracticePageMessage('請先完成目前這批所有錯題的錯因分類，再開始下一批 Daily Practice。');
-      return;
-    }
     const modeConfig = getPracticeModeConfig(practiceMode);
     setPracticePage(0);
     setPracticePageMessage('');
@@ -9841,13 +9914,7 @@ export default function App() {
           ? (result.errorType || existing?.practiceDrafts?.[result.questionId]?.errorType || '')
           : '',
       }));
-      const batchReady = Boolean(existing?.submittedAt)
-        && completedResults.length > 0
-        && completedResults.every((result) => (
-          result.isCorrect === true || (result.isCorrect === false && result.errorType)
-        ));
-      const startsNewBatch = existingAvailable
-        && batchReady;
+      const startsNewBatch = existingAvailable && Boolean(existing?.submittedAt);
       const newBatchCount = startsNewBatch
         ? (modeConfig.total > completedCount ? modeConfig.total - completedCount : modeConfig.total)
         : 0;
@@ -9899,6 +9966,7 @@ export default function App() {
               },
               highYieldInserts: rankedHighYieldTopics.slice(0, 5).map(({ id, label, type, priorityScore }) => ({ id, label, type, priorityScore })),
               questionIds: newBatchQuestionIds,
+              questionSnapshots: Object.fromEntries(newBatchQuestionIds.map((id) => [id, getQuestionWithOverride(id, prev)])),
               excludedQuestionIds: previousQuestionIds,
               previousPracticeTotal: completedCount,
               createdAt: now,
@@ -9926,6 +9994,11 @@ export default function App() {
   };
 
   const startDailyPractice = () => {
+    if (TODAY !== formatLocalDate(new Date())) {
+      TODAY = formatLocalDate(new Date());
+      createTodaySession();
+      return;
+    }
     if (dailyBatchSubmitted) {
       setPracticeMode(selectedPracticeMode);
       setTab('today');
@@ -10055,6 +10128,7 @@ export default function App() {
         <button className={`nav-home ${tab === 'training' ? 'active' : ''}`} type="button" onClick={() => setTab('training')}>
           <ClipboardList size={17} strokeWidth={2.4} /><span>提分訓練</span>
         </button>
+        <button type="button" className={`nav-home ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>測驗紀錄</button>
         <button className={`nav-home ${tab === 'quest' ? 'active' : ''}`} type="button" onClick={() => setTab('quest')}>
           <Home size={17} strokeWidth={2.4} />
           <span>讀書計畫</span>
@@ -10205,6 +10279,7 @@ export default function App() {
         </main>
       )}
 
+      {tab === 'history' && <PracticeHistoryPanel state={state} onChange={updateState} onUpdateStat={updateStat} loading={questionBankLoading || !questionBankReady} />}
       {tab === 'training' && <WrongAnswerBookPanel key="training" training state={state} onChange={(updater) => updateState(updater, ['sessions', 'stats'])} onUpdateStat={updateStat} loading={questionBankLoading || !questionBankReady} onNavigate={setTab} />}
       {tab === 'wrong-book' && <WrongAnswerBookPanel state={state} onChange={(updater) => updateState(updater, ['sessions', 'stats'])} onUpdateStat={updateStat} loading={questionBankLoading || !questionBankReady} />}
 
@@ -10325,7 +10400,7 @@ export default function App() {
               <div className="question-list">
                 {visibleTodayQuestions.map((q) => (
                   <QuestionCard
-                    key={`${todaySession?.createdAt || TODAY}-${q.id}`}
+                    key={`${todaySession?.attemptId || todaySession?.createdAt || TODAY}-${q.id}`}
                     question={q}
                     stat={getStat(state, q.id)}
                     onUpdateStat={updateStat}
