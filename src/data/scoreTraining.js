@@ -1,4 +1,5 @@
 export const TRAINING_MODES = [
+  { id: 'mixed', title: '綜合測驗', detail: '從符合條件的題目隨機抽題，搭配計時即可模擬考試。' },
   { id: 'smart', title: '智慧提分', detail: '優先補漏洞，再穿插未練題，避免只記住答案。' },
   { id: 'repair', title: '弱點修復', detail: '最近答錯與低信心答對，集中練到能說明理由。' },
   { id: 'due', title: '到期複習', detail: '依既有複習排程，檢查隔一段時間是否仍記得。' },
@@ -27,6 +28,14 @@ export function getTrainingRows(questions, stats = {}, today, mode = 'smart') {
 }
 
 export function selectTrainingIds(rows, count, mode) {
+  if (mode === 'mixed') {
+    const shuffled = [...rows];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled.slice(0, count).map(({ q }) => q.id);
+  }
   if (mode !== 'smart') return rows.slice(0, count).map(({ q }) => q.id);
   const fresh = rows.filter((row) => row.unseen).slice(0, Math.floor(count / 3));
   const freshIds = new Set(fresh.map(({ q }) => q.id));
