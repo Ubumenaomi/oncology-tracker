@@ -15,13 +15,14 @@
     "questions:promote": "node scripts/promote-question-backup.js",
     "tag:questions": "node scripts/tag-question-bank.js",
     "preview": "vite preview",
-    "test:practice": "node --test src/data/wrongAnswerBook.test.js src/data/scoreTraining.test.js src/data/practiceHistory.test.js src/data/localPersistence.test.js src/data/studyNavigation.test.js"
+    "test:practice": "node --test src/data/wrongAnswerBook.test.js src/data/wrongAnswerExport.test.js src/data/scoreTraining.test.js src/data/practiceHistory.test.js src/data/localPersistence.test.js src/data/studyNavigation.test.js"
   },
   "dependencies": {
     "firebase": "^12.13.0",
     "lucide-react": "^1.14.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "write-excel-file": "^4.1.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

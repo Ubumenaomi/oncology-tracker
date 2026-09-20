@@ -1,10 +1,11 @@
 import { STUDY_SECTIONS, getStudySection, getStudyNextStep, getAssessmentExams, getTestRemainingSeconds } from './data/studyNavigation.js';
 import { localPersistence } from './data/localPersistence.js';
 import { useCallback, useContext, useEffect, useMemo, useState, useRef } from 'react';
-import { AlertTriangle, BarChart3, BookOpen, ClipboardList, Clock3, ExternalLink, FileText, LayoutGrid, List, Pause, Play, RefreshCw, RotateCcw, Settings2 } from 'lucide-react';
+import { AlertTriangle, BarChart3, BookOpen, ClipboardList, Clock3, Download, ExternalLink, FileText, LayoutGrid, List, Pause, Play, RefreshCw, RotateCcw, Settings2 } from 'lucide-react';
 import './App.css';
 import { jumpToKnowledgeSection, getKnowledgePageId } from './data/knowledgeNavigation.js';
 import { getWrongAnswerRows, gradeWrongAnswerBatch } from './data/wrongAnswerBook.js';
+import { exportFrequentWrongQuestionsXlsx, getFrequentWrongQuestionRows } from './data/wrongAnswerExport.js';
 import { preservePracticeHistory, restoreHistoryFromAnswers, getPracticeHistory } from './data/practiceHistory.js';
 import { TRAINING_MODES, getTrainingRows, selectTrainingIds } from './data/scoreTraining.js';
 import NotionSupplementEditor from './components/NotionSupplementEditor.jsx';
@@ -4460,6 +4461,7 @@ function WrongAnswerBookPanel({ state, onChange, onUpdateStat, loading, training
     if (historySessionKey) onChange((prev) => ({ ...prev, sessions: { ...prev.sessions, [historySessionKey]: { ...prev.sessions[historySessionKey], reviewPage: value } } }));
   };
   const [message, setMessage] = useState('');
+  const [exporting, setExporting] = useState(false);
   const session = state.sessions?.[sessionKey];
   useEffect(() => {
     if (!session?.timerMinutes || session.submittedAt) return;
@@ -4471,6 +4473,7 @@ function WrongAnswerBookPanel({ state, onChange, onUpdateStat, loading, training
   const questions = getQuestionPool(state).map((q) => getQuestionWithOverride(q.id, state)).filter(Boolean);
   const trainingRows = getTrainingRows(questions, state.stats, TODAY, trainingMode);
   const rows = training ? trainingRows.filter(({ q }) => (filters.cancer === 'All' || q.cancer === filters.cancer) && `${q.id} ${q.stem} ${q.cancer} ${q.topic}`.toLowerCase().includes(filters.query.trim().toLowerCase())) : getWrongAnswerRows(questions, state.stats, { ...filters, today: TODAY });
+  const frequentWrongRows = !training && !historySessionKey ? getFrequentWrongQuestionRows(questions, state.stats, 3) : [];
   const activeQuestions = (session?.questionIds || []).map((id) => session.questionSnapshots?.[id] || getQuestionWithOverride(id, state)).filter(Boolean);
   const mode = session?.practiceSource || (training ? 'score-training' : 'wrong-book');
   const submitted = Boolean(session?.submittedAt);
@@ -4526,6 +4529,20 @@ function WrongAnswerBookPanel({ state, onChange, onUpdateStat, loading, training
     setMessage('已交卷並記錄本輪作答。可補充錯因、筆記，或再次練習。');
   };
   const filter = (key, value) => setFilters((prev) => ({ ...prev, [key]: value }));
+  const exportFrequentWrong = async () => {
+    if (!frequentWrongRows.length || exporting) return;
+    setExporting(true);
+    setMessage('正在整理答錯 3 次以上的題目…');
+    try {
+      const result = await exportFrequentWrongQuestionsXlsx(frequentWrongRows);
+      setMessage(`已匯出 ${result.count} 題：${result.fileName}`);
+    } catch (error) {
+      console.error('Failed to export frequent wrong questions', error);
+      setMessage(error.message || 'Excel 匯出失敗，請稍後再試。');
+    } finally {
+      setExporting(false);
+    }
+  };
   const activePage = Math.min(page, Math.max(0, Math.ceil(activeQuestions.length / 5) - 1));
   return <main className="panel wrong-answer-book">
     <div className="section-head"><div><h2>{historySessionKey ? '測驗檢討' : training ? '建立你的測驗' : '錯題本'}</h2><p className="muted">{historySessionKey ? '保留當時作答與評分；勾選已檢討的題目，下次接著看。' : training ? '用短回合找出失分點：先獨立作答 → 交卷看解析 → 隔日再測。' : '曾答錯的題目自動收錄；答對後仍保留，想練幾次都可以。'}</p></div><span className="pill">{historySessionKey ? `${activeQuestions.length} 題` : `${rows.length} 題符合篩選`}</span></div>
@@ -4545,10 +4562,13 @@ function WrongAnswerBookPanel({ state, onChange, onUpdateStat, loading, training
       <label>計時方式<select value={timerMinutes} onChange={(event) => setTimerMinutes(Number(event.target.value))}><option value={0}>不計時 · 一般練習</option>{[15, 30, 60, 90, 120, 180].map((minutes) => <option key={minutes} value={minutes}>限時 {minutes} 分鐘</option>)}</select></label>
       <label>本輪題數<select value={count} onChange={(e) => setCount(Number(e.target.value))}>{[5, 10, 20, 30, 50, 80, 120].map((n) => <option key={n} value={n}>{n} 題</option>)}</select></label>
     </div>
-    <button className="primary" disabled={loading || !rows.length} onClick={() => {
-      if (activeQuestions.length && !submitted && !window.confirm('本輪尚未交卷，會保留在測驗紀錄。要開始新的一份嗎？')) return;
-      start(training ? selectTrainingIds(rows, count, trainingMode) : rows.slice(0, count).map(({ q }) => q.id));
-    }}>開始測驗（{Math.min(rows.length, count)} 題）</button>
+    <div className="wrong-book-actions">
+      <button className="primary" disabled={loading || !rows.length} onClick={() => {
+        if (activeQuestions.length && !submitted && !window.confirm('本輪尚未交卷，會保留在測驗紀錄。要開始新的一份嗎？')) return;
+        start(training ? selectTrainingIds(rows, count, trainingMode) : rows.slice(0, count).map(({ q }) => q.id));
+      }}>開始測驗（{Math.min(rows.length, count)} 題）</button>
+      {!training && <button type="button" className="secondary" title="匯出全部年度與癌別中累計答錯 3 次以上的題目" disabled={loading || exporting || !frequentWrongRows.length} onClick={exportFrequentWrong}><Download size={18} />{exporting ? '正在匯出…' : `匯出全部答錯 3 次以上（${frequentWrongRows.length}）`}</button>}
+    </div>
     {loading && <p role="status">正在載入完整題庫…</p>}
     {!loading && !rows.length && <p className="empty-state">{training ? '目前沒有符合條件的題目，請切換訓練目標或癌別。完成新題後，系統會依紀錄安排補強。' : '目前沒有符合條件的錯題。答題交卷後，錯題會自動出現在這裡。'}</p>}
     {!training && <details className="subsection"><summary>瀏覽錯題清單（{rows.length} 題）</summary>{rows.slice(0, 100).map(({ q, stat, lastWrong }) => <div className="weak-row" key={q.id}><strong>{q.id} · {q.cancer}</strong> · 答錯 {stat.wrong} 次 · {stat.lastResult === 'correct' ? '最近已答對' : '仍需加強'} · {lastWrong.slice(0, 10) || '日期未記錄'}<p>{q.stem}</p><QuestionNotionLinks question={q} /></div>)}{rows.length > 100 && <p>顯示前 100 題，請使用篩選縮小範圍。</p>}</details>}
