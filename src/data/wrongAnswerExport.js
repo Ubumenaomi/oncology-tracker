@@ -25,12 +25,12 @@ function toExcelText(value) {
   return `${text.slice(0, MAX_EXCEL_TEXT_LENGTH - 8)}\n[truncated]`;
 }
 
-function getEventTime(event = {}) {
-  return String(event.submittedAt || event.updatedAt || event.date || '');
+function getEventTime(event) {
+  return String(event?.submittedAt || event?.updatedAt || event?.date || '');
 }
 
 function getLatestWrongEvent(stat = {}) {
-  return (stat.answerHistory || [])
+  return (Array.isArray(stat.answerHistory) ? stat.answerHistory : [])
     .filter((event) => event?.isCorrect === false)
     .sort((a, b) => getEventTime(a).localeCompare(getEventTime(b)))
     .at(-1) || null;
