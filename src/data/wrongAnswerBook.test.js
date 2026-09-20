@@ -13,6 +13,19 @@ test('wrong book retains corrected questions and filters actual wrong date', () 
   assert.deepEqual(getWrongAnswerRows(questions, stats, { period: '1', today: '2026-09-07' }).map(({ q }) => q.id), ['b']);
   assert.equal(getWrongAnswerRows(questions, stats, { cancer: 'Lung', query: 'colon' }).length, 0);
 });
+test('wrong book ignores null and malformed legacy answer-history entries', () => {
+  const legacyStats = {
+    a: {
+      wrong: 2,
+      lastResult: 'wrong',
+      answerHistory: [null, { isCorrect: false, updatedAt: '2026-09-08T10:00:00Z' }],
+    },
+    b: { wrong: 1, lastResult: 'wrong', answerHistory: { corrupted: true }, lastAttemptAt: '2026-09-07' },
+  };
+  const rows = getWrongAnswerRows(questions, legacyStats);
+  assert.deepEqual(rows.map(({ q }) => q.id), ['a', 'b']);
+  assert.equal(rows[0].lastWrong, '2026-09-08T10:00:00Z');
+});
 test('grading honors edited answers and keeps unknown answers ungraded', () => {
   const result = gradeWrongAnswerBatch(questions, { a: { selected: 'B' }, b: { selected: 'B', correctAnswer: 'A' }, c: { selected: 'A' } }, { a: { correctAnswer: 'B' } }, 'now');
   assert.deepEqual(result.map((r) => r.isCorrect), [true, false, null]);
