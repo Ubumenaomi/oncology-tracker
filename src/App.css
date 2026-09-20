@@ -1816,6 +1816,21 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.5; }
   flex-wrap: wrap;
 }
 
+.wrong-book-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 14px 0;
+}
+
+.wrong-book-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
 .feedback-box {
   display: flex;
   justify-content: space-between;
