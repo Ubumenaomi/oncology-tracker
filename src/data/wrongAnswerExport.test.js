@@ -24,6 +24,16 @@ test('exports every retained question with at least three actual wrong attempts'
   assert.equal(rows[1].latestWrongDate, '2026-09-18T10:00:00Z');
 });
 
+test('handles legacy frequent-wrong stats without a usable answer history', () => {
+  const legacyStats = {
+    '114-Q001': { wrong: 3, attempts: 3, lastResult: 'wrong', lastAttemptAt: '2026-09-19', answerHistory: [null] },
+    '113-Q002': { wrong: 4, attempts: 4, lastResult: 'wrong', lastAttemptAt: '2026-09-18', answerHistory: { corrupted: true } },
+  };
+  const rows = getFrequentWrongQuestionRows(questions, legacyStats);
+  assert.deepEqual(rows.map((row) => row.question.id), ['113-Q002', '114-Q001']);
+  assert.deepEqual(rows.map((row) => row.latestWrongDate), ['2026-09-18', '2026-09-19']);
+});
+
 test('workbook data contains typed counts, edited answers, notes, and explanations', () => {
   const rows = getFrequentWrongQuestionRows(questions, stats);
   const { sheetData, columns } = buildFrequentWrongWorkbookData(rows, { exportedAt: new Date('2026-09-20T12:00:00Z') });
@@ -42,4 +52,3 @@ test('workbook data contains typed counts, edited answers, notes, and explanatio
 test('uses a stable Traditional Chinese xlsx filename', () => {
   assert.equal(getFrequentWrongExportFileName(new Date(2026, 8, 20)), '錯題_答錯3次以上_2026-09-20.xlsx');
 });
-
