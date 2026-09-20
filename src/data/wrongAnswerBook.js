@@ -2,8 +2,9 @@ export function getWrongAnswerRows(questions, stats, { query = '', cancer = 'All
   return questions.flatMap((q) => {
     const stat = stats[q.id] || {};
     if (!(stat.wrong > 0)) return [];
-    const lastWrong = (stat.answerHistory || []).filter((event) => event.isCorrect === false)
-      .map((event) => event.submittedAt || event.date || '').sort().at(-1)
+    const lastWrong = (Array.isArray(stat.answerHistory) ? stat.answerHistory : [])
+      .filter((event) => event?.isCorrect === false)
+      .map((event) => event.submittedAt || event.updatedAt || event.date || '').sort().at(-1)
       || (stat.lastResult === 'wrong' ? stat.lastAttemptAt : '') || '';
     if (cancer !== 'All' && q.cancer !== cancer) return [];
     if (status === 'pending' && stat.lastResult === 'correct') return [];
